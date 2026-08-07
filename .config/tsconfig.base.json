@@ -1,0 +1,11 @@
+{
+	"compilerOptions": {
+		"composite": true,
+		"target": "esnext",
+		"lib": ["ESNext"],
+		"types": [],
+		"strict": true,
+		"isolatedModules": true,
+		"emitDeclarationOnly": true,
+	},
+}
