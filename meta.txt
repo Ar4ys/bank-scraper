@@ -1,0 +1,7 @@
+// ==UserScript==
+// @name Transactions Fetcher - PKO Bank Polski
+// @match https://*.ipko.pl/*
+// @run-at document-start
+// @grant unsafeWindow
+// @version 1.0
+// ==/UserScript==
