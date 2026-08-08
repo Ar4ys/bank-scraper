@@ -130,7 +130,7 @@ function collectTypeShape(items: unknown[]): TypeShapeNode {
 	return buildLevel(items as PlainObject[], "");
 }
 
-const [a, b] = JSONC.parse(await fs.readFile("./data.jsonc", "utf8"));
+const [a, b] = JSONC.parse(await fs.readFile("../local/data.jsonc", "utf8"));
 
 console.dir(
 	collectTypeShape([...a.response.data.items, ...b.response.data.next_items]),
