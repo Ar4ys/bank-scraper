@@ -5,4 +5,4 @@ node = "26"
 _.path = ['{{config_root}}/node_modules/.bin']
 
 [tasks]
-build = "tsdown"
+build-userscript = "tsdown"

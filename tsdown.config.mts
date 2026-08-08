@@ -3,10 +3,18 @@ import { defineConfig } from "tsdown";
 
 export default defineConfig({
 	clean: true,
-	entry: ["src/index.ts"],
+	entry: {
+		userscript: "userscript/index.ts",
+	},
 	format: "esm",
+	outputOptions: {},
 	dts: false,
 	target: false,
 	platform: "browser",
-	banner: await fs.readFile("./meta.txt", "utf8"),
+	banner: await fs.readFile("./userscript/meta.txt", "utf8"),
+	deps: {
+		onlyBundle: false,
+		neverBundle: true,
+		alwaysBundle: ["zod/mini"],
+	},
 });

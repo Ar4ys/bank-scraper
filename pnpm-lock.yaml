@@ -7,6 +7,16 @@ settings:
 importers:
 
   .:
+    dependencies:
+      es-toolkit:
+        specifier: ^1.50.0
+        version: 1.50.0
+      jsonc-simple-parser:
+        specifier: ^3.0.0
+        version: 3.0.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@biomejs/biome':
         specifier: 2.5.2
@@ -439,6 +449,9 @@ packages:
     resolution: {integrity: sha512-YGRs8knHhKHVShLkFET/rWAU8kmHbOV5LwN938RHI0pljAJ1Gf6SzXsSmRaEzcXTtOOmVqJ5+WtQPL5uigY50Q==}
     engines: {node: '>=14'}
 
+  es-toolkit@1.50.0:
+    resolution: {integrity: sha512-OyZKhUVvEep9ITEiwHn8GKnMRQIVqoSIX7WnRbkWgJkllCujilqP2rD0u979tkl8wqyc8ICwlc1UBVv/Sl1G6w==}
+
   fdir@6.5.0:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
     engines: {node: '>=12.0.0'}
@@ -459,6 +472,9 @@ packages:
     resolution: {integrity: sha512-NkJQA7oZ4YHQhd2+H3BoRFKF3d/XNsiKpHZCQEMH9pDX27hQQLsTyOocyRgaIVtf8gHX3Nt3LPkR4e5EdtPAGQ==}
     engines: {node: ^22.18.0 || >=24.0.0}
 
+  jsonc-simple-parser@3.0.0:
+    resolution: {integrity: sha512-0qi9Kuj4JPar4/3b9wZteuPZrTeFzXsQyOZj7hksnReCZN3Vr17Doz7w/i3E9XH7vRkVTHhHES+r1h97I+hfww==}
+
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
     engines: {node: '>=12.20.0'}
@@ -469,6 +485,9 @@ packages:
 
   quansync@1.0.0:
     resolution: {integrity: sha512-5xZacEEufv3HSTPQuchrvV6soaiACMFnq1H8wkVioctoH3TRha9Sz66lOxRwPK/qZj7HPiSveih9yAyh98gvqA==}
+
+  reghex@3.0.2:
+    resolution: {integrity: sha512-Zb9DJ5u6GhgqRSBnxV2QSnLqEwcKxHWFA1N2yUa4ZUAO1P8jlWKYtWZ6/ooV6yylspGXJX0O/uNzEv0xrCtwaA==}
 
   resolve-pkg-maps@1.0.0:
     resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
@@ -566,6 +585,9 @@ packages:
 
   yuku-parser@0.8.4:
     resolution: {integrity: sha512-sw41wouvT5rUmLIp87hmvm5vtF+MRSI3x6yjq6xqpYmtkQj+Ht6N7xRQ8lMhLv8N7JAzughGj0Rfi0jQRSu9HQ==}
+
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
@@ -802,6 +824,8 @@ snapshots:
 
   empathic@2.0.1: {}
 
+  es-toolkit@1.50.0: {}
+
   fdir@6.5.0(picomatch@4.0.5):
     optionalDependencies:
       picomatch: 4.0.5
@@ -814,11 +838,17 @@ snapshots:
 
   import-without-cache@0.4.0: {}
 
+  jsonc-simple-parser@3.0.0:
+    dependencies:
+      reghex: 3.0.2
+
   obug@2.1.4: {}
 
   picomatch@4.0.5: {}
 
   quansync@1.0.0: {}
+
+  reghex@3.0.2: {}
 
   resolve-pkg-maps@1.0.0: {}
 
@@ -960,3 +990,5 @@ snapshots:
       '@yuku-parser/binding-linux-x64-musl': 0.8.4
       '@yuku-parser/binding-win32-arm64': 0.8.4
       '@yuku-parser/binding-win32-x64': 0.8.4
+
+  zod@4.4.3: {}
