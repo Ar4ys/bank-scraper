@@ -6,3 +6,8 @@ _.path = ['{{config_root}}/node_modules/.bin']
 
 [tasks]
 build-userscript = "tsdown"
+start-server = "node src/index.ts"
+
+db-generate = "prisma generate"
+db-push = "prisma db push"
+db-migrate = "prisma migrate dev"

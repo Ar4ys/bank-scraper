@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+
 import JSONC from "jsonc-simple-parser";
 
 /**
@@ -30,6 +31,15 @@ interface TypeShapeNode {
 	[key: string]: TypeName[] | TypeShapeNode;
 }
 
+function isPlainObject(value: unknown): value is PlainObject {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function typeOf(value: unknown): TypeName {
+	if (value === null) return "null";
+	return typeof value;
+}
+
 /**
  * Deeply merges the *shape* of a list of objects into a single object,
  * collecting an array of unique `typeof` values seen for each leaf key
@@ -49,15 +59,6 @@ interface TypeShapeNode {
 function collectTypeShape(items: unknown[]): TypeShapeNode {
 	if (!Array.isArray(items)) {
 		throw new TypeError("Input must be an array of objects");
-	}
-
-	function isPlainObject(value: unknown): value is PlainObject {
-		return value !== null && typeof value === "object" && !Array.isArray(value);
-	}
-
-	function typeOf(value: unknown): TypeName {
-		if (value === null) return "null";
-		return typeof value as TypeName;
 	}
 
 	/**
@@ -106,6 +107,7 @@ function collectTypeShape(items: unknown[]): TypeShapeNode {
 			if (hasObject) {
 				const nested = buildLevel(nestedSources, currentPath);
 				if (types.size > 0) {
+					// oxlint-disable-next-line no-underscore-dangle
 					nested.__types__ = Array.from(types);
 				}
 				result[key] = nested;
@@ -127,6 +129,7 @@ function collectTypeShape(items: unknown[]): TypeShapeNode {
 		}
 	}
 
+	// oxlint-disable-next-line typescript/no-unsafe-type-assertion
 	return buildLevel(items as PlainObject[], "");
 }
 
@@ -134,5 +137,7 @@ const [a, b] = JSONC.parse(await fs.readFile("../local/data.jsonc", "utf8"));
 
 console.dir(
 	collectTypeShape([...a.response.data.items, ...b.response.data.next_items]),
-	{ depth: 10 },
+	{
+		depth: 10,
+	},
 );
