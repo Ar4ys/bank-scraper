@@ -6,8 +6,8 @@ _.path = ['{{config_root}}/node_modules/.bin']
 
 [tasks]
 build-userscript = "tsdown"
-start-server = "node src/index.ts"
-watch-server = "node --watch src/index.ts"
+start-server = "node src/app.ts"
+watch-server = "node --watch src/app.ts"
 
 db-generate = "drizzle-kit generate"
 db-migrate = "drizzle-kit migrate"

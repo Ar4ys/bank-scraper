@@ -1,10 +1,11 @@
 import fs from "node:fs/promises";
+
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
 	clean: true,
 	entry: {
-		userscript: "userscript/index.ts",
+		userscript: "userscript/userscript.ts",
 	},
 	format: "esm",
 	outputOptions: {},
