@@ -23,7 +23,7 @@ api.get(
 	zValidator("param", z.object({ id: z.uuidv7() })),
 	async (c) => {
 		const { id } = c.req.valid("param");
-		const data = db.query.rawTransactions.findFirst({ where: { id } });
+		const data = await db.query.rawTransactions.findFirst({ where: { id } });
 		return c.json({ data });
 	},
 );

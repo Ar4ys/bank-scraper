@@ -1,5 +1,5 @@
 info:
-  name: Get Raw Transactions
+  name: Raw Transactions
   type: http
   seq: 1
 
