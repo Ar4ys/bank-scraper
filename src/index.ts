@@ -1,10 +1,10 @@
+import { serve } from "@hono/node-server";
+import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
-import { basicAuth } from "hono/basic-auth";
-import { cors } from "hono/cors";
 import { prettyJSON } from "hono/pretty-json";
+import z from "zod";
 
-import {} from "./db";
-import { getPosts, getPost, createPost, Post } from "./model";
+import { db, tables } from "./db/db.ts";
 
 const app = new Hono();
 
@@ -12,42 +12,43 @@ app.get("/", (c) => c.text("Pretty Blog API"));
 app.use(prettyJSON());
 app.notFound((c) => c.json({ message: "Not Found", ok: false }, 404));
 
-type Bindings = {
-	USERNAME: string;
-	PASSWORD: string;
-};
+const api = new Hono();
 
-const api = new Hono<{ Bindings: Bindings }>();
-api.use("/posts/*", cors());
-
-api.get("/posts", (c) => {
-	const { limit, offset } = c.req.query();
-	const posts = getPosts({ limit, offset });
-	return c.json({ posts });
+api.get("/transactions/raw", async (c) => {
+	return c.json({ data: await db.query.rawTransactions.findMany() });
 });
 
-api.get("/posts/:id", (c) => {
-	const id = c.req.param("id");
-	const post = getPost({ id });
-	return c.json({ post });
-});
+api.get(
+	"/transactions/raw/:id",
+	zValidator("param", z.object({ id: z.uuidv7() })),
+	async (c) => {
+		const { id } = c.req.valid("param");
+		const data = db.query.rawTransactions.findFirst({ where: { id } });
+		return c.json({ data });
+	},
+);
 
 api.post(
-	"/posts",
-	async (c, next) => {
-		const auth = basicAuth({
-			username: c.env.USERNAME,
-			password: c.env.PASSWORD,
-		});
-		return auth(c, next);
-	},
+	"/transactions/raw",
+	zValidator(
+		"json",
+		z.object({
+			bankId: z.string().nonempty(),
+			data: z.json(),
+		}),
+	),
 	async (c) => {
-		const post = await c.req.json<Post>();
-		const ok = createPost({ post });
-		return c.json({ ok });
+		const rawTransactionData = c.req.valid("json");
+		const insertedTransaction = await db
+			.insert(tables.rawTransactions)
+			.values(rawTransactionData)
+			.returning();
+		return c.json({ data: insertedTransaction });
 	},
 );
 
 app.route("/api", api);
 
-export default app;
+serve({ fetch: app.fetch, hostname: "127.0.0.1", port: 8585 }, (info) => {
+	console.log(`Running on ${info.address}:${info.port}`);
+});

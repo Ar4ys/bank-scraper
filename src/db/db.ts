@@ -1,3 +1,7 @@
 import { drizzle } from "drizzle-orm/pglite";
 
-export const db = drizzle("../local/dev.db");
+import { relations } from "./relations.ts";
+
+export * as tables from "./schema.ts";
+
+export const db = drizzle("./local/dev-db", { relations });

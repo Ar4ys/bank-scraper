@@ -1,0 +1,11 @@
+# $schema: https://schema.opencollection.com/opencollection/v1.0.0.json
+opencollection: 1.0.0
+
+info:
+  name: Bank Scraper
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

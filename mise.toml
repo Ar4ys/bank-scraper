@@ -7,7 +7,8 @@ _.path = ['{{config_root}}/node_modules/.bin']
 [tasks]
 build-userscript = "tsdown"
 start-server = "node src/index.ts"
+watch-server = "node --watch src/index.ts"
 
-db-generate = "prisma generate"
-db-push = "prisma db push"
-db-migrate = "prisma migrate dev"
+db-generate = "drizzle-kit generate"
+db-migrate = "drizzle-kit migrate"
+db-push = "drizzle-kit push"
