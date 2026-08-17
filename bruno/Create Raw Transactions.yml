@@ -9,10 +9,10 @@ http:
   body:
     type: json
     data: |-
-      {
+      [{
         "bankId": "1",
         "data": {{transaction}}
-      }
+      }]
   auth: inherit
 
 settings:

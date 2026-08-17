@@ -9,6 +9,8 @@ build-userscript = "tsdown"
 start-server = "node src/app.ts"
 watch-server = "node --watch src/app.ts"
 
-db-generate = "drizzle-kit generate"
+db-generate = "drizzle-kit generate && node ./tools/patchMigrations.ts"
 db-migrate = "drizzle-kit migrate"
-db-push = "drizzle-kit push"
+
+[tasks.db-push]
+run = [{ task = "db-generate" }, { task = "db-migrate" }]

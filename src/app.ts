@@ -2,9 +2,14 @@ import { serve } from "@hono/node-server";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { prettyJSON } from "hono/pretty-json";
-import z from "zod";
+import { z } from "zod";
 
-import { db, tables } from "./db/db.ts";
+import { db, initSQLite } from "./db/db.ts";
+import {
+	insertRawTransactionsBatch,
+	rawTransactionsInputSchema,
+} from "./transactions.ts";
+import { registerShutdownHandlers } from "./utils.ts";
 
 const app = new Hono();
 
@@ -30,25 +35,28 @@ api.get(
 
 api.post(
 	"/transactions/raw",
-	zValidator(
-		"json",
-		z.object({
-			bankId: z.string().nonempty(),
-			data: z.json(),
-		}),
-	),
+	zValidator("json", rawTransactionsInputSchema),
 	async (c) => {
-		const rawTransactionData = c.req.valid("json");
-		const insertedTransaction = await db
-			.insert(tables.rawTransactions)
-			.values(rawTransactionData)
-			.returning();
+		const rawTransactions = c.req.valid("json");
+		const insertedTransaction =
+			await insertRawTransactionsBatch(rawTransactions);
 		return c.json({ data: insertedTransaction });
 	},
 );
 
 app.route("/api", api);
 
-serve({ fetch: app.fetch, hostname: "127.0.0.1", port: 8585 }, (info) => {
-	console.log(`Running on ${info.address}:${info.port}`);
-});
+async function main() {
+	await initSQLite();
+
+	const server = serve(
+		{ fetch: app.fetch, hostname: "127.0.0.1", port: 8585 },
+		(info) => {
+			console.log(`Running on ${info.address}:${info.port}`);
+		},
+	);
+
+	registerShutdownHandlers(server);
+}
+
+void main();
