@@ -12,4 +12,7 @@ export default defineConfig({
 	env: {
 		builtin: true,
 	},
+	rules: {
+		"typescript/consistent-return": "off",
+	},
 });

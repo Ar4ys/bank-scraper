@@ -4,16 +4,14 @@ type OnlyMethods<T> = {
 	[K in keyof T as T[K] extends (...args: any) => any ? K : never]: T[K];
 };
 
-export function asyncSpyOn<
-	T extends Record<any, any>,
-	K extends keyof OnlyMethods<T>,
->(
+export function asyncSpyOn<T extends Record<any, any>, K extends keyof OnlyMethods<T>>(
 	obj: T,
 	method: K,
 	spy: (args: Parameters<T[K]>, result: Awaited<ReturnType<T[K]>>) => void,
 ) {
 	const orig = obj[method];
 	obj[method] = exportFunction(
+		// oxlint-disable-next-line typescript/no-unsafe-type-assertion
 		((...args: Parameters<T[K]>) => {
 			return new unsafeWindow.Promise(
 				exportFunction(async (res, rej) => {
@@ -35,4 +33,16 @@ export function asyncSpyOn<
 		}) as T[K],
 		unsafeWindow,
 	);
+}
+
+export function defer(cb: () => void): Disposable {
+	const disposer = new DisposableStack();
+	disposer.defer(cb);
+	return disposer.move();
+}
+
+export function deferAsync(cb: () => void | Promise<void>): AsyncDisposable {
+	const disposer = new AsyncDisposableStack();
+	disposer.defer(cb);
+	return disposer.move();
 }

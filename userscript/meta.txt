@@ -3,5 +3,7 @@
 // @match https://*.ipko.pl/*
 // @run-at document-start
 // @grant unsafeWindow
+// @grant GM.fetch
+// @connect localhost
 // @version 1.0
 // ==/UserScript==
