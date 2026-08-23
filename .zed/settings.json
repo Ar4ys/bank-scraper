@@ -5,14 +5,14 @@
 {
 	"languages": {
 		"JavaScript": {
-			"formatter": { "language_server": { "name": "oxfmt" } },
+			"formatter": { "language_server": { "name": "oxfmt" } }
 		},
 		"TypeScript": {
-			"formatter": { "language_server": { "name": "oxfmt" } },
+			"formatter": { "language_server": { "name": "oxfmt" } }
 		},
 		"TSX": {
-			"formatter": { "language_server": { "name": "oxfmt" } },
-		},
+			"formatter": { "language_server": { "name": "oxfmt" } }
+		}
 	},
-	"wrap_guides": [100],
+	"wrap_guides": [100]
 }

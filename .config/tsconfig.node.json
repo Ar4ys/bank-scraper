@@ -7,6 +7,6 @@
 		"module": "NodeNext",
 		"types": ["node"],
 		"erasableSyntaxOnly": true,
-		"verbatimModuleSyntax": true,
-	},
+		"verbatimModuleSyntax": true
+	}
 }

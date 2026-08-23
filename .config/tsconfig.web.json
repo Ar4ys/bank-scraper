@@ -8,6 +8,6 @@
 		"lib": ["DOM", "ESNext"],
 		"strict": true,
 		"isolatedModules": true,
-		"emitDeclarationOnly": true,
-	},
+		"emitDeclarationOnly": true
+	}
 }

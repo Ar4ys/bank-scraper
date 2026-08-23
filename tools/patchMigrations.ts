@@ -10,10 +10,7 @@ for (const migrationDir of fs.readdirSync(migrationsPath)) {
 	let sql = fs.readFileSync(migration, "utf8");
 
 	// turn the closing `);` of CREATE TABLE statements into `) STRICT, WITHOUT ROWID;`
-	sql = sql.replace(
-		/(CREATE TABLE [^;]+?)\)\s*;/gs,
-		"$1) STRICT, WITHOUT ROWID;",
-	);
+	sql = sql.replace(/(CREATE TABLE [^;]+?)\)\s*;/gs, "$1) STRICT, WITHOUT ROWID;");
 
 	fs.writeFileSync(migration, sql);
 	console.log(`Added "STRICT, WITHOUT ROWID" to "${migrationDir}"`);

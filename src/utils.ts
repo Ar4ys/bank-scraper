@@ -8,6 +8,9 @@ import { z } from "zod";
 
 import { db } from "./db/db.ts";
 
+type EnumLike = Readonly<Record<string, string | number>>;
+export type DefineEnum<T extends EnumLike> = T[keyof T];
+
 export function jsonSha256(arg: unknown) {
 	return createHash("sha256").update(stableHash(arg)).digest("hex");
 }

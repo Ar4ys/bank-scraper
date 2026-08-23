@@ -8,6 +8,6 @@
 		"strict": true,
 		"isolatedModules": true,
 		"emitDeclarationOnly": true,
-		"allowImportingTsExtensions": true,
-	},
+		"allowImportingTsExtensions": true
+	}
 }

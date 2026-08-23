@@ -4,8 +4,8 @@ import path from "node:path";
 import JSONC from "jsonc-simple-parser";
 
 /**
- * The set of possible `typeof` results, with `null` specially reported
- * as `"null"` instead of `"object"` (since `typeof null === "object"` in JS).
+ * The set of possible `typeof` results, with `null` specially reported as `"null"` instead of
+ * `"object"` (since `typeof null === "object"` in JS).
  */
 type TypeName =
 	| "string"
@@ -22,11 +22,10 @@ type TypeName =
 type PlainObject = Record<string, unknown>;
 
 /**
- * Recursive shape of the output.
- * Each key maps either to an array of encountered `TypeName`s (leaf),
- * or to a nested `TypeShapeNode` (when the key held object values).
- * A nested node may additionally carry a `__types__` array to record
- * any primitive/undefined sightings for that same key at that depth.
+ * Recursive shape of the output. Each key maps either to an array of encountered `TypeName`s
+ * (leaf), or to a nested `TypeShapeNode` (when the key held object values). A nested node may
+ * additionally carry a `__types__` array to record any primitive/undefined sightings for that same
+ * key at that depth.
  */
 interface TypeShapeNode {
 	[key: string]: TypeName[] | TypeShapeNode;
@@ -42,20 +41,18 @@ function typeOf(value: unknown): TypeName {
 }
 
 /**
- * Deeply merges the *shape* of a list of objects into a single object,
- * collecting an array of unique `typeof` values seen for each leaf key
- * (with `null` specially reported as "null" instead of "object"), and
- * `"undefined"` recorded whenever the key is missing from a sibling object
- * at that same depth.
+ * Deeply merges the _shape_ of a list of objects into a single object, collecting an array of
+ * unique `typeof` values seen for each leaf key (with `null` specially reported as "null" instead
+ * of "object"), and `"undefined"` recorded whenever the key is missing from a sibling object at
+ * that same depth.
  *
  * - Nested plain objects are preserved as nested objects (recursively merged).
  * - Arrays anywhere in the structure cause a thrown Error.
- * - If a key is sometimes an object and sometimes a primitive/missing across
- *   sibling objects, the primitive/undefined types get recorded under a
- *   `__types__` bucket on that nested object.
+ * - If a key is sometimes an object and sometimes a primitive/missing across sibling objects, the
+ *   primitive/undefined types get recorded under a `__types__` bucket on that nested object.
  *
- * @param items - array of plain objects to walk
- * @returns a single object with all keys, values = array of typeof strings
+ * @param items - Array of plain objects to walk
+ * @returns A single object with all keys, values = array of typeof strings
  */
 function collectTypeShape(items: unknown[]): TypeShapeNode {
 	if (!Array.isArray(items)) {
@@ -63,24 +60,23 @@ function collectTypeShape(items: unknown[]): TypeShapeNode {
 	}
 
 	/**
-	 * `sources` = sibling objects that live at this same depth/branch.
-	 * e.g. at the top level, `sources` = the original `items` array.
-	 * For a nested key, `sources` = every object-value found for that key
-	 * across the parent's siblings.
+	 * `sources` = sibling objects that live at this same depth/branch. e.g. at the top level,
+	 * `sources` = the original `items` array. For a nested key, `sources` = every object-value found
+	 * for that key across the parent's siblings.
 	 */
-	function buildLevel(sources: PlainObject[], path: string): TypeShapeNode {
+	function buildLevel(sources: PlainObject[], keyPath: string): TypeShapeNode {
 		const result: TypeShapeNode = {};
 		const keys = new Set<string>();
 
 		for (const src of sources) {
 			if (Array.isArray(src)) {
-				throw new Error(`Unexpected array found at "${path || "<root>"}"`);
+				throw new Error(`Unexpected array found at "${keyPath || "<root>"}"`);
 			}
 			for (const key of Object.keys(src)) keys.add(key);
 		}
 
 		for (const key of keys) {
-			const currentPath = path ? `${path}.${key}` : key;
+			const currentPath = keyPath ? `${keyPath}.${key}` : key;
 			const types = new Set<TypeName>();
 			const nestedSources: PlainObject[] = [];
 			let hasObject = false;
@@ -134,16 +130,30 @@ function collectTypeShape(items: unknown[]): TypeShapeNode {
 	return buildLevel(items as PlainObject[], "");
 }
 
-const [a, b] = JSONC.parse(
-	await fs.readFile(
-		path.join(import.meta.dirname, "../local/data.jsonc"),
-		"utf8",
-	),
-);
+const basePath = path.join(import.meta.dirname, "../local/schemas/filtered");
+const dirs = await fs.readdir(basePath);
 
-console.dir(
-	collectTypeShape([...a.response.data.items, ...b.response.data.next_items]),
-	{
-		depth: 10,
-	},
-);
+const objects: unknown[] = [];
+
+for (const dir of dirs) {
+	// skip files
+	if (dir.includes(".")) continue;
+
+	const files = await fs.readdir(path.join(basePath, dir));
+
+	for (const file of files) {
+		const data: { sample: unknown } = JSON.parse(
+			await fs.readFile(path.join(basePath, dir, file), "utf8"),
+		);
+
+		objects.push(data.sample);
+	}
+}
+
+// const a = JSONC.parse(
+// 	await fs.readFile(path.join(import.meta.dirname, "../local/schemas/filtered/all.json"), "utf8"),
+// );
+
+console.dir(collectTypeShape(objects), {
+	depth: 10,
+});

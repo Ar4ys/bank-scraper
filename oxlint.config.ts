@@ -14,5 +14,6 @@ export default defineConfig({
 	},
 	rules: {
 		"typescript/consistent-return": "off",
+		"typescript/no-unnecessary-type-parameters": "off",
 	},
 });

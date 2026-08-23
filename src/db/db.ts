@@ -24,9 +24,7 @@ export async function initSQLite() {
 		PRAGMA cache_size = -64000;
 	`);
 
-	const { foreign_keys } = db.get<{ foreign_keys: number }>(
-		"PRAGMA foreign_keys;",
-	);
+	const { foreign_keys } = db.get<{ foreign_keys: number }>("PRAGMA foreign_keys;");
 
 	if (foreign_keys !== 1) {
 		throw new Error("SQLite foreign_keys pragma failed to enable");

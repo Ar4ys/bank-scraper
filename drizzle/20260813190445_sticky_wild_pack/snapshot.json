@@ -1,98 +1,94 @@
 {
-  "version": "7",
-  "dialect": "sqlite",
-  "id": "a835f674-41c0-40bf-af7e-2318cd87e54c",
-  "prevIds": [
-    "00000000-0000-0000-0000-000000000000"
-  ],
-  "ddl": [
-    {
-      "name": "raw_transactions",
-      "entityType": "tables"
-    },
-    {
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "name": "id",
-      "entityType": "columns",
-      "table": "raw_transactions"
-    },
-    {
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "name": "bank_id",
-      "entityType": "columns",
-      "table": "raw_transactions"
-    },
-    {
-      "type": "blob",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "name": "data",
-      "entityType": "columns",
-      "table": "raw_transactions"
-    },
-    {
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "name": "hash",
-      "entityType": "columns",
-      "table": "raw_transactions"
-    },
-    {
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
-      "generated": null,
-      "name": "processed",
-      "entityType": "columns",
-      "table": "raw_transactions"
-    },
-    {
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "CURRENT_TIMESTAMP",
-      "generated": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "table": "raw_transactions"
-    },
-    {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "name": "raw_transactions_pk",
-      "table": "raw_transactions",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        {
-          "value": "bank_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "name": "raw_transactions_bank_id_index",
-      "entityType": "indexes",
-      "table": "raw_transactions"
-    }
-  ],
-  "renames": []
+	"version": "7",
+	"dialect": "sqlite",
+	"id": "a835f674-41c0-40bf-af7e-2318cd87e54c",
+	"prevIds": ["00000000-0000-0000-0000-000000000000"],
+	"ddl": [
+		{
+			"name": "raw_transactions",
+			"entityType": "tables"
+		},
+		{
+			"type": "text",
+			"notNull": false,
+			"autoincrement": false,
+			"default": null,
+			"generated": null,
+			"name": "id",
+			"entityType": "columns",
+			"table": "raw_transactions"
+		},
+		{
+			"type": "text",
+			"notNull": true,
+			"autoincrement": false,
+			"default": null,
+			"generated": null,
+			"name": "bank_id",
+			"entityType": "columns",
+			"table": "raw_transactions"
+		},
+		{
+			"type": "blob",
+			"notNull": true,
+			"autoincrement": false,
+			"default": null,
+			"generated": null,
+			"name": "data",
+			"entityType": "columns",
+			"table": "raw_transactions"
+		},
+		{
+			"type": "text",
+			"notNull": true,
+			"autoincrement": false,
+			"default": null,
+			"generated": null,
+			"name": "hash",
+			"entityType": "columns",
+			"table": "raw_transactions"
+		},
+		{
+			"type": "integer",
+			"notNull": true,
+			"autoincrement": false,
+			"default": "false",
+			"generated": null,
+			"name": "processed",
+			"entityType": "columns",
+			"table": "raw_transactions"
+		},
+		{
+			"type": "text",
+			"notNull": true,
+			"autoincrement": false,
+			"default": "CURRENT_TIMESTAMP",
+			"generated": null,
+			"name": "created_at",
+			"entityType": "columns",
+			"table": "raw_transactions"
+		},
+		{
+			"columns": ["id"],
+			"nameExplicit": false,
+			"name": "raw_transactions_pk",
+			"table": "raw_transactions",
+			"entityType": "pks"
+		},
+		{
+			"columns": [
+				{
+					"value": "bank_id",
+					"isExpression": false
+				}
+			],
+			"isUnique": false,
+			"where": null,
+			"origin": "manual",
+			"name": "raw_transactions_bank_id_index",
+			"entityType": "indexes",
+			"table": "raw_transactions"
+		}
+	],
+	"renames": []
 }

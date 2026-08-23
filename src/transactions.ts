@@ -13,9 +13,7 @@ export const rawTransactionsInputSchema = z
 
 type RawTransactionsInput = z.infer<typeof rawTransactionsInputSchema>;
 
-export async function insertRawTransactionsBatch(
-	rawTransactionsInput: RawTransactionsInput,
-) {
+export async function insertRawTransactionsBatch(rawTransactionsInput: RawTransactionsInput) {
 	const query = rawTransactionsInput.map((t) => ({
 		bankId: t.bankId,
 		hash: jsonSha256(t.data),
@@ -71,18 +69,14 @@ const transactionSchema = z.object({
 		category: z.string().optional(),
 		order_date: z.string().optional(),
 		subcategories: z.string().optional(),
-		phone_number: z
-			.object({ country_code: z.string(), number: z.string() })
-			.optional(),
+		phone_number: z.object({ country_code: z.string(), number: z.string() }).optional(),
 		transaction_id: z.string().optional(),
 		other_account: z.string().optional(),
 		recipient_name_and_address: z.string().optional(),
 		card_number: z.string().optional(),
 		oper_date_time: z.string().optional(),
 		settlement_date: z.string().optional(),
-		original_amount: z
-			.object({ amount: z.string(), currency: z.string() })
-			.optional(),
+		original_amount: z.object({ amount: z.string(), currency: z.string() }).optional(),
 		sender_name_and_address: z.string().optional(),
 	}),
 	avatar_url: z.string().nullable(),
