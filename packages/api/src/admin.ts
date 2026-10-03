@@ -1,0 +1,299 @@
+import { transactionFieldsSchema } from "@bank-scraper/shared";
+import { zValidator } from "@hono/zod-validator";
+import { and, count, desc, eq, isNull, like, or, sql } from "drizzle-orm";
+import { Hono } from "hono";
+import { z } from "zod";
+
+import { db, tables } from "./db/db.ts";
+import { RawTransactionStatus, type RawTransaction, type Transaction } from "./db/schema.ts";
+import { listBankTransactionKeys, processBankTransactions } from "./processing/process.ts";
+import { escapeLikePattern } from "./utils.ts";
+
+const { accounts, rawTransactions, transactions, transactionVersions } = tables;
+
+const pageQuerySchema = z.object({
+	limit: z.coerce.number().int().min(1).max(500).default(100),
+	offset: z.coerce.number().int().min(0).default(0),
+});
+
+const optionalAccountId = z.coerce.number().int().optional();
+
+/** Dates and amounts cross the wire in their JSON form, see `transactionFieldsSchema` */
+const transactionJson = (transaction: Transaction) => ({
+	id: transaction.id,
+	accountId: transaction.accountId,
+	bankId: transaction.bankId,
+	...z.encode(transactionFieldsSchema, transaction),
+	createdAt: transaction.createdAt.toString(),
+	updatedAt: transaction.updatedAt.toString(),
+});
+
+const rawTransactionJson = (raw: RawTransaction) => ({
+	id: raw.id,
+	accountId: raw.accountId,
+	bankId: raw.bankId,
+	// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+	data: raw.data as Record<string, unknown>,
+	status: raw.status,
+	error: raw.error && { stage: raw.error.stage, message: raw.error.message },
+	createdAt: raw.createdAt.toString(),
+});
+
+/** The latest raw row of every bank transaction, with the number of raw versions it has */
+const latestRawTransactions = () => {
+	const versions = db
+		.select({
+			latestId: sql<string>`max(${rawTransactions.id})`.as("latest_id"),
+			versionCount: count().as("version_count"),
+		})
+		.from(rawTransactions)
+		.groupBy(rawTransactions.accountId, rawTransactions.bankId)
+		.as("versions");
+
+	return { versions, join: eq(versions.latestId, rawTransactions.id) };
+};
+
+/** JSON API of the admin app. It has no auth of its own and has to sit behind a reverse proxy. */
+export const adminApi = new Hono()
+	/** GET /api/admin/dashboard */
+	.get("/dashboard", async (c) => {
+		const { versions, join } = latestRawTransactions();
+
+		const statuses = await db
+			.select({ status: rawTransactions.status, total: count() })
+			.from(rawTransactions)
+			.innerJoin(versions, join)
+			.groupBy(rawTransactions.status);
+
+		const [totals] = await db
+			.select({
+				transactions: count(),
+				withoutMerchant: sql<number>`count(*) filter (where ${isNull(transactions.merchant)})`,
+			})
+			.from(transactions);
+
+		return c.json({
+			// Counted per bank transaction, by the status of its latest raw version
+			rawByStatus: Object.fromEntries(
+				Object.values(RawTransactionStatus).map((status) => [
+					status,
+					statuses.find((row) => row.status === status)?.total ?? 0,
+				]),
+			),
+			transactions: totals?.transactions ?? 0,
+			transactionsWithoutMerchant: totals?.withoutMerchant ?? 0,
+		});
+	})
+
+	/** GET /api/admin/accounts */
+	.get("/accounts", async (c) => {
+		const rows = await db.select().from(accounts).orderBy(accounts.id);
+
+		return c.json(
+			rows.map((account) => ({
+				id: account.id,
+				sourceAccount: account.sourceAccount,
+				name: account.name,
+				currency: account.currency,
+			})),
+		);
+	})
+
+	/** PATCH /api/admin/accounts/:id */
+	.patch(
+		"/accounts/:id",
+		zValidator("param", z.object({ id: z.coerce.number().int() })),
+		zValidator("json", z.object({ name: z.string().trim().nonempty() })),
+		async (c) => {
+			const [account] = await db
+				.update(accounts)
+				.set({ name: c.req.valid("json").name })
+				.where(eq(accounts.id, c.req.valid("param").id))
+				.returning({ id: accounts.id, name: accounts.name });
+
+			return account ? c.json(account) : c.json({ message: "Account not found" }, 404);
+		},
+	)
+
+	/** GET /api/admin/raw-transactions */
+	.get(
+		"/raw-transactions",
+		zValidator(
+			"query",
+			pageQuerySchema.extend({
+				accountId: optionalAccountId,
+				status: z.enum(RawTransactionStatus).optional(),
+			}),
+		),
+		async (c) => {
+			const { limit, offset, accountId, status } = c.req.valid("query");
+			const { versions, join } = latestRawTransactions();
+
+			const where = and(
+				accountId === undefined ? undefined : eq(rawTransactions.accountId, accountId),
+				status && eq(rawTransactions.status, status),
+			);
+
+			const rows = await db
+				.select({ raw: rawTransactions, versionCount: versions.versionCount })
+				.from(rawTransactions)
+				.innerJoin(versions, join)
+				.where(where)
+				.orderBy(desc(rawTransactions.id))
+				.limit(limit)
+				.offset(offset);
+
+			const [total] = await db
+				.select({ total: count() })
+				.from(rawTransactions)
+				.innerJoin(versions, join)
+				.where(where);
+
+			return c.json({
+				items: rows.map(({ raw, versionCount }) => ({ ...rawTransactionJson(raw), versionCount })),
+				total: total?.total ?? 0,
+			});
+		},
+	)
+
+	/** GET /api/admin/raw-transactions/:accountId/:bankId */
+	.get(
+		"/raw-transactions/:accountId/:bankId",
+		zValidator("param", z.object({ accountId: z.coerce.number().int(), bankId: z.string() })),
+		async (c) => {
+			const { accountId, bankId } = c.req.valid("param");
+
+			const versions = await db
+				.select()
+				.from(rawTransactions)
+				.where(and(eq(rawTransactions.accountId, accountId), eq(rawTransactions.bankId, bankId)))
+				.orderBy(rawTransactions.id);
+
+			if (!versions.length) return c.json({ message: "Raw transaction not found" }, 404);
+
+			const [transaction] = await db
+				.select({ id: transactions.id })
+				.from(transactions)
+				.where(and(eq(transactions.accountId, accountId), eq(transactions.bankId, bankId)));
+
+			return c.json({
+				/** Oldest first */
+				versions: versions.map(rawTransactionJson),
+				transactionId: transaction?.id ?? null,
+			});
+		},
+	)
+
+	/** GET /api/admin/transactions */
+	.get(
+		"/transactions",
+		zValidator(
+			"query",
+			pageQuerySchema.extend({
+				accountId: optionalAccountId,
+				/** `true` lists only transactions that have no merchant */
+				withoutMerchant: z.stringbool().optional(),
+				/** Text to find in merchant, description or the bank's id */
+				search: z.string().optional(),
+			}),
+		),
+		async (c) => {
+			const { limit, offset, accountId, withoutMerchant, search } = c.req.valid("query");
+			const pattern = search && `%${escapeLikePattern(search)}%`;
+
+			const where = and(
+				accountId === undefined ? undefined : eq(transactions.accountId, accountId),
+				withoutMerchant ? isNull(transactions.merchant) : undefined,
+				pattern
+					? or(
+							like(transactions.merchant, pattern),
+							like(transactions.description, pattern),
+							like(transactions.bankId, pattern),
+						)
+					: undefined,
+			);
+
+			const rows = await db
+				.select()
+				.from(transactions)
+				.where(where)
+				.orderBy(desc(transactions.date), desc(transactions.id))
+				.limit(limit)
+				.offset(offset);
+
+			const [total] = await db.select({ total: count() }).from(transactions).where(where);
+
+			return c.json({ items: rows.map(transactionJson), total: total?.total ?? 0 });
+		},
+	)
+
+	/** GET /api/admin/transactions/:id */
+	.get("/transactions/:id", async (c) => {
+		const [transaction] = await db
+			.select()
+			.from(transactions)
+			.where(eq(transactions.id, c.req.param("id")));
+
+		if (!transaction) return c.json({ message: "Transaction not found" }, 404);
+
+		const versions = await db
+			.select()
+			.from(transactionVersions)
+			.where(eq(transactionVersions.transactionId, transaction.id))
+			.orderBy(transactionVersions.id);
+
+		return c.json({
+			transaction: transactionJson(transaction),
+			/** Oldest first */
+			versions: versions.map((version) => ({
+				id: version.id,
+				rawTransactionId: version.rawTransactionId,
+				cause: version.cause,
+				ruleRevisionId: version.ruleRevisionId,
+				appCommit: version.appCommit,
+				data: version.data,
+				fieldSources: version.fieldSources,
+				createdAt: version.createdAt.toString(),
+			})),
+		});
+	})
+
+	/** POST /api/admin/reprocess */
+	.post(
+		"/reprocess",
+		zValidator(
+			"json",
+			z.object({
+				scope: z.union([
+					z.literal("all"),
+					/** Bank transactions whose latest raw version failed */
+					z.literal("failed"),
+					z.object({ accountId: z.number().int(), bankId: z.string() }),
+				]),
+				/** Report what would change without writing anything */
+				dryRun: z.boolean(),
+			}),
+		),
+		(c) => {
+			const { scope, dryRun } = c.req.valid("json");
+
+			const keys =
+				scope === "all"
+					? listBankTransactionKeys()
+					: scope === "failed"
+						? listBankTransactionKeys(RawTransactionStatus.Error)
+						: [scope];
+
+			const report = processBankTransactions(keys, { dryRun });
+
+			return c.json({
+				...report,
+				errors: report.errors.map(({ error, ...rest }) => ({
+					...rest,
+					error: { stage: error.stage, message: error.message },
+				})),
+			});
+		},
+	);
+
+export type AdminApi = typeof adminApi;

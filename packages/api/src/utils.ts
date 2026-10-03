@@ -45,3 +45,7 @@ export const zValidatorHook = <
 export function assertNever(value: never, message?: string): never {
 	throw new Error(message ?? "Unreachable reached", { cause: value });
 }
+
+export function escapeLikePattern(text: string) {
+	return text.replaceAll(/[\\%_]/g, "\\$&");
+}

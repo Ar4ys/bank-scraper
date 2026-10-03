@@ -11,6 +11,8 @@ const configSchema = z.object({
 	INGEST_API_KEY: z.string().nonempty(),
 	/** Key Sure has to send to read accounts and transactions through the Lunch Flow API */
 	LUNCHFLOW_API_KEY: z.string().nonempty(),
+	/** Directory of the built admin app, relative to the working directory. Not served if missing. */
+	ADMIN_APP_DIR: z.string().default("../admin/dist"),
 	/** Git commit of the running build, recorded with every transaction version */
 	APP_GIT_COMMIT: z.string().default("unknown"),
 });

@@ -48,6 +48,7 @@ mise run db-migrate
 | `SQLITE_DB_PATH`    | `./local/dev.db` | Path of the SQLite database file, relative to `packages/api`             |
 | `INGEST_API_KEY`    | required         | Key the userscript has to send to store scraped transactions             |
 | `LUNCHFLOW_API_KEY` | required         | Key Sure has to send to the Lunch Flow API                               |
+| `ADMIN_APP_DIR`     | `../admin/dist`  | Directory of the built admin app, relative to `packages/api`             |
 | `APP_GIT_COMMIT`    | `unknown`        | Git commit of the running build, recorded with every transaction version |
 
 ## Userscript
@@ -64,13 +65,11 @@ console.
 
 ## API
 
-These routes need the ingest key in the `x-api-key` header.
+`POST /api/transactions/raw` stores `{ sourceAccount, transactions: [{ bankId, data }] }` and returns
+the rows that were new. It needs the ingest key in the `x-api-key` header.
 
-| Route                           | What it does                                                                       |
-| ------------------------------- | ---------------------------------------------------------------------------------- |
-| `GET /api/transactions/raw`     | Lists all raw transactions                                                         |
-| `GET /api/transactions/raw/:id` | Returns one raw transaction                                                        |
-| `POST /api/transactions/raw`    | Stores `{ sourceAccount, transactions: [{ bankId, data }] }`, returns the new rows |
+`/api/admin` is the JSON API of the admin app. It has no auth of its own, so the reverse proxy in
+front of the service has to protect it together with the admin app.
 
 ### Lunch Flow API
 
