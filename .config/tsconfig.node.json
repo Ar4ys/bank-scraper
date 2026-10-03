@@ -6,6 +6,7 @@
 		"composite": true,
 		"module": "NodeNext",
 		"types": ["node"],
+		"skipLibCheck": true,
 		"erasableSyntaxOnly": true,
 		"verbatimModuleSyntax": true
 	}

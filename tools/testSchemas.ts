@@ -1,5 +1,4 @@
 import fs from "fs";
-import util from "node:util";
 import path from "path";
 
 import { z } from "zod";
@@ -9,7 +8,6 @@ import {
 	IpkoTxType,
 	OperationType,
 	operationSubTypes,
-	type IpkoTransaction,
 	baseTxSchema,
 } from "../src/ipkoSchemas.ts";
 import { zodPrettifyError } from "../src/zod.ts";

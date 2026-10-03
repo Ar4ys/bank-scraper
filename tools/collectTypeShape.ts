@@ -1,8 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import JSONC from "jsonc-simple-parser";
-
 /**
  * The set of possible `typeof` results, with `null` specially reported as `"null"` instead of
  * `"object"` (since `typeof null === "object"` in JS).
