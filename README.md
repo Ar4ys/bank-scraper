@@ -97,10 +97,10 @@ the versions of a raw transaction. Everything that reprocesses shows a preview f
 
 The code derives merchant, description and date of a transaction from the bank's data. Rules, edited
 on the Rules page, override that without a deploy, e.g. to name the merchant when the bank only puts
-`BOLT.EU/P/20261003` into the title.
+`BOLT.EU/P/2312261215` into the address of a card payment.
 
 - A rule has conditions on fields of the parsed bank transaction (`contains`, `equals` and `regex`,
-  all ignoring case) and templates for the fields it sets. A template can use `{details.title}`
+  all ignoring case) and templates for the fields it sets. A template can use `{details.address}`
   style placeholders for those fields and `{match.1}` for a capture group of the rule's first regex
   condition. A placeholder that points at nothing renders as empty text.
 - Rules read the transaction as our schemas parse it, with its `$type` and with dates and amounts

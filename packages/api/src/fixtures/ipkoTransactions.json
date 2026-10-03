@@ -1,0 +1,920 @@
+{
+	"_about": [
+		"Bank transactions as iPKO sends them, used by the tests. Keyed by the example they come from.",
+		"Source: local/examples (one sample per shape of transaction) and one hold, with every identifying detail, amount, date and reference number replaced by a made-up one.",
+		"The hold keeps every field the bank sends; the other examples lack the fields tools/filterFlatFields.ts removes."
+	],
+	"transactions": {
+		"CARD_TRANSACTION/+merchant-subcategory": {
+			"operation_id": "966",
+			"title": "Tartu, ESTONIA",
+			"money": {
+				"amount": "-21.40",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "CARD_PAYMENT",
+				"side": "DEBIT"
+			},
+			"operation_type": "CARD_TRANSACTION",
+			"details": {
+				"order_date": "2023-12-26",
+				"exec_date": "2023-12-28",
+				"operation_kind": {
+					"code": "CARD_PAYMENT",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-21.40",
+					"currency": "PLN"
+				},
+				"title": "000000001 74000000000000000000001",
+				"merchant_name": "Bolt",
+				"category": "General (others)",
+				"address": "BOLT.EU/P/2312261215",
+				"city": "Tartu",
+				"country": "ESTONIA",
+				"country_code": "EE",
+				"original_amount": {
+					"amount": "21.40",
+					"currency": "PLN"
+				}
+			},
+			"other_side": "Bolt",
+			"is_hold": false
+		},
+		"CARD_TRANSACTION/+merchant": {
+			"operation_id": "912",
+			"title": "GDANSK, POLSKA",
+			"money": {
+				"amount": "-7.85",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "CARD_PAYMENT",
+				"side": "DEBIT"
+			},
+			"operation_type": "CARD_TRANSACTION",
+			"details": {
+				"order_date": "2023-12-01",
+				"exec_date": "2023-12-03",
+				"operation_kind": {
+					"code": "CARD_PAYMENT",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-7.85",
+					"currency": "PLN"
+				},
+				"title": "74000000000000000000002",
+				"merchant_name": "Auchan",
+				"category": "Groceries",
+				"subcategories": "supermarket",
+				"address": "AUCHAN POLSKA SP. Z  27",
+				"city": "GDANSK",
+				"country": "POLSKA",
+				"country_code": "PL",
+				"original_amount": {
+					"amount": "7.85",
+					"currency": "PLN"
+				}
+			},
+			"other_side": "Auchan",
+			"is_hold": false
+		},
+		"CARD_TRANSACTION/card_transfer": {
+			"operation_id": "1510",
+			"title": "74000000000000000000003",
+			"money": {
+				"amount": "-64.20",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "PAYCARD_TRANSFER",
+				"side": "DEBIT"
+			},
+			"operation_type": "CARD_TRANSACTION",
+			"details": {
+				"order_date": "2024-06-17",
+				"exec_date": "2024-06-20",
+				"operation_kind": {
+					"code": "PAYCARD_TRANSFER",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-64.20",
+					"currency": "PLN"
+				},
+				"title": "74000000000000000000003",
+				"receiver_address": "PAYPAL *USER_NAME",
+				"city": "12345678901",
+				"country": "POLSKA",
+				"country_code": "PL",
+				"original_amount": {
+					"amount": "64.20",
+					"currency": "PLN"
+				}
+			},
+			"other_side": "Karta Płatnicza",
+			"is_hold": false
+		},
+		"CARD_TRANSACTION/default": {
+			"operation_id": "19",
+			"title": "LIDL 3011",
+			"money": {
+				"amount": "-57.33",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "CARD_PAYMENT",
+				"side": "DEBIT"
+			},
+			"operation_type": "CARD_TRANSACTION",
+			"details": {
+				"order_date": "2022-02-11",
+				"exec_date": "2022-02-13",
+				"operation_kind": {
+					"code": "CARD_PAYMENT",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-57.33",
+					"currency": "PLN"
+				},
+				"title": "000000002 05000000000000000000004",
+				"address": "LIDL 3011",
+				"city": "Wroclaw",
+				"country": "POLSKA",
+				"country_code": "PL",
+				"original_amount": {
+					"amount": "57.33",
+					"currency": "PLN"
+				}
+			},
+			"other_side": "Karta Płatnicza",
+			"is_hold": false
+		},
+		"MOBILE_TRANSACTION/+location": {
+			"operation_id": "20",
+			"title": "LIDL 3024, POZNAN, POLSKA",
+			"money": {
+				"amount": "-29.90",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_POS_TX_CODE",
+				"side": "DEBIT"
+			},
+			"operation_type": "MOBILE_TRANSACTION",
+			"details": {
+				"order_date": "2022-02-13",
+				"exec_date": "2022-02-14",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_POS_TX_CODE",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-29.90",
+					"currency": "PLN"
+				},
+				"phone_number": {
+					"country_code": "48",
+					"number": "123456789"
+				},
+				"address": "LIDL 3024",
+				"city": "POZNAN",
+				"country": "POLSKA",
+				"country_code": "PL"
+			},
+			"other_side": "Płatność mobilna",
+			"is_hold": false
+		},
+		"MOBILE_TRANSACTION/+merchant+location": {
+			"operation_id": "1842",
+			"title": "LIDL 3037, SZCZECIN, POLSKA",
+			"money": {
+				"amount": "-118.47",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_POS_TX_CODE",
+				"side": "DEBIT"
+			},
+			"operation_type": "MOBILE_TRANSACTION",
+			"details": {
+				"order_date": "2024-09-07",
+				"exec_date": "2024-09-08",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_POS_TX_CODE",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-118.47",
+					"currency": "PLN"
+				},
+				"title": "00000090000000001",
+				"merchant_name": "Lidl",
+				"category": "Groceries",
+				"subcategories": "supermarket",
+				"phone_number": {
+					"country_code": "48",
+					"number": "123456789"
+				},
+				"address": "LIDL 3037",
+				"city": "SZCZECIN",
+				"country": "POLSKA",
+				"country_code": "PL"
+			},
+			"other_side": "Lidl",
+			"is_hold": false
+		},
+		"MOBILE_TRANSACTION/+merchant-subcategories": {
+			"operation_id": "927",
+			"title": "zeccer.pl",
+			"money": {
+				"amount": "-3.60",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_POS_NO_CARD_TX_CODE",
+				"side": "DEBIT"
+			},
+			"operation_type": "MOBILE_TRANSACTION",
+			"details": {
+				"order_date": "2023-12-11",
+				"exec_date": "2023-12-12",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_POS_NO_CARD_TX_CODE",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-3.60",
+					"currency": "PLN"
+				},
+				"title": "00000080000000002",
+				"merchant_name": "Zeccer",
+				"category": "General (others)",
+				"phone_number": {
+					"country_code": "48",
+					"number": "123456789"
+				},
+				"address": "zeccer.pl"
+			},
+			"other_side": "Zeccer",
+			"is_hold": false
+		},
+		"MOBILE_TRANSACTION/+merchant": {
+			"operation_id": "898",
+			"title": "jakdojade.pl",
+			"money": {
+				"amount": "-5.20",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_POS_NO_CARD_TX_CODE",
+				"side": "DEBIT"
+			},
+			"operation_type": "MOBILE_TRANSACTION",
+			"details": {
+				"order_date": "2023-10-12",
+				"exec_date": "2023-10-16",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_POS_NO_CARD_TX_CODE",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-5.20",
+					"currency": "PLN"
+				},
+				"title": "00000080000000003",
+				"merchant_name": "Jakdojade",
+				"category": "Transport",
+				"subcategories": "train_station,travel_agency",
+				"phone_number": {
+					"country_code": "48",
+					"number": "123456789"
+				},
+				"address": "jakdojade.pl"
+			},
+			"other_side": "Jakdojade",
+			"is_hold": false
+		},
+		"MOBILE_TRANSACTION/+title+tx_id+location": {
+			"operation_id": "1836",
+			"title": "PT, Lublin, POLSKA",
+			"money": {
+				"amount": "-36.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_POS_TX_CODE",
+				"side": "DEBIT"
+			},
+			"operation_type": "MOBILE_TRANSACTION",
+			"details": {
+				"order_date": "2024-09-04",
+				"exec_date": "2024-09-06",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_POS_TX_CODE",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-36.00",
+					"currency": "PLN"
+				},
+				"title": "00000090000000004",
+				"phone_number": {
+					"country_code": "48",
+					"number": "123456789"
+				},
+				"address": "PT",
+				"city": "Lublin",
+				"country": "POLSKA",
+				"country_code": "PL"
+			},
+			"other_side": "Płatność mobilna",
+			"is_hold": false
+		},
+		"MOBILE_TRANSACTION/atm-title": {
+			"operation_id": "137",
+			"title": "ul  Dluga 7, Katowice, POLSKA",
+			"money": {
+				"amount": "-300.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_ATM_TX_CODE",
+				"side": "DEBIT"
+			},
+			"operation_type": "MOBILE_TRANSACTION",
+			"details": {
+				"order_date": "2022-05-04",
+				"exec_date": "2022-05-07",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_ATM_TX_CODE",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-300.00",
+					"currency": "PLN"
+				},
+				"phone_number": {
+					"country_code": "48",
+					"number": "123456789"
+				},
+				"address": "ul  Dluga 7",
+				"city": "Katowice",
+				"country": "POLSKA",
+				"country_code": "PL",
+				"atm": "OBCY"
+			},
+			"other_side": "Płatność mobilna",
+			"is_hold": false
+		},
+		"MOBILE_TRANSACTION/atm": {
+			"operation_id": "1181",
+			"title": "UL. KROTKA 3/5, BYDGOSZCZ, POLSKA",
+			"money": {
+				"amount": "-500.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_ATM_TX_CODE",
+				"side": "DEBIT"
+			},
+			"operation_type": "MOBILE_TRANSACTION",
+			"details": {
+				"order_date": "2024-03-29",
+				"exec_date": "2024-03-30",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_ATM_TX_CODE",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-500.00",
+					"currency": "PLN"
+				},
+				"title": "S1XX4718 4187 00000080000000005",
+				"phone_number": {
+					"country_code": "48",
+					"number": "123456789"
+				},
+				"address": "UL. KROTKA 3/5",
+				"city": "BYDGOSZCZ",
+				"country": "POLSKA",
+				"country_code": "PL",
+				"atm": "S1XX4718"
+			},
+			"other_side": "Płatność mobilna",
+			"is_hold": false
+		},
+		"MOBILE_TRANSACTION/default": {
+			"operation_id": "16",
+			"title": "orange.flex.pl/",
+			"money": {
+				"amount": "-1.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_POS_NO_CARD_TX_CODE",
+				"side": "DEBIT"
+			},
+			"operation_type": "MOBILE_TRANSACTION",
+			"details": {
+				"order_date": "2022-02-03",
+				"exec_date": "2022-02-05",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_POS_NO_CARD_TX_CODE",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-1.00",
+					"currency": "PLN"
+				},
+				"phone_number": {
+					"country_code": "48",
+					"number": "123456789"
+				},
+				"address": "orange.flex.pl/"
+			},
+			"other_side": "Płatność mobilna",
+			"is_hold": false
+		},
+		"OTHER/-recepient_name_and_address": {
+			"operation_id": "2",
+			"title": "OPŁATA MIESIĘCZNA ZA KARTĘ 123456******7890, 04.11-03.12",
+			"money": {
+				"amount": "-5.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "CARD_FEE",
+				"side": "DEBIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2021-09-29",
+				"exec_date": "2021-09-29",
+				"operation_kind": {
+					"code": "CARD_FEE",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-5.00",
+					"currency": "PLN"
+				},
+				"title": "OPŁATA MIESIĘCZNA ZA KARTĘ 123456******7890, 04.11-03.12"
+			},
+			"other_side": null,
+			"is_hold": false
+		},
+		"OTHER/default": {
+			"operation_id": "38",
+			"title": "DOŁADOWANIE TELEFONU +48 123456789 HEYAH IDENTYFIKATOR OPERACJI: 12345678",
+			"money": {
+				"amount": "-25.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "TRANSFER",
+				"side": "DEBIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2022-02-25",
+				"exec_date": "2022-02-25",
+				"operation_kind": {
+					"code": "TRANSFER",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-25.00",
+					"currency": "PLN"
+				},
+				"title": "DOŁADOWANIE TELEFONU +48 123456789 HEYAH IDENTYFIKATOR OPERACJI: 12345678",
+				"recipient_name_and_address": "PKO BP FINAT SP. Z O.O."
+			},
+			"other_side": "PKO BP FINAT SP. Z O.O.",
+			"is_hold": false,
+			"recharge_operator_id": "HEYAH"
+		},
+		"OTHER/ipko_transit_ticket": {
+			"operation_id": "2282",
+			"title": "ZAKUP BILETU KOMUNIKACYJNEGO W APLIKACJI IKO",
+			"money": {
+				"amount": "-4.60",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "TRANSPORT_TICKET_PAYMENT",
+				"side": "DEBIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2025-01-12",
+				"exec_date": "2025-01-12",
+				"operation_kind": {
+					"code": "TRANSPORT_TICKET_PAYMENT",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-4.60",
+					"currency": "PLN"
+				},
+				"title": "ZAKUP BILETU KOMUNIKACYJNEGO W APLIKACJI IKO",
+				"recipient_name_and_address": "MOBILE-TRAFFIC-DATA SP. Z O. O. UL. DRUŻBICKIEGO 11 61-693 POZNAŃ"
+			},
+			"other_side": "MOBILE-TRAFFIC-DATA SP. Z O. O.",
+			"is_hold": false
+		},
+		"REALIZED_DPW/foreign_transfer_in": {
+			"operation_id": "2949",
+			"title": "SEPA Transfer from Germany to Poland",
+			"money": {
+				"amount": "637.50",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "FOREIGN_TRANSFER_IN",
+				"side": "CREDIT"
+			},
+			"operation_type": "REALIZED_DPW",
+			"details": {
+				"order_date": "2025-05-31",
+				"exec_date": "2025-05-31",
+				"operation_kind": {
+					"code": "FOREIGN_TRANSFER_IN",
+					"side": "CREDIT"
+				},
+				"money": {
+					"amount": "637.50",
+					"currency": "PLN"
+				},
+				"other_account": "DE12345678901234567890",
+				"title": "SEPA Transfer from Germany to Poland",
+				"sender_name_and_address": "Someone who did the transfer",
+				"charges_side": "SHA",
+				"customer_references": "NOTPROVIDED",
+				"references": "SR12SE12345678DR",
+				"exchange_rate": "4.2500",
+				"original_amount": {
+					"amount": "150.00",
+					"currency": "EUR"
+				}
+			},
+			"other_side": "Someone who did the transfer",
+			"is_hold": false
+		},
+		"REALIZED_DPW/foreign_transfer_out_eur": {
+			"operation_id": "677",
+			"title": "Transfered from Poland to Germany",
+			"money": {
+				"amount": "-86.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "FOREIGN_TRANSFER",
+				"side": "DEBIT"
+			},
+			"operation_type": "REALIZED_DPW",
+			"details": {
+				"order_date": "2023-03-04",
+				"exec_date": "2023-03-04",
+				"operation_kind": {
+					"code": "FOREIGN_TRANSFER",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-86.00",
+					"currency": "PLN"
+				},
+				"other_account": "DE12345678901234567890",
+				"title": "Transfered from Poland to Germany",
+				"recipient_name_and_address": "SOMEONE WHO RECEIVED MONEY",
+				"charges_side": "SHA",
+				"references": "SR12SE12345678DR",
+				"exchange_rate": "4.3000",
+				"original_amount": {
+					"amount": "20.00",
+					"currency": "EUR"
+				}
+			},
+			"other_side": "SOMEONE WHO RECEIVED MONEY",
+			"is_hold": false
+		},
+		"REALIZED_DPW/foreign_transfer_out_pln": {
+			"operation_id": "187",
+			"title": "Transfered from Poland to Germany in PLN",
+			"money": {
+				"amount": "-47.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "FOREIGN_TRANSFER",
+				"side": "DEBIT"
+			},
+			"operation_type": "REALIZED_DPW",
+			"details": {
+				"order_date": "2022-05-29",
+				"exec_date": "2022-05-29",
+				"operation_kind": {
+					"code": "FOREIGN_TRANSFER",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-47.00",
+					"currency": "PLN"
+				},
+				"other_account": "DE12345678901234567890",
+				"title": "Transfered from Poland to Germany",
+				"recipient_name_and_address": "SOMEONE WHO RECEIVED MONEY",
+				"charges_side": "SHA",
+				"references": "SR12SE12345678DR",
+				"original_amount": {
+					"amount": "47.00",
+					"currency": "PLN"
+				}
+			},
+			"other_side": "SOMEONE WHO RECEIVED MONEY",
+			"is_hold": false
+		},
+		"TRANSFER_NORMAL/blik_transfer": {
+			"operation_id": "10",
+			"title": "PEREKAZ OD: 48123456789 DO: 489*****321",
+			"money": {
+				"amount": "-1.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_C2C_EXTERNAL",
+				"side": "DEBIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2021-12-15",
+				"exec_date": "2021-12-15",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_C2C_EXTERNAL",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-1.00",
+					"currency": "PLN"
+				},
+				"other_account": "12345678901234567890123456",
+				"title": "PEREKAZ OD: 48123456789 DO: 489*****321",
+				"recipient_name_and_address": "SOMEONE WHO RECEIVED MONEY"
+			},
+			"other_side": "SOMEONE WHO RECEIVED MONEY",
+			"is_hold": false
+		},
+		"TRANSFER_NORMAL/blik_transfer_receive": {
+			"operation_id": "8",
+			"title": "PRZELEW BLIK NA TELEFON",
+			"money": {
+				"amount": "1.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "MOBILE_PAYMENT_C2C_EXTERNAL",
+				"side": "CREDIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2021-12-08",
+				"exec_date": "2021-12-08",
+				"operation_kind": {
+					"code": "MOBILE_PAYMENT_C2C_EXTERNAL",
+					"side": "CREDIT"
+				},
+				"money": {
+					"amount": "1.00",
+					"currency": "PLN"
+				},
+				"other_account": "12345678901234567890123456",
+				"title": "PRZELEW BLIK NA TELEFON",
+				"sender_name_and_address": "SOMEONE WHO SENT MONEY"
+			},
+			"other_side": "SOMEONE WHO SENT MONEY",
+			"is_hold": false
+		},
+		"TRANSFER_NORMAL/iban_transfer": {
+			"operation_id": "76",
+			"title": "CUSTOM TRANSFER NAME",
+			"money": {
+				"amount": "-940.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "TRANSFER",
+				"side": "DEBIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2022-03-29",
+				"exec_date": "2022-03-29",
+				"operation_kind": {
+					"code": "TRANSFER",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-940.00",
+					"currency": "PLN"
+				},
+				"other_account": "12345678901234567890123456",
+				"title": "CUSTOM TRANSFER NAME",
+				"recipient_name_and_address": "SOMEONE WHO RECEIVED MONEY"
+			},
+			"other_side": "SOMEONE WHO RECEIVED MONEY",
+			"is_hold": false
+		},
+		"TRANSFER_NORMAL/iban_transfer_receive+lil_different": {
+			"operation_id": "948",
+			"title": "INCOMING TRANSFER FOR NAME SURNAME",
+			"money": {
+				"amount": "4100.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "TRANSFER",
+				"side": "CREDIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2023-12-24",
+				"exec_date": "2023-12-24",
+				"operation_kind": {
+					"code": "TRANSFER",
+					"side": "CREDIT"
+				},
+				"money": {
+					"amount": "4100.00",
+					"currency": "PLN"
+				},
+				"other_account": "12345678901234567890123456",
+				"title": "INCOMING TRANSFER FOR NAME SURNAME",
+				"sender_name_and_address": "COMPANY NAME COMPANY ADDRESS"
+			},
+			"other_side": "COMPANY NAME",
+			"is_hold": false
+		},
+		"TRANSFER_NORMAL/iban_transfer_receive": {
+			"operation_id": "17",
+			"title": "Incoming transfer for Name Surname",
+			"money": {
+				"amount": "2750.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "TRANSFER_IN",
+				"side": "CREDIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2022-02-11",
+				"exec_date": "2022-02-11",
+				"operation_kind": {
+					"code": "TRANSFER_IN",
+					"side": "CREDIT"
+				},
+				"money": {
+					"amount": "2750.00",
+					"currency": "PLN"
+				},
+				"other_account": "12345678901234567890123456",
+				"title": "Incoming transfer for Name Surname",
+				"sender_name_and_address": "NAME OF THE COMPANY ADDRESS OF THE COMPANY"
+			},
+			"other_side": "NAME OF THE COMPANY",
+			"is_hold": false
+		},
+		"TRANSFER_NORMAL/iban_transfer_repeat+recepient_id": {
+			"operation_id": "39",
+			"title": "AUTOMATIC SCHEDULED TRANSFER",
+			"money": {
+				"amount": "-47.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "TRANSFER",
+				"side": "DEBIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2022-02-25",
+				"exec_date": "2022-02-25",
+				"operation_kind": {
+					"code": "TRANSFER",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-47.00",
+					"currency": "PLN"
+				},
+				"other_account": "12345678901234567890123456",
+				"title": "AUTOMATIC SCHEDULED TRANSFER",
+				"recipient_name_and_address": "COMPANY NAME"
+			},
+			"other_side": "COMPANY NAME",
+			"is_hold": false
+		},
+		"TRANSFER_NORMAL/iban_transfer_repeat": {
+			"operation_id": "2478",
+			"title": "AUTOMATIC SCHEDULED TRANSFER",
+			"money": {
+				"amount": "-800.00",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "STANDING_ORDER",
+				"side": "DEBIT"
+			},
+			"operation_type": "TRANSFER_NORMAL",
+			"details": {
+				"order_date": "2025-02-18",
+				"exec_date": "2025-02-18",
+				"operation_kind": {
+					"code": "STANDING_ORDER",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-800.00",
+					"currency": "PLN"
+				},
+				"other_account": "12345678901234567890123456",
+				"title": "AUTOMATIC SCHEDULED TRANSFER",
+				"recipient_name_and_address": "NAME SURNAME"
+			},
+			"other_side": "NAME SURNAME",
+			"is_hold": false
+		},
+		"HOLD/card_payment": {
+			"operation_id": "2968",
+			"date": "2025-06-07",
+			"money": {
+				"amount": "-12.30",
+				"currency": "PLN"
+			},
+			"title": "Parnu, ESTONIA",
+			"operation_kind": {
+				"code": "CARD_PAYMENT",
+				"side": "DEBIT"
+			},
+			"operation_type": "CARD_TRANSACTION",
+			"details": {
+				"exec_date": "2025-06-07",
+				"hold_registration_date": "2025-06-07",
+				"operation_kind": {
+					"code": "CARD_PAYMENT",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-12.30",
+					"currency": "PLN"
+				},
+				"title": "P4000000000000001PL000001",
+				"merchant_name": "Bolt",
+				"category": "Transport",
+				"subcategories": "taxi_stand",
+				"address": "BOLT.EU/R/2506071840",
+				"city": "Parnu",
+				"country": "ESTONIA",
+				"country_code": "EE"
+			},
+			"ending_balance": {
+				"amount": "800.00",
+				"currency": "PLN"
+			},
+			"avatar_url": "667f8c9ecabc7ff016c54972_2x.png",
+			"google_place_id": null,
+			"coordinates": {
+				"latitude": null,
+				"longitude": null
+			},
+			"other_side": "Bolt",
+			"recharge_operator_id": null,
+			"is_hold": true,
+			"is_other_side_recipient": null,
+			"vat_account_number": null,
+			"ebc_margin": null,
+			"avatar": null,
+			"ref_fee_hint": null,
+			"ref_map": null,
+			"ref_operation_completed_confirmation": null,
+			"ref_operation_completed_confirmation_pl": null,
+			"ref_operation_completed_confirmation_en": null,
+			"ref_operation_completed_recipient_create_normal": null,
+			"ref_operation_completed_recipient_create_tax": null,
+			"ref_operation_completed_recipient_create_split": null,
+			"ref_operation_completed_repeat_foreign": null,
+			"ref_operation_completed_repeat_normal": null,
+			"ref_operation_completed_repeat_split": null,
+			"ref_operation_completed_repeat_tax": null,
+			"ref_operation_completed_exec_foreign": null,
+			"ref_operation_completed_exec_normal": null,
+			"ref_operation_completed_exec_split": null,
+			"ref_operation_completed_exec_tax": null,
+			"ref_operation_completed_cancel_foreign": null
+		}
+	}
+}

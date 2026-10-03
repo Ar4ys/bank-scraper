@@ -73,22 +73,22 @@ describe("Lunch Flow API", () => {
 		assert.equal(status, 200);
 		assert.equal(body.total, 2);
 
-		const [transfer, card] = body.transactions;
+		const [card, transfer] = body.transactions;
 		assert.match(transfer.id, /^[0-9a-f-]{36}$/);
 		assert.deepEqual(
 			{ ...transfer, id: undefined },
 			{
 				id: undefined,
 				accountId: account.id,
-				amount: -1500,
+				amount: -940,
 				currency: "PLN",
-				date: "2025-05-21",
-				merchant: "Jan Kowalski",
-				description: "Rent August",
+				date: "2022-03-29",
+				merchant: "SOMEONE WHO RECEIVED MONEY",
+				description: "CUSTOM TRANSFER NAME",
 				isPending: false,
 			},
 		);
-		assert.deepEqual([card.amount, card.merchant, card.date], [-12.34, null, "2025-06-06"]);
+		assert.deepEqual([card.amount, card.merchant, card.date], [-57.33, null, "2022-02-11"]);
 	});
 
 	it("filters by inclusive dates, named as Sure or as the docs name them", async () => {
@@ -97,10 +97,10 @@ describe("Lunch Flow API", () => {
 				(transaction: { date: string }) => transaction.date,
 			);
 
-		assert.deepEqual(await dates("start_date=2025-05-22"), ["2025-06-06"]);
-		assert.deepEqual(await dates("end_date=2025-05-21&include_pending=true"), ["2025-05-21"]);
-		assert.deepEqual(await dates("from=2025-05-21&to=2025-06-06"), ["2025-05-21", "2025-06-06"]);
-		assert.deepEqual(await dates("from=2025-06-07"), []);
+		assert.deepEqual(await dates("start_date=2022-02-12"), ["2022-03-29"]);
+		assert.deepEqual(await dates("end_date=2022-02-11&include_pending=true"), ["2022-02-11"]);
+		assert.deepEqual(await dates("from=2022-02-11&to=2022-03-29"), ["2022-02-11", "2022-03-29"]);
+		assert.deepEqual(await dates("from=2022-03-30"), []);
 	});
 
 	it("rejects malformed parameters and unknown accounts", async () => {

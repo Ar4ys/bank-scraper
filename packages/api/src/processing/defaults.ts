@@ -28,11 +28,12 @@ function deriveMerchantAndDescription(tx: IpkoTransaction): {
 	description: string;
 } {
 	switch (tx.$type) {
+		// For payments `details.title` is only a reference number; what was paid for is in the address
 		case IpkoTxType.CardTransaction:
 			return {
 				merchant: tx.details.merchant_name,
 				description:
-					joinParts([tx.details.title, tx.details.city, tx.details.country]) +
+					joinParts([tx.details.address, tx.details.city, tx.details.country]) +
 					originalAmountSuffix(tx, tx.details.original_amount),
 			};
 
@@ -40,14 +41,13 @@ function deriveMerchantAndDescription(tx: IpkoTransaction): {
 			return {
 				merchant: undefined,
 				description:
-					joinParts([tx.details.title, tx.details.receiver_address]) +
-					originalAmountSuffix(tx, tx.details.original_amount),
+					tx.details.receiver_address + originalAmountSuffix(tx, tx.details.original_amount),
 			};
 
 		case IpkoTxType.MobileTransaction:
 			return {
 				merchant: tx.details.merchant_name,
-				description: joinParts([tx.details.title, tx.details.address, tx.details.city]),
+				description: joinParts([tx.details.address, tx.details.city, tx.details.country]),
 			};
 
 		case IpkoTxType.MobileAtmTransaction:

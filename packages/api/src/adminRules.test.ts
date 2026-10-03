@@ -27,16 +27,18 @@ async function request(path: string, method = "GET", body?: unknown) {
 	return { status: response.status, body: (await response.json()) as any };
 }
 
-const boltRule = {
-	name: "Bolt",
+const lidlRule = {
+	name: "Lidl",
 	enabled: true,
 	txTypes: ["cardTransaction"],
-	conditions: [{ path: "details.title", operator: "regex", pattern: "^BOLT\\.EU/P/(\\d+)" }],
-	set: { merchant: "Bolt", description: "Bolt ride {match.1}" },
+	conditions: [{ path: "details.address", operator: "regex", pattern: "^LIDL (\\d+)" }],
+	set: { merchant: "Lidl", description: "Lidl store {match.1}" },
 };
 
 const merchants = async () =>
-	(await request("/transactions")).body.items.map((item: any) => [item.bankId, item.merchant]);
+	(await request("/transactions")).body.items
+		.map((item: any) => [item.bankId, item.merchant])
+		.toSorted();
 
 // The tests build on each other: draft, preview, apply, change
 describe("admin rules API", () => {
@@ -55,7 +57,7 @@ describe("admin rules API", () => {
 
 	it("rejects rules it cannot use", async () => {
 		const invalid = (rule: object) =>
-			request("/rules", "PUT", { rules: [{ ...boltRule, ...rule }] });
+			request("/rules", "PUT", { rules: [{ ...lidlRule, ...rule }] });
 
 		assert.equal(
 			(await invalid({ conditions: [{ path: "title", operator: "regex", pattern: "(" }] })).status,
@@ -67,7 +69,7 @@ describe("admin rules API", () => {
 	});
 
 	it("previews unsaved rules without writing anything", async () => {
-		const { status, body } = await request("/rules/preview", "POST", { rules: [boltRule] });
+		const { status, body } = await request("/rules/preview", "POST", { rules: [lidlRule] });
 
 		assert.equal(status, 200);
 		assert.deepEqual(
@@ -77,19 +79,19 @@ describe("admin rules API", () => {
 				change.after.merchant,
 				change.after.description,
 			]),
-			[["card-1", "rules", "Bolt", "Bolt ride 20261003"]],
+			[["card-1", "rules", "Lidl", "Lidl store 3011"]],
 		);
 		assert.equal(body.unchanged, 1);
 		assert.deepEqual(await merchants(), [
 			["card-1", null],
-			["transfer-1", "Jan Kowalski"],
+			["transfer-1", "SOMEONE WHO RECEIVED MONEY"],
 		]);
 	});
 
 	it("limits a preview to one bank transaction", async () => {
 		const accountId = (await request("/accounts")).body[0].id;
 		const { body } = await request("/rules/preview", "POST", {
-			rules: [boltRule],
+			rules: [lidlRule],
 			only: { accountId, bankId: "transfer-1" },
 		});
 
@@ -97,13 +99,13 @@ describe("admin rules API", () => {
 	});
 
 	it("saves the working set in list order, which stays unapplied", async () => {
-		const other = { ...boltRule, name: "Other", enabled: false };
-		const saved = await request("/rules", "PUT", { rules: [boltRule, other] });
+		const other = { ...lidlRule, name: "Other", enabled: false };
+		const saved = await request("/rules", "PUT", { rules: [lidlRule, other] });
 
 		assert.deepEqual(
 			saved.body.rules.map((rule: any) => [rule.name, rule.priority]),
 			[
-				["Bolt", 0],
+				["Lidl", 0],
 				["Other", 1],
 			],
 		);
@@ -119,7 +121,7 @@ describe("admin rules API", () => {
 
 		assert.equal(status, 200);
 		assert.equal(body.changes.length, 1);
-		assert.deepEqual((await merchants())[0], ["card-1", "Bolt"]);
+		assert.deepEqual((await merchants())[0], ["card-1", "Lidl"]);
 
 		const current = (await request("/rules")).body;
 		assert.deepEqual(
@@ -132,7 +134,7 @@ describe("admin rules API", () => {
 			revisions.map((revision: any) => [revision.id, revision.ruleCount]),
 			[[body.revisionId, 2]],
 		);
-		assert.equal((await request(`/rules/revisions/${body.revisionId}`)).body.rules[0].name, "Bolt");
+		assert.equal((await request(`/rules/revisions/${body.revisionId}`)).body.rules[0].name, "Lidl");
 		assert.equal((await request("/rules/revisions/nope")).status, 404);
 	});
 
@@ -153,14 +155,14 @@ describe("admin rules API", () => {
 		assert.equal(applied.body.errors.length, 1);
 
 		assert.equal((await request("/rules/revisions")).body.length, 1);
-		assert.deepEqual((await merchants())[0], ["card-1", "Bolt"]);
+		assert.deepEqual((await merchants())[0], ["card-1", "Lidl"]);
 		assert.equal((await request("/raw-transactions?status=error")).body.total, 0);
 	});
 
 	it("keeps the id of an existing rule and records a rule change in the history", async () => {
 		const { rules } = (await request("/rules")).body;
 		const saved = await request("/rules", "PUT", {
-			rules: [{ ...rules[0], set: { merchant: "Bolt Taxi" } }],
+			rules: [{ ...rules[0], set: { merchant: "Lidl Market" } }],
 		});
 		assert.equal(saved.body.rules[0].id, rules[0].id);
 
@@ -176,8 +178,8 @@ describe("admin rules API", () => {
 			]),
 			[
 				["raw", null, undefined],
-				["rules", "Bolt", "Bolt"],
-				["rules", "Bolt Taxi", "Bolt"],
+				["rules", "Lidl", "Lidl"],
+				["rules", "Lidl Market", "Lidl"],
 			],
 		);
 	});

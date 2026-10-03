@@ -128,21 +128,18 @@ describe("admin API", () => {
 		assert.deepEqual(
 			body.items.map((item: any) => [item.bankId, item.date, item.amount, item.merchant]),
 			[
-				["card-1", "2025-06-06", "-12.34", "Bolt"],
-				["transfer-1", "2025-05-21", "-1500.00", "Jan Kowalski"],
+				["transfer-1", "2022-03-29", "-940.00", "SOMEONE WHO RECEIVED MONEY"],
+				["card-1", "2022-02-11", "-57.33", "Bolt"],
 			],
 		);
 
-		const found = await request("/transactions?search=kowal");
+		const found = await request("/transactions?search=someone");
 		assert.deepEqual(
 			found.body.items.map((item: any) => item.bankId),
 			["transfer-1"],
 		);
 		assert.equal((await request("/transactions?withoutMerchant=true")).body.total, 0);
-		assert.equal(
-			(await request("/transactions?limit=1&offset=1")).body.items[0].bankId,
-			"transfer-1",
-		);
+		assert.equal((await request("/transactions?limit=1&offset=1")).body.items[0].bankId, "card-1");
 	});
 
 	it("returns a transaction with its version history", async () => {

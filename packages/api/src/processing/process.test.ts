@@ -23,14 +23,14 @@ const ingest = (data: ReturnType<typeof rawCardTransaction>) =>
 		],
 	});
 
-const boltRule: Rule = {
-	id: "bolt",
-	name: "Bolt",
+const lidlRule: Rule = {
+	id: "lidl",
+	name: "Lidl",
 	priority: 0,
 	enabled: true,
 	txTypes: null,
-	conditions: [{ path: "details.title", operator: "contains", pattern: "bolt.eu" }],
-	set: { merchant: "Bolt" },
+	conditions: [{ path: "details.address", operator: "contains", pattern: "lidl" }],
+	set: { merchant: "Lidl" },
 };
 
 async function applyRules(rules: Rule[]) {
@@ -57,9 +57,9 @@ describe("processing", () => {
 
 		const [transaction] = await db.select().from(tables.transactions);
 		assert.ok(transaction);
-		assert.equal(transaction.bankId, "card-1");
-		assert.equal(transaction.amount, -1234n);
-		assert.equal(transaction.date.toString(), "2025-06-06");
+		assert.equal(transaction.bankId, "19");
+		assert.equal(transaction.amount, -5733n);
+		assert.equal(transaction.date.toString(), "2022-02-11");
 		assert.equal(transaction.merchant, null);
 
 		const [version, ...rest] = await versions();
@@ -81,19 +81,19 @@ describe("processing", () => {
 
 	it("adds a version caused by the raw transaction when its data changes the fields", async () => {
 		await ingest(rawCardTransaction());
-		const [changed] = await ingest(rawCardTransaction({ details: { merchant_name: "Bolt" } }));
+		const [changed] = await ingest(rawCardTransaction({ details: { merchant_name: "Lidl" } }));
 		assert.ok(changed);
 
 		const [transaction, ...others] = await db.select().from(tables.transactions);
 		assert.equal(others.length, 0);
-		assert.equal(transaction?.merchant, "Bolt");
+		assert.equal(transaction?.merchant, "Lidl");
 
 		const history = await versions();
 		assert.deepEqual(
 			history.map((version) => [version.cause, version.data.merchant]),
 			[
 				["raw", null],
-				["raw", "Bolt"],
+				["raw", "Lidl"],
 			],
 		);
 		assert.equal(history[1]?.rawTransactionId, changed.id);
@@ -113,7 +113,7 @@ describe("processing", () => {
 
 	it("records a rule change as the cause when rules change the fields", async () => {
 		await ingest(rawCardTransaction());
-		const report = await applyRules([boltRule]);
+		const report = await applyRules([lidlRule]);
 
 		assert.equal(report.changes.length, 1);
 
@@ -123,10 +123,10 @@ describe("processing", () => {
 			history.map((version) => [version.cause, version.data.merchant, version.ruleRevisionId]),
 			[
 				["raw", null, null],
-				["rules", "Bolt", revision?.id],
+				["rules", "Lidl", revision?.id],
 			],
 		);
-		assert.equal(history[1]?.fieldSources.merchant, "bolt");
+		assert.equal(history[1]?.fieldSources.merchant, "lidl");
 	});
 
 	it("records a reprocess as the cause when neither raw data nor rules changed", async () => {
@@ -146,7 +146,7 @@ describe("processing", () => {
 			(await versions()).map((v) => [v.cause, v.data.description]),
 			[
 				["raw", "old format"],
-				["reprocess", "BOLT.EU/P/20261003, Tallinn, Estonia"],
+				["reprocess", "LIDL 3011, Wroclaw, POLSKA"],
 			],
 		);
 	});
@@ -179,7 +179,7 @@ describe("processing", () => {
 		await ingest(rawCardTransaction());
 		await applyRules([
 			{
-				...boltRule,
+				...lidlRule,
 				conditions: [{ path: "details.title", operator: "contains", pattern: "nothing" }],
 			},
 		]);
@@ -208,7 +208,7 @@ describe("processing", () => {
 		assert.equal((await versions()).length, 1);
 		assert.deepEqual(
 			listBankTransactionKeys("error").map((key) => key.bankId),
-			["card-1"],
+			["19"],
 		);
 	});
 
@@ -227,7 +227,7 @@ describe("processing", () => {
 
 		const report = processBankTransactions(listBankTransactionKeys(), {
 			dryRun: true,
-			ruleRevision: { id: "preview", rules: [boltRule] },
+			ruleRevision: { id: "preview", rules: [lidlRule] },
 		});
 
 		assert.equal(report.changes.length, 1);
@@ -237,7 +237,7 @@ describe("processing", () => {
 				report.changes[0]?.before?.merchant,
 				report.changes[0]?.after.merchant,
 			],
-			["rules", null, "Bolt"],
+			["rules", null, "Lidl"],
 		);
 		assert.equal((await versions()).length, 1);
 		assert.equal((await db.select().from(tables.transactions))[0]?.merchant, null);

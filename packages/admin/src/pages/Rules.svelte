@@ -138,15 +138,17 @@
 		});
 
 	function addRule() {
-		// Starts from the sample transaction, if there is one: its type, and its title to match on
+		// Starts from the sample transaction, if there is one: its type, and its text to match on.
+		// Payments carry that text in the address (their title is a reference number), the rest in the title.
 		const type = sample && getTextByPath(sample, "$type");
-		const title = sample && getTextByPath(sample, "details.title");
+		const textPath = sample && getTextByPath(sample, "details.address") ? "details.address" : "details.title";
+		const text = sample && getTextByPath(sample, textPath);
 
 		rules.push({
 			name: "New rule",
 			enabled: true,
 			txTypes: type ? [type] : null,
-			conditions: title ? [{ path: "details.title", operator: "contains", pattern: title }] : [],
+			conditions: text ? [{ path: textPath, operator: "contains", pattern: text }] : [],
 			set: {},
 		});
 	}
@@ -309,7 +311,7 @@
 		{:else if sample}
 			<p class="text-sm">
 				<Badge variant="secondary">{getTextByPath(sample, "$type")}</Badge>
-				{getTextByPath(sample, "details.title") ?? getTextByPath(sample, "title")}
+				{getTextByPath(sample, "details.address") ?? getTextByPath(sample, "details.title") ?? getTextByPath(sample, "title")}
 				<span class="tabular-nums text-muted-foreground">
 					{getTextByPath(sample, "money.amount")}
 					{getTextByPath(sample, "money.currency")}
@@ -385,7 +387,7 @@
 					<div class="flex flex-wrap gap-2">
 						<Input
 							class="max-w-xs font-mono"
-							placeholder="details.title"
+							placeholder="details.address"
 							list="fields-{index}"
 							bind:value={condition.path}
 							onfocus={() => (fieldTarget = { rule, insert: (path) => (condition.path = path) })}
