@@ -1,0 +1,24 @@
+# Example service to put next to Sure. Copy it into your compose file and set the two keys.
+#
+# The admin app and /api/admin have no auth of their own: publish the port only to a reverse proxy
+# that protects everything except /api/lunchflow and /api/transactions/raw, which have their keys.
+
+services:
+  bank-scraper:
+    build:
+      context: .
+      args:
+        # e.g. APP_GIT_COMMIT=$(git rev-parse --short HEAD) docker compose build
+        APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+    restart: unless-stopped
+    environment:
+      INGEST_API_KEY: change-me
+      LUNCHFLOW_API_KEY: change-me-too
+    volumes:
+      # The only copy of the data: back it up, see "Backup" in the README
+      - bank-scraper-data:/data
+    ports:
+      - "127.0.0.1:8585:8585"
+
+volumes:
+  bank-scraper-data:

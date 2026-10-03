@@ -23,8 +23,9 @@ Tool versions and tasks are managed with [mise](https://mise.jdx.dev).
 mise install
 pnpm install
 mkdir packages/api/local   # holds the SQLite database, ignored by git
-mise run db-migrate
 ```
+
+The server applies pending migrations when it starts.
 
 ## Tasks
 
@@ -35,7 +36,7 @@ mise run db-migrate
 | `mise run test`             | Runs the tests, each test file against its own temp SQLite file |
 | `mise run typecheck`        | Typechecks all packages                                         |
 | `mise run db-generate`      | Generates a migration from `packages/api/src/db/schema.ts`      |
-| `mise run db-migrate`       | Applies migrations to the database                              |
+| `mise run db-migrate`       | Applies migrations without starting the server                  |
 | `mise run db-push`          | `db-generate` followed by `db-migrate`                          |
 | `mise run build-userscript` | Bundles the userscript into `packages/userscript/dist/`         |
 | `mise run dev-admin`        | Starts the admin app with hot reload                            |
@@ -52,6 +53,36 @@ mise run db-migrate
 | `LUNCHFLOW_API_KEY` | required         | Key Sure has to send to the Lunch Flow API                               |
 | `ADMIN_APP_DIR`     | `../admin/dist`  | Directory of the built admin app, relative to `packages/api`             |
 | `APP_GIT_COMMIT`    | `unknown`        | Git commit of the running build, recorded with every transaction version |
+
+## Deployment
+
+`Dockerfile` builds one image that serves the API and the admin app on port 8585 and keeps the
+database in the `/data` volume. `compose.example.yaml` is a service to put next to Sure.
+
+The admin app and `/api/admin` have no auth of their own. Put the service behind a reverse proxy
+that protects everything except `/api/lunchflow` and `/api/transactions/raw`, which check their keys.
+
+### Sure
+
+Sure's Lunch Flow provider only talks to `https://lunchflow.app/api/v1`: `effective_base_url` in
+`app/models/lunchflow_item.rb` falls back to it for any other URL. To sync from this service, patch
+that method in your Sure build so it returns your base URL, `http://<host>:8585/api/lunchflow`, and
+enter the `LUNCHFLOW_API_KEY` as the Lunch Flow API key in Sure.
+
+Sure re-fetches only the transactions of about the last week on each sync, so a rule change that
+rewrites older transactions does not reach Sure (see `plans/todo.md`).
+
+### Backup
+
+The volume holds the only copy of the data, including the rules and the history of every
+transaction. This writes a consistent copy while the server runs:
+
+```sh
+docker compose exec bank-scraper node tools/backup.ts /data/backup.db
+```
+
+After a restore, transactions that were scraped after the backup come back by scrolling through the
+history in iPKO again; scraping the same transaction twice is harmless.
 
 ## Admin app
 

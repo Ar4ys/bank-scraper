@@ -1,0 +1,8 @@
+.git
+.idea
+.zed
+**/node_modules
+**/dist
+**/local
+**/*.db
+plans

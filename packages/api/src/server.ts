@@ -1,4 +1,7 @@
+import path from "node:path";
+
 import { serve, type ServerType } from "@hono/node-server";
+import { migrate } from "drizzle-orm/node-sqlite/migrator";
 
 import { app } from "./app.ts";
 import { config } from "./config.ts";
@@ -34,6 +37,7 @@ function registerShutdownHandlers(server: ServerType) {
 
 async function main() {
 	await initSQLite();
+	migrate(db, { migrationsFolder: path.join(import.meta.dirname, "../drizzle") });
 
 	const server = serve(
 		{ fetch: app.fetch, hostname: config.HTTP_HOST, port: config.HTTP_PORT },
