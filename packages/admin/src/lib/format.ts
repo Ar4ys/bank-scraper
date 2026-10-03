@@ -4,3 +4,14 @@ export const formatInstant = (instant: string) =>
 
 export const formatJson = (value: unknown) =>
 	typeof value === "string" ? value : JSON.stringify(value, null, 2);
+
+/** What caused a version of a transaction, in words */
+export const causeLabels: Record<string, string> = {
+	raw: "New data from the bank",
+	rules: "Rules changed",
+	reprocess: "Code changed",
+};
+
+/** Tailwind classes for an amount: income stands out, spending stays neutral */
+export const amountClass = (amount: string) =>
+	amount.startsWith("-") ? "" : "text-green-700 dark:text-green-400";

@@ -8,7 +8,8 @@
 	import { Label } from "$lib/components/ui/label";
 	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
-	import { p } from "$lib/router";
+	import { amountClass } from "$lib/format";
+	import { navigate } from "$lib/router";
 
 	const limit = 100;
 
@@ -58,22 +59,25 @@
 		</Table.Header>
 		<Table.Body>
 			{#each data.items as transaction (transaction.id)}
-				<Table.Row>
-					<Table.Cell class="whitespace-nowrap tabular-nums">
-						<a class="underline-offset-4 hover:underline" href={p("/transactions/:id", { params: { id: transaction.id } })}>
-							{transaction.date}
-						</a>
+				<Table.Row
+					class="cursor-pointer"
+					onclick={() => navigate("/transactions/:id", { params: { id: transaction.id } })}
+				>
+					<Table.Cell class="whitespace-nowrap tabular-nums">{transaction.date}</Table.Cell>
+					<Table.Cell class="max-w-48 truncate text-muted-foreground">
+						{accountName(transaction.accountId)}
 					</Table.Cell>
-					<Table.Cell>{accountName(transaction.accountId)}</Table.Cell>
-					<Table.Cell>
+					<Table.Cell class="max-w-56 truncate font-medium">
 						{#if transaction.merchant}
 							{transaction.merchant}
 						{:else}
-							<span class="text-muted-foreground">none</span>
+							<span class="font-normal text-muted-foreground">no merchant</span>
 						{/if}
 					</Table.Cell>
-					<Table.Cell class="max-w-md truncate">{transaction.description}</Table.Cell>
-					<Table.Cell class="whitespace-nowrap text-right tabular-nums">
+					<Table.Cell class="max-w-md truncate" title={transaction.description}>
+						{transaction.description}
+					</Table.Cell>
+					<Table.Cell class="whitespace-nowrap text-right tabular-nums {amountClass(transaction.amount)}">
 						{transaction.amount}
 						{transaction.currency}
 					</Table.Cell>

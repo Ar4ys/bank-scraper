@@ -41,7 +41,10 @@
 <Button variant="outline" size="sm" disabled={busy} onclick={() => run(true)}>{label}</Button>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+	<Dialog.Content
+		class="flex max-h-[85vh] flex-col sm:max-w-3xl"
+		onOpenAutoFocus={(event) => event.preventDefault()}
+	>
 		<Dialog.Header>
 			<Dialog.Title>{label}</Dialog.Title>
 			<Dialog.Description>
@@ -49,11 +52,13 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
+		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto">
 		{#if error}
 			<p class="text-sm text-destructive">{error}</p>
 		{:else if preview}
 			<ReportView report={preview} />
 		{/if}
+		</div>
 
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>

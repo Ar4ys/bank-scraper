@@ -24,7 +24,7 @@
 
 {#await detail}
 	<p class="text-sm text-muted-foreground">Loading…</p>
-{:then { versions, transactionId }}
+{:then { versions, transactionId, parsed }}
 	<p class="text-sm">
 		{#if transactionId}
 			<a class="underline underline-offset-4" href={p("/transactions/:id", { params: { id: transactionId } })}>
@@ -32,6 +32,12 @@
 			</a>
 		{:else}
 			<span class="text-muted-foreground">Not parsed into a transaction.</span>
+		{/if}
+		{#if parsed}
+			·
+			<a class="underline underline-offset-4" href={p("/rules", { search: { accountId, bankId } })}>
+				Try rules on it
+			</a>
 		{/if}
 	</p>
 
@@ -42,8 +48,11 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title class="flex items-center gap-2 text-base">
+					Version {versions.length - index} of {versions.length}
 					<StatusBadge status={version.status} />
-					{formatInstant(version.createdAt)}
+					<span class="text-sm font-normal text-muted-foreground">
+						scraped {formatInstant(version.createdAt)}
+					</span>
 				</Card.Title>
 				<Card.Description class="font-mono text-xs">{version.id}</Card.Description>
 			</Card.Header>

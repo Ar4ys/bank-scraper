@@ -66,7 +66,7 @@
 		{#each accounts as account (account.id)}
 			<Table.Row>
 				<Table.Cell class="tabular-nums">{account.id}</Table.Cell>
-				<Table.Cell><Input class="min-w-48" bind:value={names[account.id]} /></Table.Cell>
+				<Table.Cell><Input class="min-w-72" bind:value={names[account.id]} /></Table.Cell>
 				<Table.Cell>
 					<Button
 						size="sm"

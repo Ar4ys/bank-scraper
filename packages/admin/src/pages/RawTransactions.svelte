@@ -7,7 +7,7 @@
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import * as Table from "$lib/components/ui/table";
 	import { formatInstant } from "$lib/format";
-	import { p } from "$lib/router";
+	import { navigate } from "$lib/router";
 
 	const limit = 100;
 	const statuses = ["unprocessed", "processed", "hold", "error"] as const;
@@ -23,7 +23,15 @@
 	const page = $derived(loadRawTransactions({ limit, offset, accountId, status: status || undefined }));
 
 	const accountName = (id: number) => accounts.find((account) => account.id === id)?.name ?? id;
-	const titleOf = (data: Record<string, unknown>) => (typeof data.title === "string" ? data.title : "");
+	// Raw data has whatever shape the bank sent, so everything read from it is checked
+	const textAt = (data: unknown, ...path: string[]) => {
+		let value = data;
+		for (const key of path) {
+			// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+			value = typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined;
+		}
+		return typeof value === "string" ? value : "";
+	};
 
 	void loadAccounts().then((loaded) => (accounts = loaded));
 </script>
@@ -54,31 +62,45 @@
 		<Table.Header>
 			<Table.Row>
 				<Table.Head>Bank id</Table.Head>
-				<Table.Head>Account</Table.Head>
 				<Table.Head>Status</Table.Head>
 				<Table.Head>Versions</Table.Head>
-				<Table.Head>Title</Table.Head>
+				<Table.Head>Bank's title</Table.Head>
+				<Table.Head class="text-right">Amount</Table.Head>
+				<Table.Head>Account</Table.Head>
 				<Table.Head>Scraped</Table.Head>
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
 			{#each data.items as raw (raw.id)}
-				<Table.Row>
-					<Table.Cell class="font-mono text-xs">
-						<a
-							class="underline-offset-4 hover:underline"
-							href={p("/raw/:accountId/:bankId", {
-								params: { accountId: String(raw.accountId), bankId: raw.bankId },
-							})}
-						>
-							{raw.bankId}
-						</a>
-					</Table.Cell>
-					<Table.Cell>{accountName(raw.accountId)}</Table.Cell>
+				<Table.Row
+					class="cursor-pointer"
+					onclick={() =>
+						navigate("/raw/:accountId/:bankId", {
+							params: { accountId: String(raw.accountId), bankId: raw.bankId },
+						})}
+				>
+					<Table.Cell class="font-mono text-xs">{raw.bankId}</Table.Cell>
 					<Table.Cell><StatusBadge status={raw.status} /></Table.Cell>
-					<Table.Cell class="tabular-nums">{raw.versionCount}</Table.Cell>
-					<Table.Cell class="max-w-md truncate">{titleOf(raw.data)}</Table.Cell>
-					<Table.Cell class="whitespace-nowrap">{formatInstant(raw.createdAt)}</Table.Cell>
+					<Table.Cell class="tabular-nums">
+						{#if raw.versionCount > 1}
+							<span class="font-medium">{raw.versionCount}</span>
+						{:else}
+							<span class="text-muted-foreground">1</span>
+						{/if}
+					</Table.Cell>
+					<Table.Cell class="max-w-md truncate">
+						{textAt(raw.data, "title")}
+						<span class="text-muted-foreground">{textAt(raw.data, "details", "title")}</span>
+						{#if raw.error}
+							<div class="truncate text-xs text-destructive">{raw.error.message.split("\n")[0]}</div>
+						{/if}
+					</Table.Cell>
+					<Table.Cell class="whitespace-nowrap text-right tabular-nums">
+						{textAt(raw.data, "money", "amount")}
+						{textAt(raw.data, "money", "currency")}
+					</Table.Cell>
+					<Table.Cell class="max-w-48 truncate text-muted-foreground">{accountName(raw.accountId)}</Table.Cell>
+					<Table.Cell class="whitespace-nowrap text-muted-foreground">{formatInstant(raw.createdAt)}</Table.Cell>
 				</Table.Row>
 			{/each}
 		</Table.Body>

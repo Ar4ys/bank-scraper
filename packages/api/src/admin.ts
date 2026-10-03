@@ -13,10 +13,12 @@ import {
 	type RawTransaction,
 	type Transaction,
 } from "./db/schema.ts";
+import { parseForRules } from "./processing/derive.ts";
 import { listBankTransactionKeys, processBankTransactions } from "./processing/process.ts";
+import { defaultFieldSource } from "./processing/rules.ts";
 import { escapeLikePattern } from "./utils.ts";
 
-const { accounts, rawTransactions, transactions, transactionVersions } = tables;
+const { accounts, rawTransactions, ruleRevisions, transactions, transactionVersions } = tables;
 
 const pageQuerySchema = z.object({
 	limit: z.coerce.number().int().min(1).max(500).default(100),
@@ -220,6 +222,8 @@ export const adminApi = new Hono()
 					/** Oldest first */
 					versions: versions.map(rawTransactionJson),
 					transactionId: transaction?.id ?? null,
+					/** The latest version as rules see it, `null` if it is a hold or cannot be parsed */
+					parsed: parseForRules(versions.at(-1)?.data) ?? null,
 				},
 				200,
 			);
@@ -279,8 +283,9 @@ export const adminApi = new Hono()
 		if (!transaction) return c.json({ message: "Transaction not found" }, 404);
 
 		const versions = await db
-			.select()
+			.select({ version: transactionVersions, revisionRules: ruleRevisions.rules })
 			.from(transactionVersions)
+			.leftJoin(ruleRevisions, eq(ruleRevisions.id, transactionVersions.ruleRevisionId))
 			.where(eq(transactionVersions.transactionId, transaction.id))
 			.orderBy(transactionVersions.id);
 
@@ -288,14 +293,21 @@ export const adminApi = new Hono()
 			{
 				transaction: transactionJson(transaction),
 				/** Oldest first */
-				versions: versions.map((version) => ({
+				versions: versions.map(({ version, revisionRules }) => ({
 					id: version.id,
 					rawTransactionId: version.rawTransactionId,
 					cause: version.cause,
 					ruleRevisionId: version.ruleRevisionId,
 					appCommit: version.appCommit,
 					data: version.data,
-					fieldSources: version.fieldSources,
+					/** Fields a rule set, with the name the rule had in that revision */
+					fieldRules: Object.entries(version.fieldSources)
+						.filter(([, source]) => source !== defaultFieldSource)
+						.map(([field, ruleId]) => ({
+							field,
+							ruleId,
+							ruleName: revisionRules?.find((rule) => rule.id === ruleId)?.name ?? null,
+						})),
 					createdAt: version.createdAt.toString(),
 				})),
 			},

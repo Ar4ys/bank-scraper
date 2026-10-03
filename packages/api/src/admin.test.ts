@@ -114,6 +114,11 @@ describe("admin API", () => {
 			[undefined, "Bolt"],
 		);
 		assert.match(detail.body.transactionId, /^[0-9a-f-]{36}$/);
+		assert.deepEqual(
+			[detail.body.parsed.$type, detail.body.parsed.details.merchant_name],
+			["cardTransaction", "Bolt"],
+		);
+		assert.equal((await request(`/raw-transactions/${body[0].id}/hold-1`)).body.parsed, null);
 		assert.equal((await request(`/raw-transactions/${body[0].id}/nope`)).status, 404);
 	});
 
@@ -150,10 +155,11 @@ describe("admin API", () => {
 				version.cause,
 				version.data.merchant,
 				version.appCommit,
+				version.fieldRules,
 			]),
 			[
-				["raw", null, "unknown"],
-				["raw", "Bolt", "unknown"],
+				["raw", null, "unknown", []],
+				["raw", "Bolt", "unknown", []],
 			],
 		);
 		assert.equal((await request("/transactions/nope")).status, 404);

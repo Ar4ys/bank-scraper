@@ -172,12 +172,12 @@ describe("admin rules API", () => {
 			body.versions.map((version: any) => [
 				version.cause,
 				version.data.merchant,
-				version.fieldSources.merchant,
+				version.fieldRules[0]?.ruleName,
 			]),
 			[
-				["raw", null, "default"],
-				["rules", "Bolt", rules[0].id],
-				["rules", "Bolt Taxi", rules[0].id],
+				["raw", null, undefined],
+				["rules", "Bolt", "Bolt"],
+				["rules", "Bolt Taxi", "Bolt"],
 			],
 		);
 	});

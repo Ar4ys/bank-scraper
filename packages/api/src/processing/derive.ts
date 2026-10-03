@@ -22,6 +22,15 @@ const schemaError = (error: z.core.$ZodError): DeriveResult => ({
 });
 
 /**
+ * The transaction as rules see it, see `ipkoTransactionToJson`. `undefined` for a hold and for data
+ * the schemas reject.
+ */
+export function parseForRules(rawData: unknown): Record<string, unknown> | undefined {
+	const parsed = ipkoTransactionSchema.safeParse(rawData);
+	return parsed.success ? ipkoTransactionToJson(parsed.data) : undefined;
+}
+
+/**
  * Derives the fields of a transaction from the bank's JSON: strict parsing, code defaults, then
  * rules. Rules see the parsed transaction in its JSON form, see `ipkoTransactionToJson`.
  */

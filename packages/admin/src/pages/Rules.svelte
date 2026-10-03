@@ -1,7 +1,12 @@
 <script lang="ts">
+	import { getTextByPath, matchRule, renderTemplate } from "@bank-scraper/shared";
+	import { searchParams } from "sv-router";
+	import { SvelteSet } from "svelte/reactivity";
+
 	import {
 		applyRules,
 		loadAccounts,
+		loadRawTransaction,
 		loadRuleRevision,
 		loadRuleRevisions,
 		loadRules,
@@ -49,12 +54,20 @@
 
 	let busy = $state(false);
 	let error = $state<string>();
+	/** What the last action did, shown until the next one */
+	let notice = $state<string>();
 	let report = $state<ProcessingReport>();
 	let reportTitle = $state("");
 	let reportOpen = $state(false);
 
-	let testAccountId = $state("");
-	let testBankId = $state("");
+	// The sample transaction: rules can be tried on it, and its values are shown next to the fields
+	let sampleAccountId = $state(String(searchParams.get("accountId") ?? ""));
+	let sampleBankId = $state(String(searchParams.get("bankId") ?? ""));
+	let sample = $state<Record<string, unknown>>();
+	let sampleError = $state<string>();
+
+	/** Rules that are folded to one line */
+	const collapsed = new SvelteSet<RuleDraft>();
 
 	const hasUnsavedEdits = $derived(JSON.stringify(rules) !== savedJson);
 	const reportBlocksApply = $derived(report?.errors.some((failure) => failure.error.stage === "rules") ?? false);
@@ -73,6 +86,7 @@
 	async function run(action: () => Promise<void>) {
 		busy = true;
 		error = undefined;
+		notice = undefined;
 
 		try {
 			await action();
@@ -88,6 +102,9 @@
 			const state = await loadRules();
 			setRules(state.rules);
 			savedJson = JSON.stringify(rules);
+			// With several rules the list reads better folded; one being edited gets unfolded by hand
+			collapsed.clear();
+			if (rules.length > 1) for (const rule of rules) collapsed.add(rule);
 			({ txTypes, fieldsByTxType, appliedRevisionId, hasUnappliedChanges } = state);
 			revisions = await loadRuleRevisions();
 		});
@@ -96,6 +113,7 @@
 		run(async () => {
 			await saveRules(rules);
 			await load();
+			notice = "Draft saved. It takes effect once it is applied.";
 		});
 
 	const preview = (only?: { accountId: number; bankId: string }) =>
@@ -108,9 +126,10 @@
 	const apply = () =>
 		run(async () => {
 			await saveRules(rules);
-			await applyRules();
+			const applied = await applyRules();
 			reportOpen = false;
 			await load();
+			notice = `Rules applied: ${applied.changes.length} transaction(s) changed.`;
 		});
 
 	const loadRevision = (id: string) =>
@@ -119,7 +138,43 @@
 		});
 
 	function addRule() {
-		rules.push({ name: "New rule", enabled: true, txTypes: null, conditions: [], set: {} });
+		// Starts from the sample transaction, if there is one: its type, and its title to match on
+		const type = sample && getTextByPath(sample, "$type");
+		const title = sample && getTextByPath(sample, "details.title");
+
+		rules.push({
+			name: "New rule",
+			enabled: true,
+			txTypes: type ? [type] : null,
+			conditions: title ? [{ path: "details.title", operator: "contains", pattern: title }] : [],
+			set: {},
+		});
+	}
+
+	async function loadSample() {
+		sample = undefined;
+		sampleError = undefined;
+		if (!sampleAccountId || !sampleBankId.trim()) return;
+
+		try {
+			const { parsed } = await loadRawTransaction(sampleAccountId, sampleBankId.trim());
+			if (parsed) sample = parsed;
+			else sampleError = "This one is a hold or could not be parsed, so rules never see it.";
+		} catch (e) {
+			sampleError = String(e);
+		}
+	}
+
+	const sampleKey = () => ({ accountId: Number(sampleAccountId), bankId: sampleBankId.trim() });
+
+	/** One line that says what a rule does, for when it is folded */
+	function summarize(rule: RuleDraft) {
+		const conditions = rule.conditions.map((c) => `${c.path} ${c.operator} "${c.pattern}"`).join(" and ");
+		const sets = Object.entries(rule.set)
+			.map(([field, template]) => `${field} = "${template}"`)
+			.join(", ");
+
+		return `${conditions || "always"} → ${sets || "sets nothing"}`;
 	}
 
 	function move(index: number, by: -1 | 1) {
@@ -191,6 +246,7 @@
 	}
 
 	void load();
+	void loadSample();
 	void loadAccounts().then((loaded) => (accounts = loaded));
 </script>
 
@@ -226,26 +282,46 @@
 {#if error}
 	<p class="whitespace-pre-wrap text-sm text-destructive">{error}</p>
 {/if}
+{#if notice}
+	<p class="rounded-md bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-300">{notice}</p>
+{/if}
 
 <Card.Root>
-	<Card.Content class="flex flex-wrap items-end gap-3">
-		<div class="space-y-1">
-			<Label>Try the rules on one transaction</Label>
-			<AccountSelect bind:value={testAccountId} {accounts} />
+	<Card.Header>
+		<Card.Title class="text-base">Sample transaction</Card.Title>
+		<Card.Description>
+			Pick a transaction to see its values next to the fields below, which rules match it, and what
+			the rules in the editor would make of it. Its bank id is on its page.
+		</Card.Description>
+	</Card.Header>
+	<Card.Content class="space-y-3">
+		<div class="flex flex-wrap items-center gap-3">
+			<AccountSelect bind:value={sampleAccountId} {accounts} />
+			<Input class="max-w-xs font-mono" placeholder="Bank id" bind:value={sampleBankId} />
+			<Button variant="outline" disabled={!sampleAccountId || !sampleBankId.trim()} onclick={loadSample}>
+				Load
+			</Button>
+			<Button disabled={busy || !sample} onclick={() => preview(sampleKey())}>Try the rules on it</Button>
 		</div>
-		<Input class="max-w-xs" placeholder="Bank id" bind:value={testBankId} />
-		<Button
-			variant="outline"
-			disabled={busy || !testAccountId || !testBankId.trim()}
-			onclick={() => preview({ accountId: Number(testAccountId), bankId: testBankId.trim() })}
-		>
-			Try
-		</Button>
+
+		{#if sampleError}
+			<p class="text-sm text-destructive">{sampleError}</p>
+		{:else if sample}
+			<p class="text-sm">
+				<Badge variant="secondary">{getTextByPath(sample, "$type")}</Badge>
+				{getTextByPath(sample, "details.title") ?? getTextByPath(sample, "title")}
+				<span class="tabular-nums text-muted-foreground">
+					{getTextByPath(sample, "money.amount")}
+					{getTextByPath(sample, "money.currency")}
+				</span>
+			</p>
+		{/if}
 	</Card.Content>
 </Card.Root>
 
 {#each rules as rule, index (rule)}
 	{@const ruleFields = fieldsFor(rule)}
+	{@const captures = sample && matchRule(rule, sample)}
 
 	<datalist id="fields-{index}">
 		{#each ruleFields as field (field.path)}
@@ -256,8 +332,23 @@
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="flex flex-wrap items-center gap-3">
+				<button
+					type="button"
+					class="w-6 text-left text-muted-foreground"
+					aria-label={collapsed.has(rule) ? "Unfold rule" : "Fold rule"}
+					onclick={() => (collapsed.has(rule) ? collapsed.delete(rule) : collapsed.add(rule))}
+				>
+					{collapsed.has(rule) ? "▸" : "▾"}
+				</button>
 				<span class="tabular-nums text-muted-foreground">{index + 1}</span>
 				<Input class="max-w-sm" bind:value={rule.name} aria-label="Rule name" />
+				{#if sample}
+					{#if captures}
+						<Badge>matches the sample</Badge>
+					{:else}
+						<Badge variant="outline">no match</Badge>
+					{/if}
+				{/if}
 				<span class="flex items-center gap-2 text-sm font-normal">
 					<Switch id="enabled-{index}" bind:checked={rule.enabled} />
 					<Label for="enabled-{index}">Enabled</Label>
@@ -270,8 +361,12 @@
 					<Button variant="destructive" size="sm" onclick={() => rules.splice(index, 1)}>Delete</Button>
 				</span>
 			</Card.Title>
+			{#if collapsed.has(rule)}
+				<Card.Description class="truncate font-mono text-xs">{summarize(rule)}</Card.Description>
+			{/if}
 		</Card.Header>
 
+		{#if !collapsed.has(rule)}
 		<Card.Content class="space-y-4">
 			<div class="space-y-2">
 				<Label>Transaction types <span class="font-normal text-muted-foreground">(none selected = all)</span></Label>
@@ -301,6 +396,15 @@
 							{/each}
 						</select>
 						<Input class="max-w-md flex-1 font-mono" placeholder="^BOLT\.EU/P/(\d+)" bind:value={condition.pattern} />
+						{#if sample}
+							{@const holds = matchRule({ txTypes: null, conditions: [condition] }, sample)}
+							<span
+								class="self-center text-xs {holds ? 'text-green-700 dark:text-green-400' : 'text-destructive'}"
+								title="Against the sample transaction"
+							>
+								{holds ? "✓ holds" : "✗ fails"}
+							</span>
+						{/if}
 						<Button variant="outline" size="sm" onclick={() => rule.conditions.splice(conditionIndex, 1)}>
 							Remove
 						</Button>
@@ -331,33 +435,47 @@
 									insert: (path) => setTemplate(rule, field.key, `${rule.set[field.key] ?? ""}{${path}}`),
 								})}
 						/>
+						{#if sample && captures && rule.set[field.key] !== undefined}
+							<p class="truncate text-xs text-muted-foreground" title="For the sample transaction">
+								→ {renderTemplate(rule.set[field.key] ?? "", sample, captures) || "(empty)"}
+							</p>
+						{/if}
 					</div>
 				{/each}
 			</div>
 
-			<details class="text-sm">
+			<details class="text-sm" open={Boolean(sample)}>
 				<summary class="cursor-pointer text-muted-foreground">
 					Fields of the parsed bank transaction ({ruleFields.length})
 				</summary>
 				<p class="py-2 text-xs text-muted-foreground">
 					Click a field to put it into the condition or template you used last. A field marked with
 					<code>?</code> is not always there.
+					{#if sample}The values are those of the sample transaction.{/if}
 				</p>
-				<div class="flex flex-wrap gap-1">
+				<div class="grid gap-1 sm:grid-cols-2">
 					{#each ruleFields as field (field.path)}
+						{@const value = sample && getTextByPath(sample, field.path)}
 						<button
 							type="button"
-							class="rounded border px-1.5 py-0.5 font-mono text-xs hover:bg-muted"
+							class="flex items-baseline gap-2 rounded border px-2 py-1 text-left text-xs hover:bg-muted"
 							title="{field.type}{field.optional ? ', optional' : ''}"
 							onclick={() => insertField(rule, field.path)}
 						>
-							{field.path}{field.optional ? "?" : ""}
-							<span class="text-muted-foreground">{field.type}</span>
+							<span class="shrink-0 font-mono">{field.path}{field.optional ? "?" : ""}</span>
+							{#if sample}
+								<span class="truncate {value === undefined ? 'italic text-muted-foreground' : ''}">
+									{value === undefined ? "not there" : value || "(empty)"}
+								</span>
+							{:else}
+								<span class="text-muted-foreground">{field.type}</span>
+							{/if}
 						</button>
 					{/each}
 				</div>
 			</details>
 		</Card.Content>
+		{/if}
 	</Card.Root>
 {/each}
 
@@ -386,7 +504,10 @@
 </ul>
 
 <Dialog.Root bind:open={reportOpen}>
-	<Dialog.Content class="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+	<Dialog.Content
+		class="flex max-h-[85vh] flex-col sm:max-w-3xl"
+		onOpenAutoFocus={(event) => event.preventDefault()}
+	>
 		<Dialog.Header>
 			<Dialog.Title>{reportTitle}</Dialog.Title>
 			<Dialog.Description>
@@ -395,6 +516,7 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
+		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto">
 		{#if report}
 			<ReportView {report} />
 
@@ -404,6 +526,7 @@
 				</p>
 			{/if}
 		{/if}
+		</div>
 
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (reportOpen = false)}>Close</Button>

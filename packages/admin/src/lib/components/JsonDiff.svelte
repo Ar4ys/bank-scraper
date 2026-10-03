@@ -5,7 +5,8 @@
 
 	let { before, after }: { before: unknown; after: unknown } = $props();
 
-	const entries = $derived(diffJson(before, after));
+	// Nothing before means everything was added, field by field, not one change of the whole value
+	const entries = $derived(diffJson(before ?? {}, after));
 </script>
 
 {#if entries.length === 0}
