@@ -38,6 +38,8 @@ mise run db-migrate
 
 | Env var          | Default          | Meaning                                                      |
 | ---------------- | ---------------- | ------------------------------------------------------------ |
+| `HTTP_HOST`      | `127.0.0.1`      | Address the HTTP server listens on                           |
+| `HTTP_PORT`      | `8585`           | Port the HTTP server listens on                              |
 | `SQLITE_DB_PATH` | `./local/dev.db` | Path of the SQLite database file, relative to `packages/api` |
 
 ## Userscript

@@ -1,11 +1,12 @@
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-sqlite";
 
+import { config } from "../config.ts";
 import { relations } from "./relations.ts";
 
 export * as tables from "./schema.ts";
 
-export const db = drizzle(`file:${process.env.SQLITE_DB_PATH ?? "./local/dev.db"}`, { relations });
+export const db = drizzle(`file:${config.SQLITE_DB_PATH}`, { relations });
 
 export async function initSQLite() {
 	db.run(sql`

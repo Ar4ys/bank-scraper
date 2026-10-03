@@ -4,7 +4,7 @@
 	"private": true,
 	"license": "ISC",
 	"type": "module",
-	"main": "src/app.ts",
+	"main": "src/server.ts",
 	"dependencies": {
 		"@bank-scraper/shared": "workspace:*",
 		"@hono/node-server": "^2.1.0",
