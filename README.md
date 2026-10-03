@@ -6,7 +6,8 @@ Collects my PKO Bank Polski (iPKO) transactions from the web UI into a local SQL
    transaction to the local server.
 2. The server stores each payload as is in `raw_transactions`. A payload that is already stored
    with the same content is skipped. If the content of a known transaction changes, a new row is
-   added next to the old one, so the table doubles as a log of shape changes.
+   added next to the old one, so the table doubles as a log of shape changes. Accounts are created
+   from the account the bank reports for each scraped page.
 3. Raw transactions are then parsed with strict schemas (`packages/api/src/ipkoSchemas.ts`) into the
    `transactions` table. This step is still in progress.
 
@@ -41,21 +42,29 @@ mise run db-migrate
 | `HTTP_HOST`      | `127.0.0.1`      | Address the HTTP server listens on                           |
 | `HTTP_PORT`      | `8585`           | Port the HTTP server listens on                              |
 | `SQLITE_DB_PATH` | `./local/dev.db` | Path of the SQLite database file, relative to `packages/api` |
+| `INGEST_API_KEY` | required         | Key the userscript has to send to store scraped transactions |
 
 ## Userscript
 
 Build it with `mise run build-userscript` and install `packages/userscript/dist/userscript.js` in a userscript manager
-that provides `GM.fetch` and `exportFunction` (it is written against Firemonkey). With the server
-running, open the transaction history in iPKO: every page of transactions that the site loads is
-sent to the server, and the result is logged to the browser console.
+that provides `GM.fetch` and `exportFunction` (it is written against Firemonkey). In the menu of the
+userscript manager, use "Set ingest key" to enter the `INGEST_API_KEY` of the server and, unless the
+server runs on `http://localhost:8585`, "Set server URL". If the manager enforces `@connect`, add
+the host of the server to `packages/userscript/meta.txt` before building.
+
+With the server running, open the transaction history in iPKO: every page of transactions that the
+site loads is sent to the server together with its account, and the result is logged to the browser
+console.
 
 ## API
 
-| Route                           | What it does                                               |
-| ------------------------------- | ---------------------------------------------------------- |
-| `GET /api/transactions/raw`     | Lists all raw transactions                                 |
-| `GET /api/transactions/raw/:id` | Returns one raw transaction                                |
-| `POST /api/transactions/raw`    | Stores a batch of `{ bankId, data }`, returns the new rows |
+Every route needs the ingest key in the `x-api-key` header.
+
+| Route                           | What it does                                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------- |
+| `GET /api/transactions/raw`     | Lists all raw transactions                                                         |
+| `GET /api/transactions/raw/:id` | Returns one raw transaction                                                        |
+| `POST /api/transactions/raw`    | Stores `{ sourceAccount, transactions: [{ bankId, data }] }`, returns the new rows |
 
 Requests for [Bruno](https://www.usebruno.com) are in `packages/api/bruno/`.
 

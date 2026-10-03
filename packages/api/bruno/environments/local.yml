@@ -2,6 +2,11 @@ name: local
 variables:
   - name: baseUrl
     value: http://localhost:8585
+  - name: sourceAccount
+    value: "00 0000 0000 0000 0000 0000 0000"
+  - secret: true
+    name: ingestApiKey
+    description: ""
   - secret: true
     name: transaction
     description: ""

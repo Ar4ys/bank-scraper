@@ -6,6 +6,9 @@ info:
 http:
   method: GET
   url: "{{baseUrl}}/api/transactions/raw/:id"
+  headers:
+    - name: x-api-key
+      value: "{{ingestApiKey}}"
   params:
     - name: id
       value: 019ffbbc-cbfc-7fff-84b5-6e23befa8e94

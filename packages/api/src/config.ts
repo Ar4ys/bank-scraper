@@ -7,6 +7,8 @@ const configSchema = z.object({
 	HTTP_PORT: z.coerce.number().int().min(1).max(65535).default(8585),
 	/** Path of the SQLite database file, relative to the working directory */
 	SQLITE_DB_PATH: z.string().default("./local/dev.db"),
+	/** Key the userscript has to send to store scraped transactions */
+	INGEST_API_KEY: z.string().nonempty(),
 });
 
 export const config = configSchema.parse(process.env);

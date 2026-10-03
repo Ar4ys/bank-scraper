@@ -7,5 +7,10 @@
 		"lib": ["DOM", "ESNext"],
 		"outDir": "node_modules/.cache/tsc",
 		"tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo"
-	}
+	},
+	"references": [
+		{
+			"path": "../shared"
+		}
+	]
 }

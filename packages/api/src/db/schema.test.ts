@@ -4,11 +4,18 @@ import { after, describe, it } from "node:test";
 import { TransactionAmount } from "@bank-scraper/shared";
 import { eq } from "drizzle-orm";
 
-import { rawTransactions, transactions } from "./schema.ts";
+import { accounts, rawTransactions, transactions } from "./schema.ts";
 import { createTestDb } from "./testDb.ts";
 
 const { db, cleanup } = await createTestDb();
 after(cleanup);
+
+const [account] = await db
+	.insert(accounts)
+	.values({ sourceAccount: "1", name: "Main" })
+	.returning();
+assert.ok(account);
+const accountId = account.id;
 
 function storedText(table: string, column: string, id: string) {
 	const row = db.$client.prepare(`select ${column} as value from ${table} where id = ?`).get(id);
@@ -21,7 +28,7 @@ describe("instant column", () => {
 
 		const [inserted] = await db
 			.insert(rawTransactions)
-			.values({ bankId: "explicit", data: {}, hash: "hash", createdAt })
+			.values({ accountId, bankId: "explicit", data: {}, hash: "hash", createdAt })
 			.returning();
 		assert.ok(inserted);
 
@@ -39,7 +46,7 @@ describe("instant column", () => {
 
 		const [inserted] = await db
 			.insert(rawTransactions)
-			.values({ bankId: "default", data: {}, hash: "hash" })
+			.values({ accountId, bankId: "default", data: {}, hash: "hash" })
 			.returning();
 		assert.ok(inserted);
 
@@ -62,6 +69,7 @@ describe("transactions table", () => {
 		const [inserted] = await db
 			.insert(transactions)
 			.values({
+				accountId,
 				bankId: "1",
 				date,
 				amount,

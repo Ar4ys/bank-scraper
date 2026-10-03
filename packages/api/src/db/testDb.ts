@@ -1,31 +1,24 @@
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const projectRoot = path.join(import.meta.dirname, "../..");
+import { migrate } from "drizzle-orm/node-sqlite/migrator";
+
+export const testIngestApiKey = "test-ingest-key";
 
 /**
- * Points `db` at a fresh SQLite file in a temp directory and creates the tables of `schema.ts` in
- * it. Call it before anything imports `db.ts`, so modules that depend on `db` have to be imported
- * dynamically afterwards.
- *
- * The tables come from `drizzle-kit export`, not from the migrations, so they lack the `STRICT,
- * WITHOUT ROWID` that `tools/patchMigrations.ts` adds.
+ * Points `db` at a fresh, migrated SQLite file in a temp directory and sets the rest of the
+ * environment the app needs. Call it before anything imports `db.ts` or `config.ts`, so modules
+ * that depend on them have to be imported dynamically afterwards.
  */
 export async function createTestDb() {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bank-scraper-test-"));
 	process.env.SQLITE_DB_PATH = path.join(dir, "test.db");
-
-	const ddl = execFileSync(
-		path.join(projectRoot, "node_modules/.bin/drizzle-kit"),
-		["export", "--sql"],
-		{ cwd: projectRoot, encoding: "utf8" },
-	);
+	process.env.INGEST_API_KEY = testIngestApiKey;
 
 	const { db, initSQLite } = await import("./db.ts");
 	await initSQLite();
-	db.$client.exec(ddl);
+	migrate(db, { migrationsFolder: path.join(import.meta.dirname, "../../drizzle") });
 
 	return {
 		db,

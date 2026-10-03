@@ -6,13 +6,19 @@ info:
 http:
   method: POST
   url: "{{baseUrl}}/api/transactions/raw"
+  headers:
+    - name: x-api-key
+      value: "{{ingestApiKey}}"
   body:
     type: json
     data: |-
-      [{
-        "bankId": "1",
-        "data": {{transaction}}
-      }]
+      {
+        "sourceAccount": "{{sourceAccount}}",
+        "transactions": [{
+          "bankId": "1",
+          "data": {{transaction}}
+        }]
+      }
   auth: inherit
 
 settings:

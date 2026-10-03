@@ -4,6 +4,9 @@
 // @run-at document-start
 // @grant unsafeWindow
 // @grant GM.fetch
+// @grant GM.getValue
+// @grant GM.setValue
+// @grant GM.registerMenuCommand
 // @connect localhost
-// @version 1.0
+// @version 1.1
 // ==/UserScript==

@@ -8,6 +8,7 @@
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
+		"@bank-scraper/shared": "workspace:*",
 		"@types/node": "26",
 		"tsdown": "^0.22.14"
 	}

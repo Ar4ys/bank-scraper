@@ -1,4 +1,5 @@
 import "./global";
+import { type IngestBody } from "@bank-scraper/shared";
 import { z } from "zod/mini";
 
 import { asyncSpyOn, defer } from "./utils";
@@ -44,6 +45,24 @@ const resBodySchema = z.object({
 
 const createTransactionsResponse = z.array(z.unknown());
 
+const defaultServerUrl = "http://localhost:8585";
+
+function registerSetting(menuName: string, key: string, question: string) {
+	GM.registerMenuCommand(menuName, () => {
+		void (async () => {
+			const value = prompt(question, (await GM.getValue<string>(key)) ?? "");
+			if (value !== null) await GM.setValue(key, value.trim());
+		})();
+	});
+}
+
+registerSetting(
+	"Set server URL",
+	"serverUrl",
+	`URL of the bank-scraper server (${defaultServerUrl})`,
+);
+registerSetting("Set ingest key", "ingestApiKey", "Ingest API key of the bank-scraper server");
+
 async function processResponseBody(body: unknown) {
 	const { data, error } = resBodySchema.safeParse(body);
 
@@ -52,16 +71,30 @@ async function processResponseBody(body: unknown) {
 		return;
 	}
 
-	const transactions = data.response.data.items.map((transaction) => ({
-		bankId: transaction.operation_id,
-		data: transaction,
-	}));
+	const ingestApiKey = await GM.getValue<string>("ingestApiKey");
 
-	const response = await GM.fetch("http://localhost:8585/api/transactions/raw", {
+	if (!ingestApiKey) {
+		console.error('Ingest key is not set: use "Set ingest key" in the userscript menu');
+		return;
+	}
+
+	const serverUrl = (await GM.getValue<string>("serverUrl")) || defaultServerUrl;
+
+	const ingestBody = {
+		sourceAccount: data.response.data.ref_operations_download_preferences.data.source_account,
+		transactions: data.response.data.items.map((transaction) => ({
+			bankId: transaction.operation_id,
+			// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+			data: transaction as IngestBody["transactions"][number]["data"],
+		})),
+	} satisfies IngestBody;
+
+	const response = await GM.fetch(new URL("/api/transactions/raw", serverUrl), {
 		method: "POST",
-		body: JSON.stringify(transactions),
+		body: JSON.stringify(ingestBody),
 		headers: {
 			"Content-Type": "application/json",
+			"x-api-key": ingestApiKey,
 		},
 	});
 
@@ -70,7 +103,7 @@ async function processResponseBody(body: unknown) {
 		console.groupCollapsed("Request Info");
 		using _ = defer(() => console.groupEnd());
 
-		console.log("Request Body", transactions);
+		console.log("Request Body", ingestBody);
 		console.log("Response", response);
 
 		const responseData = await response
