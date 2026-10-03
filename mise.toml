@@ -9,6 +9,7 @@ _.path = ['{{config_root}}/node_modules/.bin']
 build-userscript = "tsdown"
 start-server = "node src/app.ts"
 watch-server = "node --watch src/app.ts"
+test = "node --test 'src/**/*.test.ts'"
 
 db-generate = "drizzle-kit generate && node ./tools/patchMigrations.ts"
 db-migrate = "drizzle-kit migrate"

@@ -5,7 +5,7 @@ import { relations } from "./relations.ts";
 
 export * as tables from "./schema.ts";
 
-export const db = drizzle("file:./local/dev.db", { relations });
+export const db = drizzle(`file:${process.env.SQLITE_DB_PATH ?? "./local/dev.db"}`, { relations });
 
 export async function initSQLite() {
 	db.run(sql`
