@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 
-import { TransactionAmount } from "@bank-scraper/shared";
 import { eq } from "drizzle-orm";
 
 import * as tables from "./db/schema.ts";
-import { createTestDb, testLunchflowApiKey } from "./db/testDb.ts";
+import { createTestDb, testIngestApiKey, testLunchflowApiKey } from "./db/testDb.ts";
 import { rawCardTransaction, rawTransferSend } from "./processing/fixtures.ts";
 
 const { db, cleanup } = await createTestDb();
@@ -114,18 +113,42 @@ describe("Lunch Flow API", () => {
 		assert.equal((await get("/accounts/999999/balance")).status, 404);
 	});
 
-	it("answers 404 for the balance until one was scraped, then returns it", async () => {
+	it("answers 404 for the balance until one was scraped", async () => {
 		const missing = await get(`/accounts/${account.id}/balance`);
+
 		assert.equal(missing.status, 404);
 		assert.deepEqual(Object.keys(missing.body), ["error", "message"]);
+	});
+
+	it("reports the scraped ledger as the balance, or the bank's balance if the account says so", async () => {
+		const scraped = await app.request("/api/accounts/balances", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "x-api-key": testIngestApiKey },
+			body: JSON.stringify({
+				accounts: [
+					{
+						sourceAccount: "PL00",
+						name: "Konto",
+						currency: "PLN",
+						balance: "1200.15",
+						ledger: "1000.05",
+					},
+				],
+			}),
+		});
+		assert.equal(scraped.status, 200);
+
+		assert.deepEqual((await get(`/accounts/${account.id}/balance`)).body, {
+			balance: { amount: 1000.05, currency: "PLN" },
+		});
 
 		await db
 			.update(tables.accounts)
-			.set({ balanceAmount: TransactionAmount(123456n), balanceCurrency: "PLN" })
+			.set({ balanceSource: "balance" })
 			.where(eq(tables.accounts.id, account.id));
 
 		assert.deepEqual((await get(`/accounts/${account.id}/balance`)).body, {
-			balance: { amount: 1234.56, currency: "PLN" },
+			balance: { amount: 1200.15, currency: "PLN" },
 		});
 	});
 

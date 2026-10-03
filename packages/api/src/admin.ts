@@ -1,4 +1,4 @@
-import { transactionFieldsSchema } from "@bank-scraper/shared";
+import { transactionFieldsSchema, zTransactionAmount } from "@bank-scraper/shared";
 import { zValidator } from "@hono/zod-validator";
 import { and, count, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -6,7 +6,13 @@ import { z } from "zod";
 
 import { adminRulesApi } from "./adminRules.ts";
 import { db, tables } from "./db/db.ts";
-import { RawTransactionStatus, type RawTransaction, type Transaction } from "./db/schema.ts";
+import {
+	BalanceSource,
+	RawTransactionStatus,
+	type Account,
+	type RawTransaction,
+	type Transaction,
+} from "./db/schema.ts";
 import { listBankTransactionKeys, processBankTransactions } from "./processing/process.ts";
 import { escapeLikePattern } from "./utils.ts";
 
@@ -27,6 +33,19 @@ const transactionJson = (transaction: Transaction) => ({
 	...z.encode(transactionFieldsSchema, transaction),
 	createdAt: transaction.createdAt.toString(),
 	updatedAt: transaction.updatedAt.toString(),
+});
+
+const accountJson = (account: Account) => ({
+	id: account.id,
+	sourceAccount: account.sourceAccount,
+	name: account.name,
+	currency: account.currency,
+	balance:
+		account.balanceAmount === null ? null : z.encode(zTransactionAmount, account.balanceAmount),
+	ledger: account.ledgerAmount === null ? null : z.encode(zTransactionAmount, account.ledgerAmount),
+	balanceCurrency: account.balanceCurrency,
+	balanceAt: account.balanceAt?.toString() ?? null,
+	balanceSource: account.balanceSource,
 });
 
 const rawTransactionJson = (raw: RawTransaction) => ({
@@ -98,30 +117,34 @@ export const adminApi = new Hono()
 	.get("/accounts", async (c) => {
 		const rows = await db.select().from(accounts).orderBy(accounts.id);
 
-		return c.json(
-			rows.map((account) => ({
-				id: account.id,
-				sourceAccount: account.sourceAccount,
-				name: account.name,
-				currency: account.currency,
-			})),
-			200,
-		);
+		return c.json(rows.map(accountJson), 200);
 	})
 
 	/** PATCH /api/admin/accounts/:id */
 	.patch(
 		"/accounts/:id",
 		zValidator("param", z.object({ id: z.coerce.number().int() })),
-		zValidator("json", z.object({ name: z.string().trim().nonempty() })),
+		zValidator(
+			"json",
+			z.object({
+				name: z.string().trim().nonempty().optional(),
+				/** Which scraped amount the Lunch Flow API reports as the balance */
+				balanceSource: z.enum(BalanceSource).optional(),
+			}),
+		),
 		async (c) => {
-			const [account] = await db
-				.update(accounts)
-				.set({ name: c.req.valid("json").name })
-				.where(eq(accounts.id, c.req.valid("param").id))
-				.returning({ id: accounts.id, name: accounts.name });
+			const { id } = c.req.valid("param");
+			const changes = c.req.valid("json");
 
-			return account ? c.json(account, 200) : c.json({ message: "Account not found" }, 404);
+			if (changes.name !== undefined || changes.balanceSource !== undefined) {
+				await db.update(accounts).set(changes).where(eq(accounts.id, id));
+			}
+
+			const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
+
+			return account
+				? c.json(accountJson(account), 200)
+				: c.json({ message: "Account not found" }, 404);
 		},
 	)
 

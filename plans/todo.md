@@ -8,5 +8,7 @@ Deferred work, not part of the current plan.
   Lunch Flow shape allows.
 - **Holds as pending transactions.** Holds (`is_hold: true`) are stored raw and never exposed.
   Exposing them as `isPending` needs a way to retire a hold when the settled operation arrives.
+  Once holds are exposed, the account's reported balance should probably switch from the bank's
+  ledger to its balance, which is why that is a per-account option.
 - **Rule editor for the remaining fields.** The rule engine can override any internal field, the
   admin app only exposes merchant, description and date.

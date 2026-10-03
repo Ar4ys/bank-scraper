@@ -124,12 +124,16 @@ the host of the server to `packages/userscript/meta.txt` before building.
 
 With the server running, open the transaction history in iPKO: every page of transactions that the
 site loads is sent to the server together with its account, and the result is logged to the browser
-console.
+console. Whenever the site loads the list of accounts, their names and balances are sent too.
 
 ## API
 
 `POST /api/transactions/raw` stores `{ sourceAccount, transactions: [{ bankId, data }] }` and returns
 the rows that were new. It needs the ingest key in the `x-api-key` header.
+
+`POST /api/accounts/balances` stores `{ accounts: [{ sourceAccount, name, currency, balance, ledger }] }`
+with the same key. `balance` and `ledger` are the bank's two amounts: the money on the account, and
+that amount with holds deducted. The name is used only while the account was not renamed.
 
 `/api/admin` is the JSON API of the admin app. It has no auth of its own, so the reverse proxy in
 front of the service has to protect it together with the admin app.
@@ -144,7 +148,7 @@ Lunch Flow key in `x-api-key` or as `Authorization: Bearer`.
 | ---------------------------------------------- | ---------------------------------------------------------------- |
 | `GET /api/lunchflow/accounts`                  | Accounts that have at least one processed transaction            |
 | `GET /api/lunchflow/accounts/:id/transactions` | Transactions, filtered by `start_date`/`end_date` or `from`/`to` |
-| `GET /api/lunchflow/accounts/:id/balance`      | Last scraped balance, 404 until there is one                     |
+| `GET /api/lunchflow/accounts/:id/balance`      | Scraped ledger or balance, as set per account; 404 until scraped |
 | `GET /api/lunchflow/accounts/:id/holdings`     | Always 501, which Sure reads as "no holdings"                    |
 
 Requests for [Bruno](https://www.usebruno.com) are in `packages/api/bruno/`.

@@ -1,4 +1,6 @@
-import { type IngestBody } from "@bank-scraper/shared";
+import { type accountBalancesBodySchema, type IngestBody } from "@bank-scraper/shared";
+import { and, eq, isNull } from "drizzle-orm";
+import { type z } from "zod";
 
 import { db, tables } from "./db/db.ts";
 import { processBankTransactions } from "./processing/process.ts";
@@ -48,4 +50,44 @@ export async function ingestRawTransactions({ sourceAccount, transactions }: Ing
 	}
 
 	return inserted;
+}
+
+type AccountBalances = z.output<typeof accountBalancesBodySchema>;
+
+/**
+ * Stores the scraped balances, creating accounts that are new. The bank's name of an account is
+ * taken over only while the account still has its default name, so a rename in the admin app
+ * stays.
+ */
+export async function ingestAccountBalances({ accounts }: AccountBalances) {
+	const balanceAt = Temporal.Now.instant();
+
+	for (const scraped of accounts) {
+		const account = await findOrCreateAccount(scraped.sourceAccount);
+
+		await db
+			.update(tables.accounts)
+			.set({
+				balanceAmount: scraped.balance,
+				ledgerAmount: scraped.ledger,
+				balanceCurrency: scraped.currency,
+				balanceAt,
+			})
+			.where(eq(tables.accounts.id, account.id));
+
+		await db
+			.update(tables.accounts)
+			.set({ currency: scraped.currency })
+			.where(and(eq(tables.accounts.id, account.id), isNull(tables.accounts.currency)));
+
+		// The default name is the bank's identifier, see findOrCreateAccount
+		await db
+			.update(tables.accounts)
+			.set({ name: scraped.name })
+			.where(
+				and(eq(tables.accounts.id, account.id), eq(tables.accounts.name, account.sourceAccount)),
+			);
+	}
+
+	return { updated: accounts.length };
 }

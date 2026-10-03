@@ -7,6 +7,7 @@ import { z } from "zod";
 import { apiKeyAuth } from "./auth.ts";
 import { config } from "./config.ts";
 import { db, tables } from "./db/db.ts";
+import { BalanceSource } from "./db/schema.ts";
 
 /** Lunch Flow sends amounts as JSON numbers in major units */
 const toMajorUnits = (amount: TransactionAmount) => Number(amount) / 100;
@@ -111,7 +112,12 @@ export const lunchflowApi = new Hono()
 			const account = await db.query.accounts.findFirst({ where: { id } });
 			if (!account) return c.json(accountNotFound, 404);
 
-			if (account.balanceAmount === null || account.balanceCurrency === null) {
+			const amount =
+				account.balanceSource === BalanceSource.Ledger
+					? account.ledgerAmount
+					: account.balanceAmount;
+
+			if (amount === null || account.balanceCurrency === null) {
 				// Sure keeps its previous balance when this call fails, which beats a made-up zero
 				return c.json(
 					{ error: "Not Found", message: "No balance was scraped for this account yet" },
@@ -120,10 +126,7 @@ export const lunchflowApi = new Hono()
 			}
 
 			return c.json({
-				balance: {
-					amount: toMajorUnits(account.balanceAmount),
-					currency: account.balanceCurrency,
-				},
+				balance: { amount: toMajorUnits(amount), currency: account.balanceCurrency },
 			});
 		},
 	)

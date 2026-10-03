@@ -42,6 +42,12 @@ export const minorUnits = s.customType<{ data: TransactionAmount; driverData: nu
 	fromDriver: (value) => TransactionAmount(BigInt(value)),
 });
 
+export type BalanceSource = DefineEnum<typeof BalanceSource>;
+export const BalanceSource = Object.freeze({
+	Ledger: "ledger",
+	Balance: "balance",
+});
+
 export type Account = typeof accounts.$inferSelect;
 export const accounts = s.snakeCase.table("accounts", {
 	// Lunch Flow account ids are numbers, so this one is not a UUID like the others
@@ -51,9 +57,15 @@ export const accounts = s.snakeCase.table("accounts", {
 	name: s.text().notNull(),
 	/** Unknown until the first transaction of the account is processed */
 	currency: s.text(),
+	/** The bank's `balance`: the money on the account, holds not deducted */
 	balanceAmount: minorUnits(),
+	/** The bank's `ledger`: `balance` with holds deducted */
+	ledgerAmount: minorUnits(),
 	balanceCurrency: s.text(),
+	/** When the two amounts were scraped */
 	balanceAt: instant(),
+	/** Which of the two amounts the Lunch Flow API reports as the balance */
+	balanceSource: s.text().$type<BalanceSource>().notNull().default(BalanceSource.Ledger),
 	createdAt: instant().notNull().default(sqlDateTimeNow),
 });
 

@@ -52,7 +52,17 @@ describe("admin API", () => {
 	it("lists and renames accounts", async () => {
 		const { body } = await request("/accounts");
 		assert.deepEqual(body, [
-			{ id: body[0].id, sourceAccount, name: sourceAccount, currency: "PLN" },
+			{
+				id: body[0].id,
+				sourceAccount,
+				name: sourceAccount,
+				currency: "PLN",
+				balance: null,
+				ledger: null,
+				balanceCurrency: null,
+				balanceAt: null,
+				balanceSource: "ledger",
+			},
 		]);
 
 		assert.equal(
@@ -61,6 +71,17 @@ describe("admin API", () => {
 		);
 		assert.equal((await postJson("/accounts/999", { name: "Main" }, "PATCH")).status, 404);
 		assert.equal((await postJson(`/accounts/${body[0].id}`, { name: " " }, "PATCH")).status, 400);
+
+		const switched = await postJson(
+			`/accounts/${body[0].id}`,
+			{ balanceSource: "balance" },
+			"PATCH",
+		);
+		assert.deepEqual([switched.body.name, switched.body.balanceSource], ["Main", "balance"]);
+		assert.equal(
+			(await postJson(`/accounts/${body[0].id}`, { balanceSource: "nope" }, "PATCH")).status,
+			400,
+		);
 	});
 
 	it("lists the latest raw version of every bank transaction", async () => {

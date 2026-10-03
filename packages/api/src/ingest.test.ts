@@ -145,3 +145,58 @@ describe("POST /api/transactions/raw", () => {
 		);
 	});
 });
+
+describe("POST /api/accounts/balances", () => {
+	const post = (
+		scrapedAccounts: unknown[],
+		headers: Record<string, string> = { "x-api-key": testIngestApiKey },
+	) =>
+		app.request("/api/accounts/balances", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", ...headers },
+			body: JSON.stringify({ accounts: scrapedAccounts }),
+		});
+
+	const scraped = {
+		sourceAccount: "balances",
+		name: "PKO KONTO",
+		currency: "PLN",
+		balance: "1200.15",
+		ledger: "1000.05",
+	};
+	const stored = async () =>
+		(await db.query.accounts.findFirst({ where: { sourceAccount: "balances" } }))!;
+
+	it("rejects a request without the ingest key and a malformed amount", async () => {
+		assert.equal((await post([scraped], {})).status, 401);
+		assert.equal((await post([{ ...scraped, balance: "a lot" }])).status, 400);
+	});
+
+	it("creates the account with the bank's name, both amounts and its currency", async () => {
+		assert.equal((await post([scraped])).status, 200);
+
+		const account = await stored();
+		assert.deepEqual(
+			[
+				account.name,
+				account.currency,
+				account.balanceAmount,
+				account.ledgerAmount,
+				account.balanceCurrency,
+				account.balanceSource,
+			],
+			["PKO KONTO", "PLN", 120015n, 100005n, "PLN", "ledger"],
+		);
+		assert.ok(account.balanceAt);
+	});
+
+	it("updates the amounts and follows the bank's name while the account was not renamed", async () => {
+		await post([{ ...scraped, name: "Nickname", balance: "5.00", ledger: "-1.50" }]);
+
+		const account = await stored();
+		assert.deepEqual(
+			[account.name, account.balanceAmount, account.ledgerAmount],
+			["PKO KONTO", 500n, -150n],
+		);
+	});
+});

@@ -59,8 +59,10 @@ export type ReprocessScope = "all" | "failed" | { accountId: number; bankId: str
 export const reprocess = (scope: ReprocessScope, dryRun: boolean) =>
 	unwrap(api.reprocess.$post({ json: { scope, dryRun } }));
 
-export const renameAccount = (id: number, name: string) =>
-	unwrap(api.accounts[":id"].$patch({ param: { id: String(id) }, json: { name } }));
+export const updateAccount = (
+	id: number,
+	changes: { name?: string; balanceSource?: Account["balanceSource"] },
+) => unwrap(api.accounts[":id"].$patch({ param: { id: String(id) }, json: changes }));
 
 export type RulesState = Awaited<ReturnType<typeof loadRules>>;
 export type Rule = RulesState["rules"][number];
