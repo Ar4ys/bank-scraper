@@ -135,6 +135,12 @@ export const transactions = s.snakeCase.table(
 		merchant: s.text(),
 		description: s.text().notNull(),
 		isPending: s.integer({ mode: "boolean" }).notNull(),
+		/**
+		 * What the transaction was last processed with, whether or not that changed its fields. The
+		 * latest version cannot tell: it stays the same for as long as the fields do.
+		 */
+		rawTransactionId: s.text().references(() => rawTransactions.id),
+		ruleRevisionId: s.text().references(() => ruleRevisions.id),
 		createdAt: instant().notNull().default(sqlDateTimeNow),
 		updatedAt: instant().notNull().default(sqlDateTimeNow),
 	},

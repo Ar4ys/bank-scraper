@@ -119,16 +119,30 @@ function processOne(
 			.limit(1)
 			.get();
 
-	if (latestVersion && isDeepStrictEqual(latestVersion.data, derived.fields)) {
-		report.unchanged++;
+	/** Remembers what the transaction was processed with, so that the next change gets the right cause */
+	const markProcessed = (transactionId: string) => {
+		db.update(transactions)
+			.set({ rawTransactionId: raw.id, ruleRevisionId: ruleRevision.id })
+			.where(eq(transactions.id, transactionId))
+			.run();
 		setRawStatus(RawTransactionStatus.Processed);
+	};
+
+	if (transaction && latestVersion && isDeepStrictEqual(latestVersion.data, derived.fields)) {
+		report.unchanged++;
+		if (!dryRun) markProcessed(transaction.id);
 		return;
 	}
 
+	// The first of raw data, rules and code that differs from the last processing is the cause
 	let cause: TransactionVersionCause = TransactionVersionCause.Raw;
-	if (latestVersion?.rawTransactionId === raw.id) {
+	if (transaction && (transaction.rawTransactionId ?? latestVersion?.rawTransactionId) === raw.id) {
+		const lastRevisionId = transaction.rawTransactionId
+			? transaction.ruleRevisionId
+			: (latestVersion?.ruleRevisionId ?? null);
+
 		cause =
-			latestVersion.ruleRevisionId === ruleRevision.id
+			lastRevisionId === ruleRevision.id
 				? TransactionVersionCause.Reprocess
 				: TransactionVersionCause.Rules;
 	}
@@ -179,7 +193,7 @@ function processOne(
 		.where(and(eq(accounts.id, key.accountId), isNull(accounts.currency)))
 		.run();
 
-	setRawStatus(RawTransactionStatus.Processed);
+	markProcessed(transactionId);
 }
 
 /**

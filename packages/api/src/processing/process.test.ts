@@ -151,6 +151,48 @@ describe("processing", () => {
 		);
 	});
 
+	// Stands in for a version derived by older code
+	async function makeLatestVersionStale() {
+		const version = (await versions()).at(-1);
+		assert.ok(version);
+
+		await db
+			.update(tables.transactionVersions)
+			.set({ data: { ...version.data, description: "old format" } })
+			.where(eq(tables.transactionVersions.id, version.id));
+	}
+
+	it("blames the code, not the raw data, for a change after raw data that changed no field", async () => {
+		await ingest(rawCardTransaction());
+		await ingest(rawCardTransaction({ some_new_bank_field: true }));
+		await makeLatestVersionStale();
+
+		processBankTransactions(listBankTransactionKeys());
+
+		assert.deepEqual(
+			(await versions()).map((v) => v.cause),
+			["raw", "reprocess"],
+		);
+	});
+
+	it("blames the code, not the rules, for a change after rules that changed no field", async () => {
+		await ingest(rawCardTransaction());
+		await applyRules([
+			{
+				...boltRule,
+				conditions: [{ path: "details.title", operator: "contains", pattern: "nothing" }],
+			},
+		]);
+		await makeLatestVersionStale();
+
+		processBankTransactions(listBankTransactionKeys());
+
+		assert.deepEqual(
+			(await versions()).map((v) => v.cause),
+			["raw", "reprocess"],
+		);
+	});
+
 	it("stores the error and keeps the transaction when a new raw version cannot be parsed", async () => {
 		await ingest(rawCardTransaction());
 		await ingest(rawCardTransaction({ operation_type: "SOMETHING_NEW" }));
