@@ -4,6 +4,11 @@ variables:
     value: http://localhost:8585
   - name: sourceAccount
     value: "00 0000 0000 0000 0000 0000 0000"
+  - name: accountId
+    value: "1"
+  - secret: true
+    name: lunchflowApiKey
+    description: ""
   - secret: true
     name: ingestApiKey
     description: ""

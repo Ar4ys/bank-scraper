@@ -41,13 +41,14 @@ mise run db-migrate
 
 ## Configuration
 
-| Env var          | Default          | Meaning                                                                  |
-| ---------------- | ---------------- | ------------------------------------------------------------------------ |
-| `HTTP_HOST`      | `127.0.0.1`      | Address the HTTP server listens on                                       |
-| `HTTP_PORT`      | `8585`           | Port the HTTP server listens on                                          |
-| `SQLITE_DB_PATH` | `./local/dev.db` | Path of the SQLite database file, relative to `packages/api`             |
-| `INGEST_API_KEY` | required         | Key the userscript has to send to store scraped transactions             |
-| `APP_GIT_COMMIT` | `unknown`        | Git commit of the running build, recorded with every transaction version |
+| Env var             | Default          | Meaning                                                                  |
+| ------------------- | ---------------- | ------------------------------------------------------------------------ |
+| `HTTP_HOST`         | `127.0.0.1`      | Address the HTTP server listens on                                       |
+| `HTTP_PORT`         | `8585`           | Port the HTTP server listens on                                          |
+| `SQLITE_DB_PATH`    | `./local/dev.db` | Path of the SQLite database file, relative to `packages/api`             |
+| `INGEST_API_KEY`    | required         | Key the userscript has to send to store scraped transactions             |
+| `LUNCHFLOW_API_KEY` | required         | Key Sure has to send to the Lunch Flow API                               |
+| `APP_GIT_COMMIT`    | `unknown`        | Git commit of the running build, recorded with every transaction version |
 
 ## Userscript
 
@@ -63,13 +64,26 @@ console.
 
 ## API
 
-Every route needs the ingest key in the `x-api-key` header.
+These routes need the ingest key in the `x-api-key` header.
 
 | Route                           | What it does                                                                       |
 | ------------------------------- | ---------------------------------------------------------------------------------- |
 | `GET /api/transactions/raw`     | Lists all raw transactions                                                         |
 | `GET /api/transactions/raw/:id` | Returns one raw transaction                                                        |
 | `POST /api/transactions/raw`    | Stores `{ sourceAccount, transactions: [{ bankId, data }] }`, returns the new rows |
+
+### Lunch Flow API
+
+`/api/lunchflow` implements the part of the [Lunch Flow Personal API](https://lunchflow.app/docs/api/personal-api-overview)
+that [Sure](https://sure.am) uses, so a Sure instance can sync from this service. It needs the
+Lunch Flow key in `x-api-key` or as `Authorization: Bearer`.
+
+| Route                                          | What it does                                                     |
+| ---------------------------------------------- | ---------------------------------------------------------------- |
+| `GET /api/lunchflow/accounts`                  | Accounts that have at least one processed transaction            |
+| `GET /api/lunchflow/accounts/:id/transactions` | Transactions, filtered by `start_date`/`end_date` or `from`/`to` |
+| `GET /api/lunchflow/accounts/:id/balance`      | Last scraped balance, 404 until there is one                     |
+| `GET /api/lunchflow/accounts/:id/holdings`     | Always 501, which Sure reads as "no holdings"                    |
 
 Requests for [Bruno](https://www.usebruno.com) are in `packages/api/bruno/`.
 

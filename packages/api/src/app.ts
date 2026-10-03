@@ -8,6 +8,7 @@ import { apiKeyAuth } from "./auth.ts";
 import { config } from "./config.ts";
 import { db } from "./db/db.ts";
 import { ingestRawTransactions } from "./ingest.ts";
+import { lunchflowApi } from "./lunchflow.ts";
 import { zValidatorHook } from "./utils.ts";
 
 export const app = new Hono();
@@ -35,3 +36,4 @@ rawTransactionsApi.post("/", zValidator("json", ingestBodySchema, zValidatorHook
 });
 
 app.route("/api/transactions/raw", rawTransactionsApi);
+app.route("/api/lunchflow", lunchflowApi);
