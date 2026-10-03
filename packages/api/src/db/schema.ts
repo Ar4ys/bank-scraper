@@ -8,6 +8,7 @@ import {
 } from "@bank-scraper/shared";
 import { sql } from "drizzle-orm";
 import * as s from "drizzle-orm/sqlite-core";
+import { type z } from "zod";
 
 import { type DefineEnum } from "../utils.ts";
 
@@ -65,6 +66,14 @@ export const RawTransactionStatus = Object.freeze({
 	Error: "error",
 });
 
+/** Why a raw transaction could not be turned into a transaction */
+export type ProcessingError = {
+	/** Which part rejected it: the bank schema, or a value produced by a rule */
+	stage: "schema" | "rules";
+	message: string;
+	issues: z.core.$ZodIssue[];
+};
+
 export type RawTransaction = typeof rawTransactions.$inferSelect;
 export type InsertRawTransaction = typeof rawTransactions.$inferInsert;
 /**
@@ -87,7 +96,7 @@ export const rawTransactions = s.snakeCase.table(
 			.$type<RawTransactionStatus>()
 			.notNull()
 			.default(RawTransactionStatus.Unprocessed),
-		error: s.blob({ mode: "json" }),
+		error: s.blob({ mode: "json" }).$type<ProcessingError>(),
 		createdAt: instant().notNull().default(sqlDateTimeNow),
 	},
 	(table) => [

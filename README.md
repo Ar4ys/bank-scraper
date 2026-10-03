@@ -8,8 +8,12 @@ Collects my PKO Bank Polski (iPKO) transactions from the web UI into a local SQL
    with the same content is skipped. If the content of a known transaction changes, a new row is
    added next to the old one, so the table doubles as a log of shape changes. Accounts are created
    from the account the bank reports for each scraped page.
-3. Raw transactions are then parsed with strict schemas (`packages/api/src/ipkoSchemas.ts`) into the
-   `transactions` table. This step is still in progress.
+3. Every new raw transaction is parsed with strict schemas (`packages/api/src/ipkoSchemas.ts`) and
+   turned into a row of `transactions`, which has our own id. Each time the fields of a transaction
+   change, a row of `transaction_versions` records the new fields and what caused the change: a new
+   version of the raw transaction, a new rule revision, or a change of the code. A raw transaction
+   that cannot be parsed keeps the error on its row and leaves its transaction untouched. Holds are
+   stored but never become transactions.
 
 ## Setup
 
@@ -37,12 +41,13 @@ mise run db-migrate
 
 ## Configuration
 
-| Env var          | Default          | Meaning                                                      |
-| ---------------- | ---------------- | ------------------------------------------------------------ |
-| `HTTP_HOST`      | `127.0.0.1`      | Address the HTTP server listens on                           |
-| `HTTP_PORT`      | `8585`           | Port the HTTP server listens on                              |
-| `SQLITE_DB_PATH` | `./local/dev.db` | Path of the SQLite database file, relative to `packages/api` |
-| `INGEST_API_KEY` | required         | Key the userscript has to send to store scraped transactions |
+| Env var          | Default          | Meaning                                                                  |
+| ---------------- | ---------------- | ------------------------------------------------------------------------ |
+| `HTTP_HOST`      | `127.0.0.1`      | Address the HTTP server listens on                                       |
+| `HTTP_PORT`      | `8585`           | Port the HTTP server listens on                                          |
+| `SQLITE_DB_PATH` | `./local/dev.db` | Path of the SQLite database file, relative to `packages/api`             |
+| `INGEST_API_KEY` | required         | Key the userscript has to send to store scraped transactions             |
+| `APP_GIT_COMMIT` | `unknown`        | Git commit of the running build, recorded with every transaction version |
 
 ## Userscript
 

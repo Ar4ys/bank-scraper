@@ -1,6 +1,7 @@
 import { type IngestBody } from "@bank-scraper/shared";
 
 import { db, tables } from "./db/db.ts";
+import { processBankTransactions } from "./processing/process.ts";
 import { jsonSha256 } from "./utils.ts";
 
 async function findOrCreateAccount(sourceAccount: string) {
@@ -16,16 +17,17 @@ async function findOrCreateAccount(sourceAccount: string) {
 }
 
 /**
- * Stores scraped transactions and returns the rows that were new. A transaction that is already
- * stored with the same data is skipped; one whose data changed is stored as a new row next to the
- * old one, which keeps a log of how the bank's data changes over time.
+ * Stores scraped transactions, processes the new ones and returns their rows as stored. A
+ * transaction that is already stored with the same data is skipped; one whose data changed is
+ * stored as a new row next to the old one, which keeps a log of how the bank's data changes over
+ * time.
  */
 export async function ingestRawTransactions({ sourceAccount, transactions }: IngestBody) {
 	const account = await findOrCreateAccount(sourceAccount);
 
 	if (!transactions.length) return [];
 
-	return db
+	const inserted = await db
 		.insert(tables.rawTransactions)
 		.values(
 			transactions.map((transaction) => ({
@@ -37,4 +39,13 @@ export async function ingestRawTransactions({ sourceAccount, transactions }: Ing
 		)
 		.onConflictDoNothing()
 		.returning();
+
+	try {
+		processBankTransactions(inserted);
+	} catch (error) {
+		// The raw rows are what must not get lost: they stay unprocessed and can be reprocessed later
+		console.error("Processing of ingested transactions failed:", error);
+	}
+
+	return inserted;
 }

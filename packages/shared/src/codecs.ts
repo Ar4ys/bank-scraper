@@ -7,7 +7,14 @@ export type TransactionAmount = Branded<bigint, "TransactionAmount">;
 export const TransactionAmount = createBrander<bigint, TransactionAmount>();
 
 export const zPlainDate = z.codec(z.string(), z.instanceof(Temporal.PlainDate), {
-	decode: (value) => Temporal.PlainDate.from(value),
+	decode: (value, ctx) => {
+		try {
+			return Temporal.PlainDate.from(value);
+		} catch {
+			ctx.issues.push({ code: "invalid_format", format: "date", input: value });
+			return z.NEVER;
+		}
+	},
 	encode: (value) => value.toString(),
 });
 

@@ -9,6 +9,8 @@ const configSchema = z.object({
 	SQLITE_DB_PATH: z.string().default("./local/dev.db"),
 	/** Key the userscript has to send to store scraped transactions */
 	INGEST_API_KEY: z.string().nonempty(),
+	/** Git commit of the running build, recorded with every transaction version */
+	APP_GIT_COMMIT: z.string().default("unknown"),
 });
 
 export const config = configSchema.parse(process.env);

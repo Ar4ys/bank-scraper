@@ -42,6 +42,10 @@ describe("zPlainDate", () => {
 		assert.ok(date.equals(Temporal.PlainDate.from({ year: 2026, month: 8, day: 17 })));
 	});
 
+	it("rejects text that is not a date", () => {
+		assert.equal(z.safeDecode(zPlainDate, "BOLT.EU").success, false);
+	});
+
 	it("encodes back to an ISO date", () => {
 		assert.equal(z.encode(zPlainDate, Temporal.PlainDate.from("2026-08-17")), "2026-08-17");
 	});
