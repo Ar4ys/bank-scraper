@@ -62,6 +62,22 @@ the versions of a raw transaction. Everything that reprocesses shows a preview f
 - `mise run dev-admin` starts the Vite dev server, which proxies `/api` to the API on port 8585.
 - `mise run build-admin` builds it into `packages/admin/dist`, which the API serves at `/`.
 
+### Rules
+
+The code derives merchant, description and date of a transaction from the bank's data. Rules, edited
+on the Rules page, override that without a deploy, e.g. to name the merchant when the bank only puts
+`BOLT.EU/P/20261003` into the title.
+
+- A rule has conditions on fields of the bank's JSON (`contains` and `equals` ignore case, `regex` is
+  used as written) and templates for the fields it sets. A template can use `{details.title}` style
+  placeholders for the bank's JSON and `{match.1}` for a capture group of the rule's first regex
+  condition. A placeholder that points at nothing renders as empty text.
+- For every field, the first enabled rule from the top that matches and sets that field wins.
+- Edits are a draft until they are applied. Applying shows which transactions would change, refuses
+  rules that produce a value a field cannot hold, stores the rules as a new revision and reprocesses
+  every transaction, recording the rule revision as the cause in its history.
+- Rules live only in the database. Export them to a JSON file from the Rules page to keep a copy.
+
 It needs a browser that has `Temporal`.
 
 ## Userscript

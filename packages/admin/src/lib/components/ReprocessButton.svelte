@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { reprocess, type ProcessingReport, type ReprocessScope } from "$lib/api";
-	import JsonDiff from "$lib/components/JsonDiff.svelte";
+	import ReportView from "$lib/components/ReportView.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
 
@@ -52,24 +52,7 @@
 		{#if error}
 			<p class="text-sm text-destructive">{error}</p>
 		{:else if preview}
-			<p class="text-sm">
-				{preview.changes.length} would change, {preview.unchanged} stay the same,
-				{preview.errors.length} fail, {preview.holds} are holds.
-			</p>
-
-			{#each preview.changes as change (change.rawTransactionId)}
-				<div class="space-y-1">
-					<p class="font-mono text-xs">{change.bankId} · {change.cause}</p>
-					<JsonDiff before={change.before} after={change.after} />
-				</div>
-			{/each}
-
-			{#each preview.errors as failure (failure.rawTransactionId)}
-				<div class="space-y-1">
-					<p class="font-mono text-xs">{failure.bankId} · {failure.error.stage} error</p>
-					<pre class="whitespace-pre-wrap rounded bg-destructive/10 p-2 text-xs">{failure.error.message}</pre>
-				</div>
-			{/each}
+			<ReportView report={preview} />
 		{/if}
 
 		<Dialog.Footer>

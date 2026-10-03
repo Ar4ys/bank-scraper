@@ -4,6 +4,7 @@ import { and, count, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { adminRulesApi } from "./adminRules.ts";
 import { db, tables } from "./db/db.ts";
 import { RawTransactionStatus, type RawTransaction, type Transaction } from "./db/schema.ts";
 import { listBankTransactionKeys, processBankTransactions } from "./processing/process.ts";
@@ -58,6 +59,8 @@ const latestRawTransactions = () => {
  * Successful responses state their 200, which is how the typed client tells them from errors.
  */
 export const adminApi = new Hono()
+	.route("/rules", adminRulesApi)
+
 	/** GET /api/admin/dashboard */
 	.get("/dashboard", async (c) => {
 		const { versions, join } = latestRawTransactions();

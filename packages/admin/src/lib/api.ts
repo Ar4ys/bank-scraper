@@ -62,6 +62,33 @@ export const reprocess = (scope: ReprocessScope, dryRun: boolean) =>
 export const renameAccount = (id: number, name: string) =>
 	unwrap(api.accounts[":id"].$patch({ param: { id: String(id) }, json: { name } }));
 
+export type RulesState = Awaited<ReturnType<typeof loadRules>>;
+export type Rule = RulesState["rules"][number];
+/** A rule in the editor: one that is new has no id yet, and its priority is its position */
+export type RuleDraft = Omit<Rule, "id" | "priority" | "txTypes"> & {
+	id?: string;
+	txTypes: string[] | null;
+};
+export const loadRules = () => unwrap(api.rules.$get());
+
+// The server checks the transaction types, the editor only passes them through
+type RulesInput = Parameters<typeof api.rules.$put>[0]["json"]["rules"];
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+const toRulesInput = (rules: RuleDraft[]) => rules as RulesInput;
+
+export const saveRules = (rules: RuleDraft[]) =>
+	unwrap(api.rules.$put({ json: { rules: toRulesInput(rules) } }));
+
+export const previewRules = (rules: RuleDraft[], only?: { accountId: number; bankId: string }) =>
+	unwrap(api.rules.preview.$post({ json: { rules: toRulesInput(rules), only } }));
+
+export const applyRules = () => unwrap(api.rules.apply.$post());
+
+export type RuleRevisionSummary = Awaited<ReturnType<typeof loadRuleRevisions>>[number];
+export const loadRuleRevisions = () => unwrap(api.rules.revisions.$get());
+export const loadRuleRevision = (id: string) =>
+	unwrap(api.rules.revisions[":id"].$get({ param: { id } }));
+
 /** Query strings carry text only, and a filter that is not set must be left out */
 function toQuery<T extends Record<string, string | number | boolean | undefined>>(query: T) {
 	// oxlint-disable-next-line typescript/no-unsafe-type-assertion
