@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { TransactionAmount } from "./db/schema.ts";
+
 type DeepMask<T extends Record<string, any>> = {
 	[K in keyof T]?: T[K] extends Record<string, any> ? DeepMask<T[K]> : true;
 };
@@ -151,6 +153,26 @@ export function zMdu<
 		encode: (data) => data as z.input<T[number]>,
 	});
 }
+
+export const zPlainDate = z.codec(z.string(), z.instanceof(Temporal.PlainDate), {
+	decode: (value) => Temporal.PlainDate.from(value),
+	encode: (value) => value.toString(),
+});
+
+export const zTransactionAmount = z.codec(
+	z.string().regex(/-?\d+(\.\d{2})?/, "Transaction amount must have format: 0.00 or -0.00"),
+	z.bigint().transform(TransactionAmount),
+	{
+		decode: (value) => BigInt(!value.includes(".") ? value + "00" : value.replace(".", "")),
+		encode: (value) => {
+			const integerPart = value / 100n;
+			let fractionalPart = value / 100n;
+			if (fractionalPart < 0n) fractionalPart = -fractionalPart;
+
+			return `${integerPart}.${fractionalPart}`;
+		},
+	},
+);
 
 export function zodPrettifyError(error: { issues: z.core.$ZodIssue[] }): string {
 	const lines: string[] = [];

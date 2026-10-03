@@ -77,12 +77,30 @@ import { z } from "zod";
 //
 //
 //
+// const a = z
+// 	.discriminatedUnion("a", [
+// 		z.object({ a: z.literal(1), b: z.string() }),
+// 		z.object({ a: z.literal(2) }),
+// 	])
+// 	.safeParse({ a: 3 });
+
 const a = z
-	.discriminatedUnion("a", [
-		z.object({ a: z.literal(1), b: z.string() }),
-		z.object({ a: z.literal(2) }),
-	])
-	.safeParse({ a: 3 });
+	.codec(
+		z.string().regex(/-?\d+(\.\d{2})?/, "Transaction amount must have format: 0.00 or -0.00"),
+		z.bigint(),
+		{
+			decode: (value) => BigInt(!value.includes(".") ? value + "00" : value.replace(".", "")),
+			encode: (value) => {
+				const integerPart = value / 100n;
+				let fractionalPart = value / 100n;
+				if (fractionalPart < 0n) fractionalPart = -fractionalPart;
+
+				return `${integerPart}.${fractionalPart}`;
+			},
+		},
+	)
+	.transform((x) => x)
+	.safeEncode(1000n);
 
 if (a.success) {
 	console.dir(a.data);

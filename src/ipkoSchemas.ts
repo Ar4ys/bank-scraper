@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { type DefineEnum } from "./utils.ts";
-import { zMdu } from "./zod.ts";
+import { zMdu, zPlainDate, zTransactionAmount } from "./zod.ts";
 
 const type =
 	<const TType extends string>(typeName: TType) =>
@@ -53,15 +53,15 @@ export const baseTxSchema = z.object({
 		},
 		side: z.enum(OperationSide),
 	}),
-	money: z.object({ amount: z.string(), currency: z.string() }),
+	money: z.object({ amount: zTransactionAmount, currency: z.string() }),
 	is_hold: z.boolean(), // TODO: Parse only when true. When false - save as is and ignore
 });
 
 export const sharedTxSchema = z.object({
 	...baseTxSchema.shape,
 	details: z.object({
-		exec_date: z.string(),
-		order_date: z.string(),
+		exec_date: zPlainDate,
+		order_date: zPlainDate,
 	}),
 	is_hold: z.literal(false),
 });
@@ -96,7 +96,7 @@ export const cardTransaction = z
 			country_code: z.string(),
 
 			original_amount: z.object({
-				amount: z.string(),
+				amount: zTransactionAmount,
 				currency: z.string(),
 			}),
 
@@ -127,7 +127,7 @@ export const cardTransferSend = z
 			country_code: z.string(),
 
 			original_amount: z.object({
-				amount: z.string(),
+				amount: zTransactionAmount,
 				currency: z.string(),
 			}),
 
@@ -298,7 +298,7 @@ export const foreignTransferSend = z
 			recipient_name_and_address: z.string(), // TODO: I have no idea, how it looks when address is also present
 
 			original_amount: z.object({
-				amount: z.string(),
+				amount: zTransactionAmount,
 				currency: z.string(),
 			}),
 			exchange_rate: z.string().optional(),
@@ -325,7 +325,7 @@ export const foreignTransferReceive = z
 			sender_name_and_address: z.string(),
 
 			original_amount: z.object({
-				amount: z.string(),
+				amount: zTransactionAmount,
 				currency: z.string(),
 			}),
 			exchange_rate: z.string().optional(),
