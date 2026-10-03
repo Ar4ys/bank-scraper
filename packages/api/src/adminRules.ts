@@ -21,7 +21,7 @@ const ipkoTxTypes = Object.values(IpkoTxType);
 
 const isValidRegex = (pattern: string) => {
 	try {
-		return RegExp(pattern) instanceof RegExp;
+		return RegExp(pattern, "i") instanceof RegExp;
 	} catch {
 		return false;
 	}

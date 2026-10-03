@@ -40,8 +40,7 @@ export type Rule = z.infer<typeof ruleSchema>;
  * apply, otherwise the capture groups for `{match.N}`, which come from the first `regex` condition
  * of the rule.
  *
- * `contains` and `equals` ignore case, `regex` is used as written. A path that points at nothing
- * never matches.
+ * Every operator ignores case. A path that points at nothing never matches.
  */
 export function matchRule(
 	rule: Pick<Rule, "txTypes" | "conditions">,
@@ -66,7 +65,7 @@ export function matchRule(
 				break;
 
 			case "regex": {
-				const match = new RegExp(condition.pattern).exec(text);
+				const match = new RegExp(condition.pattern, "i").exec(text);
 				if (!match) return undefined;
 				captures ??= [...match];
 				break;

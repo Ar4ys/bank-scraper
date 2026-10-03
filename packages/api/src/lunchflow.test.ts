@@ -89,7 +89,7 @@ describe("Lunch Flow API", () => {
 				isPending: false,
 			},
 		);
-		assert.deepEqual([card.amount, card.merchant, card.date], [-12.34, "", "2025-06-06"]);
+		assert.deepEqual([card.amount, card.merchant, card.date], [-12.34, null, "2025-06-06"]);
 	});
 
 	it("filters by inclusive dates, named as Sure or as the docs name them", async () => {

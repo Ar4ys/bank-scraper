@@ -33,10 +33,10 @@ describe("matchRule", () => {
 		);
 	});
 
-	it("uses a regex as written, case included", () => {
-		assert.equal(
-			match([{ path: "details.title", operator: "regex", pattern: "^bolt" }]),
-			undefined,
+	it("ignores case in a regex too", () => {
+		assert.deepEqual(
+			match([{ path: "details.title", operator: "regex", pattern: "^bolt\\.eu/p/(\\d+)" }]),
+			["BOLT.EU/P/20261003", "20261003"],
 		);
 	});
 

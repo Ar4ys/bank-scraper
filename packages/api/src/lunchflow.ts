@@ -90,7 +90,7 @@ export const lunchflowApi = new Hono()
 					amount: toMajorUnits(transaction.amount),
 					currency: transaction.currency,
 					date: transaction.date.toString(),
-					merchant: transaction.merchant ?? "",
+					merchant: transaction.merchant,
 					description: transaction.description,
 					isPending: transaction.isPending,
 				})),

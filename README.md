@@ -99,8 +99,8 @@ The code derives merchant, description and date of a transaction from the bank's
 on the Rules page, override that without a deploy, e.g. to name the merchant when the bank only puts
 `BOLT.EU/P/20261003` into the title.
 
-- A rule has conditions on fields of the bank's JSON (`contains` and `equals` ignore case, `regex` is
-  used as written) and templates for the fields it sets. A template can use `{details.title}` style
+- A rule has conditions on fields of the bank's JSON (`contains`, `equals` and `regex`, all ignoring
+  case) and templates for the fields it sets. A template can use `{details.title}` style
   placeholders for the bank's JSON and `{match.1}` for a capture group of the rule's first regex
   condition. A placeholder that points at nothing renders as empty text.
 - For every field, the first enabled rule from the top that matches and sets that field wins.
