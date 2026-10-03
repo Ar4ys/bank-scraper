@@ -1,25 +1,14 @@
 {
 	"name": "bank-scraper",
 	"version": "1.0.0",
+	"private": true,
 	"license": "ISC",
 	"type": "module",
-	"main": "src/app.ts",
-	"dependencies": {
-		"@hono/node-server": "^2.1.0",
-		"@hono/zod-validator": "^0.9.0",
-		"drizzle-orm": "1.0.0-rc.4",
-		"hono": "^4.13.1",
-		"neverthrow": "^8.2.0",
-		"stable-hash": "^0.0.6",
-		"zod": "^4.4.3"
-	},
 	"devDependencies": {
 		"@types/node": "26",
-		"drizzle-kit": "1.0.0-rc.4",
 		"oxfmt": "^0.62.0",
 		"oxlint": "^1.77.0",
 		"oxlint-tsgolint": "^7.0.2001",
-		"tsdown": "^0.22.14",
 		"typescript": "^7.0.2"
 	},
 	"packageManager": "pnpm@12.6.0"

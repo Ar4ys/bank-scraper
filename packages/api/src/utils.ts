@@ -45,11 +45,3 @@ export const zValidatorHook = <
 export function assertNever(value: never, message?: string): never {
 	throw new Error(message ?? "Unreachable reached", { cause: value });
 }
-
-const brand = Symbol("brand");
-export type Branded<T, Brand extends string> = T & { [brand]: Brand };
-export const createBrander =
-	<TBase, TBranded extends Branded<TBase, any>>() =>
-	(value: TBase): TBranded =>
-		// oxlint-disable-next-line typescript/no-unsafe-type-assertion
-		value as any as TBranded;

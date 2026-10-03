@@ -6,13 +6,28 @@ pnpm = "12"
 _.path = ['{{config_root}}/node_modules/.bin']
 
 [tasks]
-build-userscript = "tsdown"
-start-server = "node src/app.ts"
-watch-server = "node --watch src/app.ts"
-test = "node --test 'src/**/*.test.ts'"
+test = "node --test 'packages/*/src/**/*.test.ts'"
+typecheck = "tsc -b"
 
-db-generate = "drizzle-kit generate && node ./tools/patchMigrations.ts"
-db-migrate = "drizzle-kit migrate"
+[tasks.build-userscript]
+dir = "packages/userscript"
+run = "pnpm exec tsdown"
+
+[tasks.start-server]
+dir = "packages/api"
+run = "node src/app.ts"
+
+[tasks.watch-server]
+dir = "packages/api"
+run = "node --watch src/app.ts"
+
+[tasks.db-generate]
+dir = "packages/api"
+run = "pnpm exec drizzle-kit generate && node ./tools/patchMigrations.ts"
+
+[tasks.db-migrate]
+dir = "packages/api"
+run = "pnpm exec drizzle-kit migrate"
 
 [tasks.db-push]
 run = [{ task = "db-generate" }, { task = "db-migrate" }]

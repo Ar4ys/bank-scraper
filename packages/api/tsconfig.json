@@ -1,0 +1,19 @@
+{
+	"$schema": "https://json.schemastore.org/tsconfig",
+	"extends": "../../.config/tsconfig.base.json",
+	"include": ["src", "tools", "drizzle.config.ts"],
+	"references": [
+		{
+			"path": "../shared"
+		}
+	],
+	"compilerOptions": {
+		"module": "NodeNext",
+		"types": ["node"],
+		"skipLibCheck": true,
+		"erasableSyntaxOnly": true,
+		"verbatimModuleSyntax": true,
+		"outDir": "node_modules/.cache/tsc",
+		"tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo"
+	}
+}

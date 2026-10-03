@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 
+import { TransactionAmount } from "@bank-scraper/shared";
 import { eq } from "drizzle-orm";
 
-import { rawTransactions, TransactionAmount, transactions } from "./schema.ts";
+import { rawTransactions, transactions } from "./schema.ts";
 import { createTestDb } from "./testDb.ts";
 
 const { db, cleanup } = await createTestDb();

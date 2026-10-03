@@ -3,8 +3,7 @@ import { describe, it } from "node:test";
 
 import { z } from "zod";
 
-import { TransactionAmount } from "./db/schema.ts";
-import { zPlainDate, zTransactionAmount } from "./zod.ts";
+import { TransactionAmount, zPlainDate, zTransactionAmount } from "./codecs.ts";
 
 describe("zTransactionAmount", () => {
 	const cases: Array<[string, bigint]> = [

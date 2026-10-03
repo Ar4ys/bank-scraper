@@ -1,0 +1,7 @@
+{
+	"name": "@bank-scraper/admin",
+	"version": "1.0.0",
+	"private": true,
+	"license": "ISC",
+	"type": "module"
+}

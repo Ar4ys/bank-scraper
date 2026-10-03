@@ -1,12 +1,15 @@
 {
 	"$schema": "https://json.schemastore.org/tsconfig",
 	"extends": "./tsconfig.base.json",
-	"include": ["../*.ts", "../*.mts", "../*.cts", "../*.js", "../*.mjs", "../*.cjs"],
+	"include": ["../*.ts", "../packages/userscript/tsdown.config.mts"],
 	"compilerOptions": {
 		"composite": true,
 		"module": "NodeNext",
 		"types": ["node"],
 		"skipLibCheck": true,
+		"rootDir": "..",
+		"outDir": "../node_modules/.cache/tsc",
+		"tsBuildInfoFile": "../node_modules/.cache/tsc/tsconfig.tsbuildinfo",
 		"allowJs": true,
 		"checkJs": true
 	}

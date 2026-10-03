@@ -1,7 +1,8 @@
+import { zPlainDate, zTransactionAmount } from "@bank-scraper/shared";
 import { z } from "zod";
 
 import { type DefineEnum } from "./utils.ts";
-import { zMdu, zPlainDate, zTransactionAmount } from "./zod.ts";
+import { zMdu } from "./zod.ts";
 
 const type =
 	<const TType extends string>(typeName: TType) =>

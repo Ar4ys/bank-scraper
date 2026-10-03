@@ -1,0 +1,14 @@
+{
+	"$schema": "https://json.schemastore.org/tsconfig",
+	"extends": "../../.config/tsconfig.base.json",
+	"include": ["src"],
+	"compilerOptions": {
+		"module": "NodeNext",
+		"types": ["node"],
+		"skipLibCheck": true,
+		"erasableSyntaxOnly": true,
+		"verbatimModuleSyntax": true,
+		"outDir": "node_modules/.cache/tsc",
+		"tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo"
+	}
+}

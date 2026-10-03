@@ -1,9 +1,10 @@
 import { randomUUIDv7 } from "node:crypto";
 
+import { type TransactionAmount } from "@bank-scraper/shared";
 import { sql } from "drizzle-orm";
 import * as s from "drizzle-orm/sqlite-core";
 
-import { createBrander, type Branded, type DefineEnum } from "../utils.ts";
+import { type DefineEnum } from "../utils.ts";
 
 // SQLite uses a weird datetime format - like an ISO string but without timezone:
 // SQLite 2026-08-17 16:39:36.741 === ISO 2026-08-17T16:39:36.741Z
@@ -67,9 +68,6 @@ export const rawTransactions = s.snakeCase.table(
 //   ],
 //   "total": 0
 // }
-
-export type TransactionAmount = Branded<bigint, "TransactionAmount">;
-export const TransactionAmount = createBrander<bigint, TransactionAmount>();
 
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = typeof transactions.$inferInsert;

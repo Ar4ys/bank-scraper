@@ -1,0 +1,16 @@
+{
+	"name": "@bank-scraper/shared",
+	"version": "1.0.0",
+	"private": true,
+	"license": "ISC",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@types/node": "26"
+	}
+}
