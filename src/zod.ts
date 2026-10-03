@@ -160,16 +160,18 @@ export const zPlainDate = z.codec(z.string(), z.instanceof(Temporal.PlainDate), 
 });
 
 export const zTransactionAmount = z.codec(
-	z.string().regex(/-?\d+(\.\d{2})?/, "Transaction amount must have format: 0.00 or -0.00"),
-	z.bigint().transform(TransactionAmount),
+	z.string().regex(/^-?\d+(\.\d{2})?$/, "Transaction amount must have format: 0.00 or -0.00"),
+	z.custom<TransactionAmount>((value) => typeof value === "bigint"),
 	{
-		decode: (value) => BigInt(!value.includes(".") ? value + "00" : value.replace(".", "")),
+		decode: (value) =>
+			TransactionAmount(BigInt(!value.includes(".") ? value + "00" : value.replace(".", ""))),
 		encode: (value) => {
-			const integerPart = value / 100n;
-			let fractionalPart = value / 100n;
-			if (fractionalPart < 0n) fractionalPart = -fractionalPart;
+			// Sign is handled separately, because the integer part of e.g. -0.50 is 0n and loses it
+			const sign = value < 0n ? "-" : "";
+			const absolute = value < 0n ? -BigInt(value) : value;
+			const fractionalPart = String(absolute % 100n).padStart(2, "0");
 
-			return `${integerPart}.${fractionalPart}`;
+			return `${sign}${absolute / 100n}.${fractionalPart}`;
 		},
 	},
 );

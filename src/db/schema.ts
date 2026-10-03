@@ -13,11 +13,11 @@ export const instant = s.customType<{ data: Temporal.Instant; driverData: string
 		value
 			.toString({ smallestUnit: "milliseconds", fractionalSecondDigits: 3 })
 			.replace("T", " ")
-			.replace("Z", " "),
+			.replace("Z", ""),
 	fromDriver: (value) => Temporal.Instant.from(value.replace(" ", "T") + "Z"),
 });
 
-export const sqlDateTimeNow = sql`datetime('subsec')`;
+export const sqlDateTimeNow = sql`(datetime('now', 'subsec'))`;
 
 export const plainDate = s.customType<{ data: Temporal.PlainDate; driverData: string }>({
 	dataType: () => "text",
