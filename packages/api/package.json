@@ -5,6 +5,9 @@
 	"license": "ISC",
 	"type": "module",
 	"main": "src/server.ts",
+	"exports": {
+		"./admin": "./src/admin.ts"
+	},
 	"dependencies": {
 		"@bank-scraper/shared": "workspace:*",
 		"@hono/node-server": "^2.1.0",

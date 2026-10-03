@@ -7,11 +7,19 @@ _.path = ['{{config_root}}/node_modules/.bin']
 
 [tasks]
 test = "node --test 'packages/*/src/**/*.test.ts'"
-typecheck = "tsc -b"
+typecheck = "tsc -b && pnpm --filter @bank-scraper/admin run check"
 
 [tasks.build-userscript]
 dir = "packages/userscript"
 run = "pnpm exec tsdown"
+
+[tasks.dev-admin]
+dir = "packages/admin"
+run = "pnpm exec vite"
+
+[tasks.build-admin]
+dir = "packages/admin"
+run = "pnpm exec vite build"
 
 [tasks.start-server]
 dir = "packages/api"

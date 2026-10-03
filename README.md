@@ -38,6 +38,8 @@ mise run db-migrate
 | `mise run db-migrate`       | Applies migrations to the database                              |
 | `mise run db-push`          | `db-generate` followed by `db-migrate`                          |
 | `mise run build-userscript` | Bundles the userscript into `packages/userscript/dist/`         |
+| `mise run dev-admin`        | Starts the admin app with hot reload                            |
+| `mise run build-admin`      | Builds the admin app into `packages/admin/dist`                 |
 
 ## Configuration
 
@@ -50,6 +52,17 @@ mise run db-migrate
 | `LUNCHFLOW_API_KEY` | required         | Key Sure has to send to the Lunch Flow API                               |
 | `ADMIN_APP_DIR`     | `../admin/dist`  | Directory of the built admin app, relative to `packages/api`             |
 | `APP_GIT_COMMIT`    | `unknown`        | Git commit of the running build, recorded with every transaction version |
+
+## Admin app
+
+`packages/admin` is a Svelte app for looking into the data: which raw transaction became which
+transaction, the history of a transaction with what caused each change, and the changes between
+the versions of a raw transaction. Everything that reprocesses shows a preview first.
+
+- `mise run dev-admin` starts the Vite dev server, which proxies `/api` to the API on port 8585.
+- `mise run build-admin` builds it into `packages/admin/dist`, which the API serves at `/`.
+
+It needs a browser that has `Temporal`.
 
 ## Userscript
 
@@ -93,6 +106,7 @@ A pnpm workspace:
 - `packages/api` server, database schema, migrations (`drizzle/`), iPKO schemas and one-off
   scripts (`tools/`) used to explore the shape of the bank's JSON
 - `packages/userscript` the browser side
-- `packages/shared` code used by more than one package (codecs for dates and amounts)
-- `packages/admin` the admin app (empty for now)
+- `packages/shared` code used by more than one package: codecs for dates and amounts, rule and
+  transaction schemas, the template renderer and the JSON diff
+- `packages/admin` the admin app
 - `plans/todo.md` deferred work

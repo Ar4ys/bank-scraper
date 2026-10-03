@@ -53,7 +53,10 @@ const latestRawTransactions = () => {
 	return { versions, join: eq(versions.latestId, rawTransactions.id) };
 };
 
-/** JSON API of the admin app. It has no auth of its own and has to sit behind a reverse proxy. */
+/**
+ * JSON API of the admin app. It has no auth of its own and has to sit behind a reverse proxy.
+ * Successful responses state their 200, which is how the typed client tells them from errors.
+ */
 export const adminApi = new Hono()
 	/** GET /api/admin/dashboard */
 	.get("/dashboard", async (c) => {
@@ -72,17 +75,20 @@ export const adminApi = new Hono()
 			})
 			.from(transactions);
 
-		return c.json({
-			// Counted per bank transaction, by the status of its latest raw version
-			rawByStatus: Object.fromEntries(
-				Object.values(RawTransactionStatus).map((status) => [
-					status,
-					statuses.find((row) => row.status === status)?.total ?? 0,
-				]),
-			),
-			transactions: totals?.transactions ?? 0,
-			transactionsWithoutMerchant: totals?.withoutMerchant ?? 0,
-		});
+		return c.json(
+			{
+				// Counted per bank transaction, by the status of its latest raw version
+				rawByStatus: Object.fromEntries(
+					Object.values(RawTransactionStatus).map((status) => [
+						status,
+						statuses.find((row) => row.status === status)?.total ?? 0,
+					]),
+				),
+				transactions: totals?.transactions ?? 0,
+				transactionsWithoutMerchant: totals?.withoutMerchant ?? 0,
+			},
+			200,
+		);
 	})
 
 	/** GET /api/admin/accounts */
@@ -96,6 +102,7 @@ export const adminApi = new Hono()
 				name: account.name,
 				currency: account.currency,
 			})),
+			200,
 		);
 	})
 
@@ -111,7 +118,7 @@ export const adminApi = new Hono()
 				.where(eq(accounts.id, c.req.valid("param").id))
 				.returning({ id: accounts.id, name: accounts.name });
 
-			return account ? c.json(account) : c.json({ message: "Account not found" }, 404);
+			return account ? c.json(account, 200) : c.json({ message: "Account not found" }, 404);
 		},
 	)
 
@@ -149,10 +156,16 @@ export const adminApi = new Hono()
 				.innerJoin(versions, join)
 				.where(where);
 
-			return c.json({
-				items: rows.map(({ raw, versionCount }) => ({ ...rawTransactionJson(raw), versionCount })),
-				total: total?.total ?? 0,
-			});
+			return c.json(
+				{
+					items: rows.map(({ raw, versionCount }) => ({
+						...rawTransactionJson(raw),
+						versionCount,
+					})),
+					total: total?.total ?? 0,
+				},
+				200,
+			);
 		},
 	)
 
@@ -176,11 +189,14 @@ export const adminApi = new Hono()
 				.from(transactions)
 				.where(and(eq(transactions.accountId, accountId), eq(transactions.bankId, bankId)));
 
-			return c.json({
-				/** Oldest first */
-				versions: versions.map(rawTransactionJson),
-				transactionId: transaction?.id ?? null,
-			});
+			return c.json(
+				{
+					/** Oldest first */
+					versions: versions.map(rawTransactionJson),
+					transactionId: transaction?.id ?? null,
+				},
+				200,
+			);
 		},
 	)
 
@@ -223,7 +239,7 @@ export const adminApi = new Hono()
 
 			const [total] = await db.select({ total: count() }).from(transactions).where(where);
 
-			return c.json({ items: rows.map(transactionJson), total: total?.total ?? 0 });
+			return c.json({ items: rows.map(transactionJson), total: total?.total ?? 0 }, 200);
 		},
 	)
 
@@ -242,20 +258,23 @@ export const adminApi = new Hono()
 			.where(eq(transactionVersions.transactionId, transaction.id))
 			.orderBy(transactionVersions.id);
 
-		return c.json({
-			transaction: transactionJson(transaction),
-			/** Oldest first */
-			versions: versions.map((version) => ({
-				id: version.id,
-				rawTransactionId: version.rawTransactionId,
-				cause: version.cause,
-				ruleRevisionId: version.ruleRevisionId,
-				appCommit: version.appCommit,
-				data: version.data,
-				fieldSources: version.fieldSources,
-				createdAt: version.createdAt.toString(),
-			})),
-		});
+		return c.json(
+			{
+				transaction: transactionJson(transaction),
+				/** Oldest first */
+				versions: versions.map((version) => ({
+					id: version.id,
+					rawTransactionId: version.rawTransactionId,
+					cause: version.cause,
+					ruleRevisionId: version.ruleRevisionId,
+					appCommit: version.appCommit,
+					data: version.data,
+					fieldSources: version.fieldSources,
+					createdAt: version.createdAt.toString(),
+				})),
+			},
+			200,
+		);
 	})
 
 	/** POST /api/admin/reprocess */
@@ -286,13 +305,16 @@ export const adminApi = new Hono()
 
 			const report = processBankTransactions(keys, { dryRun });
 
-			return c.json({
-				...report,
-				errors: report.errors.map(({ error, ...rest }) => ({
-					...rest,
-					error: { stage: error.stage, message: error.message },
-				})),
-			});
+			return c.json(
+				{
+					...report,
+					errors: report.errors.map(({ error, ...rest }) => ({
+						...rest,
+						error: { stage: error.stage, message: error.message },
+					})),
+				},
+				200,
+			);
 		},
 	);
 
