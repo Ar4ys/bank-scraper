@@ -11,6 +11,7 @@
 		type ProcessingReport,
 		type RuleDraft,
 		type RuleRevisionSummary,
+		type RulesState,
 	} from "$lib/api";
 	import AccountSelect from "$lib/components/AccountSelect.svelte";
 	import ReportView from "$lib/components/ReportView.svelte";
@@ -32,8 +33,13 @@
 
 	const operators = ["contains", "equals", "regex"] as const;
 
+	type Field = RulesState["fieldsByTxType"][string][number];
+
 	let rules = $state<RuleDraft[]>([]);
 	let txTypes = $state<string[]>([]);
+	let fieldsByTxType = $state<RulesState["fieldsByTxType"]>({});
+	/** The input a clicked field goes into: the one that had focus last */
+	let fieldTarget = $state<{ rule: RuleDraft; insert: (path: string) => void }>();
 	let appliedRevisionId = $state<string | null>(null);
 	let hasUnappliedChanges = $state(false);
 	/** The rules as last loaded from or saved to the server, to tell whether the editor has edits */
@@ -82,7 +88,7 @@
 			const state = await loadRules();
 			setRules(state.rules);
 			savedJson = JSON.stringify(rules);
-			({ txTypes, appliedRevisionId, hasUnappliedChanges } = state);
+			({ txTypes, fieldsByTxType, appliedRevisionId, hasUnappliedChanges } = state);
 			revisions = await loadRuleRevisions();
 		});
 
@@ -132,6 +138,31 @@
 		// An empty template means the rule does not set the field, not that it sets it to nothing
 		if (template === "") delete rule.set[field];
 		else rule.set[field] = template;
+	}
+
+	/** The fields a rule can read: those of its transaction types, or of all types if it has none */
+	function fieldsFor(rule: RuleDraft): Field[] {
+		const types = rule.txTypes ?? txTypes;
+		const fieldsOf = (txType: string) => fieldsByTxType[txType] ?? [];
+		const byPath = new Map<string, Field>();
+
+		for (const field of types.flatMap(fieldsOf)) {
+			const known = byPath.get(field.path);
+			byPath.set(field.path, { ...field, optional: field.optional || (known?.optional ?? false) });
+		}
+
+		return [...byPath.values()]
+			.map((field) => ({
+				...field,
+				// A field that one of the types lacks is not always there either
+				optional: field.optional || types.some((txType) => !fieldsOf(txType).some((f) => f.path === field.path)),
+			}))
+			.toSorted((a, b) => a.path.localeCompare(b.path));
+	}
+
+	function insertField(rule: RuleDraft, path: string) {
+		if (fieldTarget?.rule === rule) fieldTarget.insert(path);
+		else rule.conditions.push({ path, operator: "contains", pattern: "" });
 	}
 
 	function exportRules() {
@@ -185,8 +216,9 @@
 
 <p class="text-sm text-muted-foreground">
 	For every field of a transaction, the first enabled rule from the top that matches and sets that
-	field wins; fields no rule sets keep the value the code derives. Templates can use
-	<code>{"{path}"}</code> for a field of the bank's JSON, e.g. <code>{"{details.title}"}</code>, and
+	field wins; fields no rule sets keep the value the code derives. Conditions and templates read the
+	parsed bank transaction: a template can use <code>{"{path}"}</code> for one of its fields, e.g.
+	<code>{"{details.title}"}</code>, and
 	<code>{"{match.1}"}</code> for a capture group of the rule's first regex condition. Rules take
 	effect when they are applied, after a preview.
 </p>
@@ -213,6 +245,14 @@
 </Card.Root>
 
 {#each rules as rule, index (rule)}
+	{@const ruleFields = fieldsFor(rule)}
+
+	<datalist id="fields-{index}">
+		{#each ruleFields as field (field.path)}
+			<option value={field.path}>{field.type}{field.optional ? ", optional" : ""}</option>
+		{/each}
+	</datalist>
+
 	<Card.Root>
 		<Card.Header>
 			<Card.Title class="flex flex-wrap items-center gap-3">
@@ -248,7 +288,13 @@
 				<Label>Conditions <span class="font-normal text-muted-foreground">(all must match)</span></Label>
 				{#each rule.conditions as condition, conditionIndex (condition)}
 					<div class="flex flex-wrap gap-2">
-						<Input class="max-w-xs font-mono" placeholder="details.title" bind:value={condition.path} />
+						<Input
+							class="max-w-xs font-mono"
+							placeholder="details.title"
+							list="fields-{index}"
+							bind:value={condition.path}
+							onfocus={() => (fieldTarget = { rule, insert: (path) => (condition.path = path) })}
+						/>
 						<select bind:value={condition.operator} class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
 							{#each operators as operator (operator)}
 								<option value={operator}>{operator}</option>
@@ -279,10 +325,38 @@
 							placeholder={field.placeholder}
 							value={rule.set[field.key] ?? ""}
 							oninput={(event) => setTemplate(rule, field.key, event.currentTarget.value)}
+							onfocus={() =>
+								(fieldTarget = {
+									rule,
+									insert: (path) => setTemplate(rule, field.key, `${rule.set[field.key] ?? ""}{${path}}`),
+								})}
 						/>
 					</div>
 				{/each}
 			</div>
+
+			<details class="text-sm">
+				<summary class="cursor-pointer text-muted-foreground">
+					Fields of the parsed bank transaction ({ruleFields.length})
+				</summary>
+				<p class="py-2 text-xs text-muted-foreground">
+					Click a field to put it into the condition or template you used last. A field marked with
+					<code>?</code> is not always there.
+				</p>
+				<div class="flex flex-wrap gap-1">
+					{#each ruleFields as field (field.path)}
+						<button
+							type="button"
+							class="rounded border px-1.5 py-0.5 font-mono text-xs hover:bg-muted"
+							title="{field.type}{field.optional ? ', optional' : ''}"
+							onclick={() => insertField(rule, field.path)}
+						>
+							{field.path}{field.optional ? "?" : ""}
+							<span class="text-muted-foreground">{field.type}</span>
+						</button>
+					{/each}
+				</div>
+			</details>
 		</Card.Content>
 	</Card.Root>
 {/each}

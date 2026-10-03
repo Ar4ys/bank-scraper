@@ -137,6 +137,19 @@ describe("deriveTransaction rules", () => {
 		assert.equal(fields.date, "2025-06-08");
 	});
 
+	it("shows rules the parsed transaction: known fields, its type, dates and amounts as text", () => {
+		const { fields } = derive(rawCardTransaction({ field_the_schema_does_not_know: "raw only" }), [
+			rule({
+				set: {
+					description:
+						"{$type}|{money.amount}|{details.order_date}|{is_hold}|{field_the_schema_does_not_know}|",
+				},
+			}),
+		]);
+
+		assert.equal(fields.description, "cardTransaction|-12.34|2025-06-06|false||");
+	});
+
 	it("renders a placeholder for an absent field as empty text", () => {
 		const { fields } = derive(rawCardTransaction(), [
 			rule({

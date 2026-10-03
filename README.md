@@ -99,10 +99,13 @@ The code derives merchant, description and date of a transaction from the bank's
 on the Rules page, override that without a deploy, e.g. to name the merchant when the bank only puts
 `BOLT.EU/P/20261003` into the title.
 
-- A rule has conditions on fields of the bank's JSON (`contains`, `equals` and `regex`, all ignoring
-  case) and templates for the fields it sets. A template can use `{details.title}` style
-  placeholders for the bank's JSON and `{match.1}` for a capture group of the rule's first regex
+- A rule has conditions on fields of the parsed bank transaction (`contains`, `equals` and `regex`,
+  all ignoring case) and templates for the fields it sets. A template can use `{details.title}`
+  style placeholders for those fields and `{match.1}` for a capture group of the rule's first regex
   condition. A placeholder that points at nothing renders as empty text.
+- Rules read the transaction as our schemas parse it, with its `$type` and with dates and amounts
+  as text (`2026-08-17`, `-12.34`). A field of the bank's JSON that the schemas do not list is not
+  visible to rules. The editor lists the available fields per transaction type.
 - For every field, the first enabled rule from the top that matches and sets that field wins.
 - Edits are a draft until they are applied. Applying shows which transactions would change, refuses
   rules that produce a value a field cannot hold, stores the rules as a new revision and reprocesses

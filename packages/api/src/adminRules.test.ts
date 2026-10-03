@@ -48,6 +48,9 @@ describe("admin rules API", () => {
 			[[], null, false],
 		);
 		assert.ok(body.txTypes.includes("cardTransaction"));
+		assert.ok(
+			body.fieldsByTxType.cardTransaction.some((field: any) => field.path === "details.title"),
+		);
 	});
 
 	it("rejects rules it cannot use", async () => {

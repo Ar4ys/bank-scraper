@@ -418,20 +418,82 @@ export const operationSubTypes = [
 	"HOLD_1048" as const,
 ];
 
+const ipkoSchemas = [
+	cardTransaction,
+	cardTransferSend,
+	mobileTransaction,
+	mobileAtmTransaction,
+	transferSend,
+	transferReceive,
+	foreignTransferSend,
+	foreignTransferReceive,
+	transitTicketPurchase,
+	phoneTopUp,
+	fees,
+] as const;
+
 export type IpkoTransaction = z.infer<typeof ipkoTransactionSchema>;
 export const ipkoTransactionSchema = zMdu(
 	{ operation_type: true, operation_kind: { code: true, side: true } },
-	[
-		cardTransaction,
-		cardTransferSend,
-		mobileTransaction,
-		mobileAtmTransaction,
-		transferSend,
-		transferReceive,
-		foreignTransferSend,
-		foreignTransferReceive,
-		transitTicketPurchase,
-		phoneTopUp,
-		fees,
-	],
+	ipkoSchemas,
+);
+
+// `type()` describes every schema with the `$type` it assigns
+const ipkoSchemaByType = new Map<string, z.ZodObject>(
+	ipkoSchemas.map((schema) => [schema.description ?? "", schema]),
+);
+
+/**
+ * JSON form of a parsed transaction: the fields our schemas know, with dates and amounts as the
+ * text the bank sent. Fields of the bank's JSON that the schemas do not list are not part of it.
+ */
+export function ipkoTransactionToJson(tx: IpkoTransaction): Record<string, unknown> {
+	const schema = ipkoSchemaByType.get(tx.$type);
+	if (!schema) throw new Error(`No ipko schema for $type "${tx.$type}"`);
+
+	return z.encode(schema, tx);
+}
+
+export type IpkoField = {
+	/** Dot path into the JSON form of a parsed transaction, e.g. `details.title` */
+	path: string;
+	type: "text" | "date" | "amount" | "boolean";
+	/** The bank does not always send it */
+	optional: boolean;
+};
+
+function collectFields(schema: z.ZodType, path: string, optional: boolean, fields: IpkoField[]) {
+	if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) {
+		// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+		collectFields(schema.unwrap() as z.ZodType, path, true, fields);
+	} else if (schema instanceof z.ZodDefault) {
+		// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+		collectFields(schema.unwrap() as z.ZodType, path, optional, fields);
+	} else if (schema instanceof z.ZodObject) {
+		for (const [key, child] of Object.entries(schema.shape)) {
+			// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+			collectFields(child as z.ZodType, path ? `${path}.${key}` : key, optional, fields);
+		}
+	} else {
+		const isBoolean =
+			schema instanceof z.ZodBoolean ||
+			(schema instanceof z.ZodLiteral &&
+				[...schema.values].every((value) => typeof value === "boolean"));
+
+		let fieldType: IpkoField["type"] = "text";
+		if (schema === zPlainDate) fieldType = "date";
+		else if (schema === zTransactionAmount) fieldType = "amount";
+		else if (isBoolean) fieldType = "boolean";
+
+		fields.push({ path, type: fieldType, optional });
+	}
+}
+
+/** The fields rules can read, by transaction type, taken from the schemas above */
+export const ipkoFieldsByType: Record<string, IpkoField[]> = Object.fromEntries(
+	ipkoSchemas.map((schema) => {
+		const fields: IpkoField[] = [];
+		collectFields(schema, "", false, fields);
+		return [schema.description ?? "", fields];
+	}),
 );

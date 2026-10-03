@@ -7,7 +7,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { db, tables } from "./db/db.ts";
-import { IpkoTxType } from "./ipkoSchemas.ts";
+import { ipkoFieldsByType, IpkoTxType } from "./ipkoSchemas.ts";
 import {
 	getLatestRuleRevision,
 	listBankTransactionKeys,
@@ -91,6 +91,8 @@ export const adminRulesApi = new Hono()
 				appliedRevisionId: applied.id,
 				hasUnappliedChanges: !isDeepStrictEqual(working, applied.rules),
 				txTypes: ipkoTxTypes,
+				/** The fields of a parsed bank transaction that rules can read, by transaction type */
+				fieldsByTxType: ipkoFieldsByType,
 			},
 			200,
 		);

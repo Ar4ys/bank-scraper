@@ -2,7 +2,7 @@ import { type Rule, type TransactionFieldsJson } from "@bank-scraper/shared";
 import { type z } from "zod";
 
 import { RawTransactionStatus, type FieldSources, type ProcessingError } from "../db/schema.ts";
-import { baseTxSchema, ipkoTransactionSchema } from "../ipkoSchemas.ts";
+import { baseTxSchema, ipkoTransactionSchema, ipkoTransactionToJson } from "../ipkoSchemas.ts";
 import { zodPrettifyError } from "../zod.ts";
 import { deriveDefaults } from "./defaults.ts";
 import { applyRules } from "./rules.ts";
@@ -23,7 +23,7 @@ const schemaError = (error: z.core.$ZodError): DeriveResult => ({
 
 /**
  * Derives the fields of a transaction from the bank's JSON: strict parsing, code defaults, then
- * rules. Rules see the bank's JSON as it was scraped, plus the `$type` the parsing assigned.
+ * rules. Rules see the parsed transaction in its JSON form, see `ipkoTransactionToJson`.
  */
 export function deriveTransaction(rawData: unknown, rules: readonly Rule[]): DeriveResult {
 	const base = baseTxSchema.safeParse(rawData);
@@ -33,8 +33,7 @@ export function deriveTransaction(rawData: unknown, rules: readonly Rule[]): Der
 	const parsed = ipkoTransactionSchema.safeParse(rawData);
 	if (!parsed.success) return schemaError(parsed.error);
 
-	const bankTransaction: unknown = Object.assign({}, rawData, { $type: parsed.data.$type });
-	const result = applyRules(deriveDefaults(parsed.data), bankTransaction, rules);
+	const result = applyRules(deriveDefaults(parsed.data), ipkoTransactionToJson(parsed.data), rules);
 
 	if (!result.success) {
 		return {
