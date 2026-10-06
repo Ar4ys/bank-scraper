@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { loadAccounts, loadRawTransaction, loadTransaction, type Account } from "$lib/api";
 	import JsonDiff from "$lib/components/JsonDiff.svelte";
+	import JsonView from "$lib/components/JsonView.svelte";
 	import ReprocessButton from "$lib/components/ReprocessButton.svelte";
 	import { Badge } from "$lib/components/ui/badge";
 	import * as Card from "$lib/components/ui/card";
-	import { amountClass, causeLabels, formatInstant, formatJson } from "$lib/format";
+	import { amountClass, causeLabels, formatInstant } from "$lib/format";
 	import { p, route } from "$lib/router";
 
 	// Bumped to load again after a reprocess
@@ -79,7 +80,7 @@
 	{#if parsed}
 		<details class="text-sm">
 			<summary class="cursor-pointer text-muted-foreground">Parsed bank transaction, as rules see it</summary>
-			<pre class="mt-2 overflow-x-auto rounded-md border p-3 text-xs">{formatJson(parsed)}</pre>
+			<JsonView class="mt-2" value={parsed} />
 		</details>
 	{/if}
 

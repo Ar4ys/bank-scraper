@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { loadRawTransaction } from "$lib/api";
 	import JsonDiff from "$lib/components/JsonDiff.svelte";
+	import JsonView from "$lib/components/JsonView.svelte";
 	import ReprocessButton from "$lib/components/ReprocessButton.svelte";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import * as Card from "$lib/components/ui/card";
 	import * as Tabs from "$lib/components/ui/tabs";
-	import { formatInstant, formatJson } from "$lib/format";
+	import { formatInstant } from "$lib/format";
 	import { p, route } from "$lib/router";
 
 	const accountId = $derived(route.params.accountId ?? "");
@@ -73,7 +74,7 @@
 						{/if}
 					</Tabs.Content>
 					<Tabs.Content value="json">
-						<pre class="overflow-x-auto rounded-md border p-3 text-xs">{formatJson(version.data)}</pre>
+						<JsonView value={version.data} />
 					</Tabs.Content>
 				</Tabs.Root>
 			</Card.Content>
