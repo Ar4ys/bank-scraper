@@ -4,6 +4,12 @@ export {};
 declare global {
 	const unsafeWindow: typeof window;
 
+	/** URL of the bank-scraper server. Firemonkey user variable (`@var` in `meta.txt`) */
+	const serverUrl: string;
+
+	/** Ingest API key of the bank-scraper server. Firemonkey user variable (`@var` in `meta.txt`) */
+	const ingestApiKey: string;
+
 	function exportFunction<T extends (...args: any) => any>(fn: T, window: Window): T;
 
 	export namespace GM {
@@ -153,18 +159,5 @@ declare global {
 	// oxlint-disable-next-line typescript/no-extraneous-class
 	export class GM {
 		static fetch(this: GM, input: string | URL, init?: GM.RequestInit): Promise<GM.Response>;
-
-		/** Reads a value from the storage of this userscript */
-		static getValue<T extends string | number | boolean>(
-			this: GM,
-			key: string,
-			defaultValue?: T,
-		): Promise<T | undefined>;
-
-		/** Writes a value to the storage of this userscript */
-		static setValue(this: GM, key: string, value: string | number | boolean): Promise<void>;
-
-		/** Adds an entry to the menu of the userscript manager */
-		static registerMenuCommand(this: GM, name: string, onClick: () => void): void;
 	}
 }

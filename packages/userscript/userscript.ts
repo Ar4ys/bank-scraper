@@ -64,34 +64,17 @@ const accountsResBodySchema = z.object({
 	}),
 });
 
-const defaultServerUrl = "http://localhost:8585";
-
-function registerSetting(menuName: string, key: string, question: string) {
-	GM.registerMenuCommand(menuName, () => {
-		void (async () => {
-			const value = prompt(question, (await GM.getValue<string>(key)) ?? "");
-			if (value !== null) await GM.setValue(key, value.trim());
-		})();
-	});
-}
-
-registerSetting(
-	"Set server URL",
-	"serverUrl",
-	`URL of the bank-scraper server (${defaultServerUrl})`,
-);
-registerSetting("Set ingest key", "ingestApiKey", "Ingest API key of the bank-scraper server");
+// Firemonkey drops a `@var` that has no default, so the key needs a placeholder to be declared at all
+const unsetIngestApiKey = "changeme";
 
 /** Sends scraped data to the server. Returns its answer, or `undefined` after logging what failed. */
 async function postToServer(path: string, body: unknown): Promise<unknown> {
-	const ingestApiKey = await GM.getValue<string>("ingestApiKey");
-
-	if (!ingestApiKey) {
-		console.error('Ingest key is not set: use "Set ingest key" in the userscript menu');
+	if (ingestApiKey === unsetIngestApiKey) {
+		console.error(
+			'Ingest key is not set: fill in "Ingest API key" in the User Variables of the userscript',
+		);
 		return undefined;
 	}
-
-	const serverUrl = (await GM.getValue<string>("serverUrl")) || defaultServerUrl;
 
 	const response = await GM.fetch(new URL(path, serverUrl), {
 		method: "POST",

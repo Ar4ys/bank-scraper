@@ -4,9 +4,7 @@
 // @run-at document-start
 // @grant unsafeWindow
 // @grant GM.fetch
-// @grant GM.getValue
-// @grant GM.setValue
-// @grant GM.registerMenuCommand
-// @connect localhost
-// @version 1.2
+// @var text serverUrl "Server URL" http://localhost:8585
+// @var text ingestApiKey "Ingest API key" changeme
+// @version 1.3
 // ==/UserScript==

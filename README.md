@@ -117,10 +117,10 @@ It needs a browser that has `Temporal`.
 ## Userscript
 
 Build it with `mise run build-userscript` and install `packages/userscript/dist/userscript.js` in a userscript manager
-that provides `GM.fetch` and `exportFunction` (it is written against Firemonkey). In the menu of the
-userscript manager, use "Set ingest key" to enter the `INGEST_API_KEY` of the server and, unless the
-server runs on `http://localhost:8585`, "Set server URL". If the manager enforces `@connect`, add
-the host of the server to `packages/userscript/meta.txt` before building.
+that provides `GM.fetch`, `exportFunction` and `@var` user variables (it is written against
+Firemonkey). In the options of Firemonkey, open the script and fill in its User Variables: "Ingest
+API key" with the `INGEST_API_KEY` of the server and, unless the server runs on
+`http://localhost:8585`, "Server URL".
 
 With the server running, open the transaction history in iPKO: every page of transactions that the
 site loads is sent to the server together with its account, and the result is logged to the browser
