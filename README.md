@@ -70,13 +70,20 @@ that protects everything except `/api/lunchflow` and `/api/transactions/raw`, wh
 
 ### Sure
 
-Sure's Lunch Flow provider only talks to `https://lunchflow.app/api/v1`: `effective_base_url` in
-`app/models/lunchflow_item.rb` falls back to it for any other URL. To sync from this service, patch
-that method in your Sure build so it returns your base URL, `http://<host>:8585/api/lunchflow`, and
-enter the `LUNCHFLOW_API_KEY` as the Lunch Flow API key in Sure.
+Enter `http://<host>:8585/api/lunchflow` as the base URL and the `LUNCHFLOW_API_KEY` as the API key
+of a Lunch Flow connection in Sure.
 
-Sure re-fetches only the transactions of about the last week on each sync, so a rule or merchant
-change that rewrites older transactions does not reach Sure.
+This needs a Sure build with two changes, which my fork ([Ar4ys/sure](https://github.com/Ar4ys/sure))
+has. Upstream Sure does neither:
+
+- It talks only to `https://lunchflow.app/api/v1`, whatever base URL is entered. The fork uses the
+  entered URL (`effective_base_url` in `app/models/lunchflow_item.rb`).
+- It fetches only about the last week on each sync, the first one included. The fork fetches the
+  whole history on every sync from a connection with a custom base URL
+  (`determine_sync_start_date` in `app/models/lunchflow_item/importer.rb`), so older transactions
+  arrive, and so does a rule or merchant change that rewrites them.
+
+A transaction that was edited in Sure is not updated by later syncs.
 
 ### Backup
 
