@@ -5,11 +5,11 @@ import {
 	type Rule,
 	type TransactionFieldsJson,
 } from "@bank-scraper/shared";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { config } from "../config.ts";
-import { db, tables } from "../db/db.ts";
+import { db, inTransaction, tables } from "../db/db.ts";
 import {
 	RawTransactionStatus,
 	sqlDateTimeNow,
@@ -18,6 +18,7 @@ import {
 	type ProcessingError,
 } from "../db/schema.ts";
 import { deriveTransaction } from "./derive.ts";
+import { loadMerchantDirectory, resolveMerchant, type MerchantDirectory } from "./merchants.ts";
 
 /** Identifies one bank transaction; its raw rows are the versions of it */
 export type BankTransactionKey = { accountId: number; bankId: string };
@@ -50,7 +51,22 @@ export type ProcessOptions = {
 	dryRun?: boolean;
 	/** Rules to derive with instead of the latest applied revision */
 	ruleRevision?: RuleRevisionRef;
+	/**
+	 * What the caller changed before processing. A transaction of which only the merchant changes is
+	 * recorded with this cause; any other change gets the cause it would get without it.
+	 */
+	cause?: typeof TransactionVersionCause.Merchants;
 };
+
+type ProcessContext = {
+	ruleRevision: RuleRevisionRef;
+	merchantDirectory: MerchantDirectory;
+	dryRun: boolean;
+	cause: ProcessOptions["cause"];
+	report: ProcessingReport;
+};
+
+const withoutMerchant = (fields: TransactionFieldsJson) => ({ ...fields, merchant: null });
 
 export function getLatestRuleRevision(): RuleRevisionRef {
 	const revision = db
@@ -65,9 +81,7 @@ export function getLatestRuleRevision(): RuleRevisionRef {
 
 function processOne(
 	key: BankTransactionKey,
-	ruleRevision: RuleRevisionRef,
-	dryRun: boolean,
-	report: ProcessingReport,
+	{ ruleRevision, merchantDirectory, dryRun, cause: causeOfCaller, report }: ProcessContext,
 ) {
 	const { rawTransactions, transactions, transactionVersions, accounts } = tables;
 
@@ -103,6 +117,9 @@ function processOne(
 		return;
 	}
 
+	const merchant = resolveMerchant(derived.fields.merchant, merchantDirectory, dryRun);
+	const derivedFields: TransactionFieldsJson = { ...derived.fields, merchant: merchant.name };
+
 	const transaction = db
 		.select()
 		.from(transactions)
@@ -122,13 +139,13 @@ function processOne(
 	/** Remembers what the transaction was processed with, so that the next change gets the right cause */
 	const markProcessed = (transactionId: string) => {
 		db.update(transactions)
-			.set({ rawTransactionId: raw.id, ruleRevisionId: ruleRevision.id })
+			.set({ rawTransactionId: raw.id, ruleRevisionId: ruleRevision.id, merchantId: merchant.id })
 			.where(eq(transactions.id, transactionId))
 			.run();
 		setRawStatus(RawTransactionStatus.Processed);
 	};
 
-	if (transaction && latestVersion && isDeepStrictEqual(latestVersion.data, derived.fields)) {
+	if (transaction && latestVersion && isDeepStrictEqual(latestVersion.data, derivedFields)) {
 		report.unchanged++;
 		if (!dryRun) markProcessed(transaction.id);
 		return;
@@ -147,25 +164,33 @@ function processOne(
 				: TransactionVersionCause.Rules;
 	}
 
+	if (
+		causeOfCaller &&
+		latestVersion &&
+		isDeepStrictEqual(withoutMerchant(latestVersion.data), withoutMerchant(derivedFields))
+	) {
+		cause = causeOfCaller;
+	}
+
 	report.changes.push({
 		...key,
 		rawTransactionId: raw.id,
 		transactionId: transaction?.id ?? null,
 		cause,
 		before: latestVersion?.data ?? null,
-		after: derived.fields,
+		after: derivedFields,
 		fieldSources: derived.fieldSources,
 	});
 
 	if (dryRun) return;
 
-	const fields = z.decode(transactionFieldsSchema, derived.fields);
+	const fields = z.decode(transactionFieldsSchema, derivedFields);
 
 	const transactionId = transaction
 		? transaction.id
 		: db
 				.insert(transactions)
-				.values({ ...key, ...fields })
+				.values({ ...key, ...fields, merchantId: merchant.id })
 				.returning({ id: transactions.id })
 				.get().id;
 
@@ -183,7 +208,7 @@ function processOne(
 			cause,
 			ruleRevisionId: ruleRevision.id,
 			appCommit: config.APP_GIT_COMMIT,
-			data: derived.fields,
+			data: derivedFields,
 			fieldSources: derived.fieldSources,
 		})
 		.run();
@@ -198,20 +223,45 @@ function processOne(
 
 /**
  * Derives transactions from the latest raw row of each given bank transaction and records a new
- * version for every transaction whose fields changed. A raw row that cannot be processed gets the
- * error stored on it and leaves its transaction as it was.
+ * version for every transaction whose fields changed. The merchant text that defaults and rules
+ * derive is replaced by the name of the merchant it stands for, see `resolveMerchant`. A raw row
+ * that cannot be processed gets the error stored on it and leaves its transaction as it was.
  */
 export function processBankTransactions(
 	keys: readonly BankTransactionKey[],
-	{ dryRun = false, ruleRevision = getLatestRuleRevision() }: ProcessOptions = {},
+	{ dryRun = false, ruleRevision = getLatestRuleRevision(), cause }: ProcessOptions = {},
 ): ProcessingReport {
 	const report: ProcessingReport = { changes: [], errors: [], unchanged: 0, holds: 0 };
 
-	db.transaction(() => {
-		for (const key of keys) processOne(key, ruleRevision, dryRun, report);
+	inTransaction(() => {
+		const context = {
+			ruleRevision,
+			merchantDirectory: loadMerchantDirectory(),
+			dryRun,
+			cause,
+			report,
+		};
+
+		for (const key of keys) processOne(key, context);
 	});
 
 	return report;
+}
+
+/**
+ * Processes the transactions that have a merchant text but no merchant yet, which is how
+ * transactions from before merchants were stored get theirs.
+ */
+export function linkTransactionsToMerchants() {
+	const { transactions } = tables;
+
+	const keys = db
+		.select({ accountId: transactions.accountId, bankId: transactions.bankId })
+		.from(transactions)
+		.where(and(isNotNull(transactions.merchant), isNull(transactions.merchantId)))
+		.all();
+
+	if (keys.length) processBankTransactions(keys);
 }
 
 /** Keys of every bank transaction, or only of those whose latest raw row has the given status */

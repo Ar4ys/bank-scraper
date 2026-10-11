@@ -118,6 +118,38 @@ export const rawTransactions = s.snakeCase.table(
 	],
 );
 
+export type Merchant = typeof merchants.$inferSelect;
+export const merchants = s.snakeCase.table("merchants", {
+	id: s.text().primaryKey().$defaultFn(randomUUIDv7),
+	/** The name transactions of the merchant get */
+	name: s.text().notNull(),
+	/** Set while the merchant is deleted: its transactions are derived without a merchant */
+	deletedAt: instant(),
+	createdAt: instant().notNull().default(sqlDateTimeNow),
+	updatedAt: instant().notNull().default(sqlDateTimeNow),
+});
+
+export type MerchantName = typeof merchantNames.$inferSelect;
+/**
+ * Every name that stands for a merchant: the one it is shown with, and the ones merged into it. The
+ * merchant text that defaults and rules derive is looked up here.
+ */
+export const merchantNames = s.snakeCase.table(
+	"merchant_names",
+	{
+		/** The name as it is matched, see `merchantKey` */
+		key: s.text().primaryKey(),
+		/** The name as it was first seen */
+		name: s.text().notNull(),
+		merchantId: s
+			.text()
+			.notNull()
+			.references(() => merchants.id),
+		createdAt: instant().notNull().default(sqlDateTimeNow),
+	},
+	(table) => [s.index("merchant_names_merchant_id_index").on(table.merchantId)],
+);
+
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = typeof transactions.$inferInsert;
 export const transactions = s.snakeCase.table(
@@ -133,6 +165,8 @@ export const transactions = s.snakeCase.table(
 		amount: minorUnits().notNull(),
 		currency: s.text().notNull(),
 		merchant: s.text(),
+		/** The merchant whose name `merchant` is */
+		merchantId: s.text().references(() => merchants.id),
 		description: s.text().notNull(),
 		isPending: s.integer({ mode: "boolean" }).notNull(),
 		/**
@@ -147,6 +181,7 @@ export const transactions = s.snakeCase.table(
 	(table) => [
 		s.uniqueIndex("transactions_account_id_bank_id_unique").on(table.accountId, table.bankId),
 		s.index("transactions_account_id_date_index").on(table.accountId, table.date),
+		s.index("transactions_merchant_id_index").on(table.merchantId),
 	],
 );
 
@@ -158,6 +193,8 @@ export const TransactionVersionCause = Object.freeze({
 	Rules: "rules",
 	/** Same raw transaction and rules, so the code that derives transactions changed */
 	Reprocess: "reprocess",
+	/** A merchant was renamed, merged, detached, deleted or restored */
+	Merchants: "merchants",
 });
 
 /** Which rule set a field, or `"default"` when the code did */

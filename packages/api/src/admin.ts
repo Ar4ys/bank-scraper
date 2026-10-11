@@ -4,6 +4,7 @@ import { and, count, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { adminMerchantsApi } from "./adminMerchants.ts";
 import { adminRulesApi } from "./adminRules.ts";
 import { db, tables } from "./db/db.ts";
 import {
@@ -81,6 +82,7 @@ const latestRawTransactions = () => {
  */
 export const adminApi = new Hono()
 	.route("/rules", adminRulesApi)
+	.route("/merchants", adminMerchantsApi)
 
 	/** GET /api/admin/dashboard */
 	.get("/dashboard", async (c) => {
@@ -239,17 +241,20 @@ export const adminApi = new Hono()
 				accountId: optionalAccountId,
 				/** `true` lists only transactions that have no merchant */
 				withoutMerchant: z.stringbool().optional(),
+				merchantId: z.string().optional(),
 				/** Text to find in merchant, description or the bank's id */
 				search: z.string().optional(),
 			}),
 		),
 		async (c) => {
-			const { limit, offset, accountId, withoutMerchant, search } = c.req.valid("query");
+			const { limit, offset, accountId, withoutMerchant, merchantId, search } =
+				c.req.valid("query");
 			const pattern = search && `%${escapeLikePattern(search)}%`;
 
 			const where = and(
 				accountId === undefined ? undefined : eq(transactions.accountId, accountId),
 				withoutMerchant ? isNull(transactions.merchant) : undefined,
+				merchantId ? eq(transactions.merchantId, merchantId) : undefined,
 				pattern
 					? or(
 							like(transactions.merchant, pattern),

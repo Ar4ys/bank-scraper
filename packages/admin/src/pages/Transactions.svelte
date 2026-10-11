@@ -4,6 +4,7 @@
 	import { loadAccounts, loadTransactions, type Account } from "$lib/api";
 	import AccountSelect from "$lib/components/AccountSelect.svelte";
 	import Pagination from "$lib/components/Pagination.svelte";
+	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { Switch } from "$lib/components/ui/switch";
@@ -17,10 +18,18 @@
 	let accountId = $state("");
 	let search = $state("");
 	let withoutMerchant = $state(searchParams.get("withoutMerchant") === true);
+	let merchantId = $state(String(searchParams.get("merchantId") ?? ""));
 	let offset = $state(0);
 
 	const page = $derived(
-		loadTransactions({ limit, offset, accountId, search, withoutMerchant: withoutMerchant || undefined }),
+		loadTransactions({
+			limit,
+			offset,
+			accountId,
+			search,
+			merchantId,
+			withoutMerchant: withoutMerchant || undefined,
+		}),
 	);
 
 	const accountName = (id: number) => accounts.find((account) => account.id === id)?.name ?? id;
@@ -42,6 +51,18 @@
 		<Switch id="without-merchant" bind:checked={withoutMerchant} onCheckedChange={() => (offset = 0)} />
 		<Label for="without-merchant">Without merchant</Label>
 	</span>
+	{#if merchantId}
+		<Button
+			variant="outline"
+			size="sm"
+			onclick={() => {
+				merchantId = "";
+				offset = 0;
+			}}
+		>
+			Of one merchant ✕
+		</Button>
+	{/if}
 </div>
 
 {#await page}

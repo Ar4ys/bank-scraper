@@ -2,6 +2,7 @@ import { createRouter } from "sv-router";
 
 import Accounts from "../pages/Accounts.svelte";
 import Dashboard from "../pages/Dashboard.svelte";
+import Merchants from "../pages/Merchants.svelte";
 import RawTransactionDetail from "../pages/RawTransactionDetail.svelte";
 import RawTransactions from "../pages/RawTransactions.svelte";
 import Rules from "../pages/Rules.svelte";
@@ -15,6 +16,7 @@ export const { p, navigate, isActive, route } = createRouter({
 	"/raw/:accountId/:bankId": RawTransactionDetail,
 	"/transactions": Transactions,
 	"/transactions/:id": TransactionDetail,
+	"/merchants": Merchants,
 	"/rules": Rules,
 	"/accounts": Accounts,
 });

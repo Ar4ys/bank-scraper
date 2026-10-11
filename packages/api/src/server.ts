@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/node-sqlite/migrator";
 import { app } from "./app.ts";
 import { config } from "./config.ts";
 import { db, initSQLite } from "./db/db.ts";
+import { linkTransactionsToMerchants } from "./processing/process.ts";
 
 function registerShutdownHandlers(server: ServerType) {
 	const handler = async () => {
@@ -38,6 +39,7 @@ function registerShutdownHandlers(server: ServerType) {
 async function main() {
 	await initSQLite();
 	migrate(db, { migrationsFolder: path.join(import.meta.dirname, "../drizzle") });
+	linkTransactionsToMerchants();
 
 	const server = serve(
 		{ fetch: app.fetch, hostname: config.HTTP_HOST, port: config.HTTP_PORT },

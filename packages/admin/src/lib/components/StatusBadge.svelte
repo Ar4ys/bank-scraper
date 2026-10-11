@@ -11,6 +11,7 @@
 		raw: "secondary",
 		rules: "default",
 		reprocess: "outline",
+		merchants: "default",
 	};
 </script>
 

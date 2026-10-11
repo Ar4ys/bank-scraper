@@ -47,6 +47,7 @@ export const loadTransactions = (query: {
 	offset: number;
 	accountId?: string;
 	withoutMerchant?: boolean;
+	merchantId?: string;
 	search?: string;
 }) => unwrap(api.transactions.$get({ query: toQuery(query) }));
 
@@ -63,6 +64,25 @@ export const updateAccount = (
 	id: number,
 	changes: { name?: string; balanceSource?: Account["balanceSource"] },
 ) => unwrap(api.accounts[":id"].$patch({ param: { id: String(id) }, json: changes }));
+
+export type Merchant = Awaited<ReturnType<typeof loadMerchants>>[number];
+export const loadMerchants = () => unwrap(api.merchants.$get());
+
+export const renameMerchant = (id: string, name: string) =>
+	unwrap(api.merchants[":id"].$patch({ param: { id }, json: { name } }));
+
+/** Leaves only `intoId`, which takes over the names and transactions of `id` */
+export const mergeMerchant = (id: string, intoId: string) =>
+	unwrap(api.merchants[":id"].merge.$post({ param: { id }, json: { intoId } }));
+
+export const detachMerchantName = (id: string, key: string) =>
+	unwrap(api.merchants[":id"].detach.$post({ param: { id }, json: { key } }));
+
+export const deleteMerchant = (id: string) =>
+	unwrap(api.merchants[":id"].$delete({ param: { id } }));
+
+export const restoreMerchant = (id: string) =>
+	unwrap(api.merchants[":id"].restore.$post({ param: { id } }));
 
 export type RulesState = Awaited<ReturnType<typeof loadRules>>;
 export type Rule = RulesState["rules"][number];

@@ -14,6 +14,12 @@ Collects my PKO Bank Polski (iPKO) transactions from the web UI into a local SQL
    version of the raw transaction, a new rule revision, or a change of the code. A raw transaction
    that cannot be parsed keeps the error on its row and leaves its transaction untouched. Holds are
    stored but never become transactions.
+4. The merchant that defaults and rules derive is only a name. It is looked up, ignoring case, among
+   the merchants of the admin app's Merchants page, and the transaction gets that merchant. A name
+   that is not known yet becomes a new merchant. Merchants can be renamed, merged, deleted and
+   restored there: merging one into another makes its names stand for the merchant that is left,
+   for later transactions too, and a deleted merchant leaves its transactions without a merchant.
+   Every such change derives all transactions again and is recorded in their versions.
 
 ## Setup
 
@@ -69,8 +75,8 @@ Sure's Lunch Flow provider only talks to `https://lunchflow.app/api/v1`: `effect
 that method in your Sure build so it returns your base URL, `http://<host>:8585/api/lunchflow`, and
 enter the `LUNCHFLOW_API_KEY` as the Lunch Flow API key in Sure.
 
-Sure re-fetches only the transactions of about the last week on each sync, so a rule change that
-rewrites older transactions does not reach Sure (see `plans/todo.md`).
+Sure re-fetches only the transactions of about the last week on each sync, so a rule or merchant
+change that rewrites older transactions does not reach Sure (see `plans/todo.md`).
 
 ### Backup
 

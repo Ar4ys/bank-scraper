@@ -8,6 +8,12 @@ export * as tables from "./schema.ts";
 
 export const db = drizzle(`file:${config.SQLITE_DB_PATH}`, { relations });
 
+/** Runs `fn` in a transaction, or as a part of the one that is already open */
+export function inTransaction(fn: () => void) {
+	if (db.$client.isTransaction) fn();
+	else db.transaction(fn);
+}
+
 export async function initSQLite() {
 	db.run(sql`
 		-- SQLite allows only one writer at a time. This timeout allows multiple

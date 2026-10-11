@@ -10,6 +10,7 @@ export const causeLabels: Record<string, string> = {
 	raw: "New data from the bank",
 	rules: "Rules changed",
 	reprocess: "Code changed",
+	merchants: "Merchants changed",
 };
 
 /** Tailwind classes for an amount: income stands out, spending stays neutral */

@@ -10,7 +10,8 @@ import { rawCardTransaction, rawHold } from "./fixtures.ts";
 
 const { db, cleanup } = await createTestDb();
 const { ingestRawTransactions } = await import("../ingest.ts");
-const { listBankTransactionKeys, processBankTransactions } = await import("./process.ts");
+const { linkTransactionsToMerchants, listBankTransactionKeys, processBankTransactions } =
+	await import("./process.ts");
 after(cleanup);
 
 const sourceAccount = "PL00";
@@ -22,6 +23,8 @@ const ingest = (data: ReturnType<typeof rawCardTransaction>) =>
 			{ bankId: typeof data.operation_id === "string" ? data.operation_id : "", data },
 		],
 	});
+
+const lidlPayment = () => rawCardTransaction({ details: { merchant_name: "Lidl" } });
 
 const lidlRule: Rule = {
 	id: "lidl",
@@ -46,6 +49,8 @@ describe("processing", () => {
 	beforeEach(async () => {
 		await db.delete(tables.transactionVersions);
 		await db.delete(tables.transactions);
+		await db.delete(tables.merchantNames);
+		await db.delete(tables.merchants);
 		await db.delete(tables.rawTransactions);
 		await db.delete(tables.ruleRevisions);
 		await db.delete(tables.accounts);
@@ -241,6 +246,7 @@ describe("processing", () => {
 		);
 		assert.equal((await versions()).length, 1);
 		assert.equal((await db.select().from(tables.transactions))[0]?.merchant, null);
+		assert.equal((await db.select().from(tables.merchants)).length, 0);
 	});
 
 	it("reports nothing when processing again changes nothing", async () => {
@@ -249,5 +255,94 @@ describe("processing", () => {
 		const report = processBankTransactions(listBankTransactionKeys());
 
 		assert.deepEqual([report.changes.length, report.unchanged], [0, 1]);
+	});
+
+	const reprocessForMerchants = () =>
+		processBankTransactions(listBankTransactionKeys(), { cause: "merchants" });
+
+	it("creates the merchant a new merchant text stands for", async () => {
+		await ingest(lidlPayment());
+
+		const [merchant, ...others] = await db.select().from(tables.merchants);
+		assert.ok(merchant);
+		assert.equal(others.length, 0);
+		assert.equal(merchant.name, "Lidl");
+
+		assert.deepEqual(
+			(await db.select().from(tables.merchantNames)).map((name) => [
+				name.key,
+				name.name,
+				name.merchantId,
+			]),
+			[["lidl", "Lidl", merchant.id]],
+		);
+		assert.equal((await db.select().from(tables.transactions))[0]?.merchantId, merchant.id);
+	});
+
+	it("gives a text that differs only in case the name of the merchant that is known", async () => {
+		await ingest(lidlPayment());
+		await ingest(rawCardTransaction({ operation_id: "20", details: { merchant_name: "LIDL" } }));
+
+		assert.equal((await db.select().from(tables.merchants)).length, 1);
+		assert.deepEqual(
+			(await db.select().from(tables.transactions)).map((transaction) => transaction.merchant),
+			["Lidl", "Lidl"],
+		);
+	});
+
+	it("gives transactions the new name of their merchant and blames the merchants for it", async () => {
+		await ingest(lidlPayment());
+		await db.update(tables.merchants).set({ name: "Lidl Polska" });
+
+		const report = reprocessForMerchants();
+
+		assert.equal(report.changes.length, 1);
+		assert.deepEqual(
+			(await versions()).map((version) => [version.cause, version.data.merchant]),
+			[
+				["raw", "Lidl"],
+				["merchants", "Lidl Polska"],
+			],
+		);
+		assert.equal((await db.select().from(tables.transactions))[0]?.merchant, "Lidl Polska");
+	});
+
+	it("derives no merchant for the names of a deleted merchant", async () => {
+		await ingest(lidlPayment());
+		await db.update(tables.merchants).set({ deletedAt: Temporal.Now.instant() });
+
+		reprocessForMerchants();
+
+		const [transaction] = await db.select().from(tables.transactions);
+		assert.deepEqual([transaction?.merchant, transaction?.merchantId], [null, null]);
+		assert.equal((await db.select().from(tables.merchants)).length, 1);
+	});
+
+	it("blames the code, not the merchants, when more than the merchant changed", async () => {
+		await ingest(lidlPayment());
+		await makeLatestVersionStale();
+		await db.update(tables.merchants).set({ name: "Lidl Polska" });
+
+		reprocessForMerchants();
+
+		assert.deepEqual(
+			(await versions()).map((version) => version.cause),
+			["raw", "reprocess"],
+		);
+	});
+
+	it("links transactions that have a merchant text but no merchant, without a new version", async () => {
+		await ingest(lidlPayment());
+		// Stands in for a transaction from before merchants were stored
+		await db.update(tables.transactions).set({ merchantId: null });
+		await db.delete(tables.merchantNames);
+		await db.delete(tables.merchants);
+
+		linkTransactionsToMerchants();
+
+		const [merchant] = await db.select().from(tables.merchants);
+		assert.equal(merchant?.name, "Lidl");
+		assert.equal((await db.select().from(tables.transactions))[0]?.merchantId, merchant?.id);
+		assert.equal((await versions()).length, 1);
 	});
 });

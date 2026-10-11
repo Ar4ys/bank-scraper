@@ -7,6 +7,7 @@
 		{ href: p("/"), label: "Dashboard", active: () => isActive("/") },
 		{ href: p("/transactions"), label: "Transactions", active: () => isActive.startsWith("/transactions") },
 		{ href: p("/raw"), label: "Raw transactions", active: () => isActive.startsWith("/raw") },
+		{ href: p("/merchants"), label: "Merchants", active: () => isActive("/merchants") },
 		{ href: p("/rules"), label: "Rules", active: () => isActive("/rules") },
 		{ href: p("/accounts"), label: "Accounts", active: () => isActive("/accounts") },
 	];
