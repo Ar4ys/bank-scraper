@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getTextByPath, matchRule, renderTemplate } from "@bank-scraper/shared";
 	import { searchParams } from "sv-router";
+	import { tick } from "svelte";
 	import { SvelteSet } from "svelte/reactivity";
 
 	import {
@@ -44,7 +45,19 @@
 	let txTypes = $state<string[]>([]);
 	let fieldsByTxType = $state<RulesState["fieldsByTxType"]>({});
 	/** The input a clicked field goes into: the one that had focus last */
-	let fieldTarget = $state<{ rule: RuleDraft; insert: (path: string) => void }>();
+	type FieldTarget = {
+		rule: RuleDraft;
+		/** The condition or the internal field the input belongs to */
+		owner: object | string;
+		part: "path" | "pattern" | "template";
+		element: HTMLInputElement;
+		/** What a clicked field puts into the input, nothing if it has no text for it */
+		textFor: (path: string) => string | undefined;
+		/** Whether that text replaces what the input holds, or goes where its caret is */
+		replaces: boolean;
+		write: (text: string) => void;
+	};
+	let fieldTarget = $state.raw<FieldTarget>();
 	let appliedRevisionId = $state<string | null>(null);
 	let hasUnappliedChanges = $state(false);
 	/** The rules as last loaded from or saved to the server, to tell whether the editor has edits */
@@ -169,6 +182,19 @@
 
 	const sampleKey = () => ({ accountId: Number(sampleAccountId), bankId: sampleBankId.trim() });
 
+	const targetOnFocus =
+		(target: Omit<FieldTarget, "element">) => (event: FocusEvent & { currentTarget: HTMLInputElement }) => {
+			fieldTarget = { ...target, element: event.currentTarget };
+		};
+
+	/** The focus ring of an input, for the one fields go into while the focus is elsewhere */
+	const targetClass = (rule: RuleDraft, owner: FieldTarget["owner"], part: FieldTarget["part"]) =>
+		fieldTarget?.rule === rule && fieldTarget.owner === owner && fieldTarget.part === part
+			? "border-ring ring-3 ring-ring/50"
+			: "";
+
+	const escapeRegex = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 	/** One line that says what a rule does, for when it is folded */
 	function summarize(rule: RuleDraft) {
 		const conditions = rule.conditions.map((c) => `${c.path} ${c.operator} "${c.pattern}"`).join(" and ");
@@ -209,6 +235,8 @@
 		}
 
 		return [...byPath.values()]
+			// The type of the transaction is not picked as a field, it has the picker above the conditions
+			.filter((field) => field.path !== "$type")
 			.map((field) => ({
 				...field,
 				// A field that one of the types lacks is not always there either
@@ -218,8 +246,33 @@
 	}
 
 	function insertField(rule: RuleDraft, path: string) {
-		if (fieldTarget?.rule === rule) fieldTarget.insert(path);
-		else rule.conditions.push({ path, operator: "contains", pattern: "" });
+		const target = fieldTarget?.rule === rule ? fieldTarget : undefined;
+
+		if (!target) {
+			rule.conditions.push({ path, operator: "contains", pattern: "" });
+			return;
+		}
+
+		const text = target.textFor(path);
+		if (!text) return;
+
+		if (target.replaces) {
+			target.write(text);
+			return;
+		}
+
+		const { element } = target;
+		// An input that lost the focus has no caret to speak of, so the text goes to its end
+		const focused = document.activeElement === element;
+		const start = (focused ? element.selectionStart : null) ?? element.value.length;
+		const end = (focused ? element.selectionEnd : null) ?? element.value.length;
+
+		target.write(element.value.slice(0, start) + text + element.value.slice(end));
+
+		// The new value reaches the input with the next render, only then can the caret go behind the text
+		if (focused) {
+			void tick().then(() => element.setSelectionRange(start + text.length, start + text.length));
+		}
 	}
 
 	function exportRules() {
@@ -364,7 +417,14 @@
 				</span>
 			</Card.Title>
 			{#if collapsed.has(rule)}
-				<Card.Description class="truncate font-mono text-xs">{summarize(rule)}</Card.Description>
+				<Card.Description class="flex items-center gap-2 text-xs">
+					{#each rule.txTypes ?? [] as txType (txType)}
+						<Badge variant="secondary">{txType}</Badge>
+					{:else}
+						<Badge variant="outline">all types</Badge>
+					{/each}
+					<span class="truncate font-mono">{summarize(rule)}</span>
+				</Card.Description>
 			{/if}
 		</Card.Header>
 
@@ -386,18 +446,40 @@
 				{#each rule.conditions as condition, conditionIndex (condition)}
 					<div class="flex flex-wrap gap-2">
 						<Input
-							class="max-w-xs font-mono"
+							class="max-w-xs font-mono {targetClass(rule, condition, 'path')}"
 							placeholder="details.address"
 							list="fields-{index}"
 							bind:value={condition.path}
-							onfocus={() => (fieldTarget = { rule, insert: (path) => (condition.path = path) })}
+							onfocus={targetOnFocus({
+								rule,
+								owner: condition,
+								part: "path",
+								textFor: (path) => path,
+								replaces: true,
+								write: (path) => (condition.path = path),
+							})}
 						/>
 						<select bind:value={condition.operator} class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
 							{#each operators as operator (operator)}
 								<option value={operator}>{operator}</option>
 							{/each}
 						</select>
-						<Input class="max-w-md flex-1 font-mono" placeholder="^BOLT\.EU/P/(\d+)" bind:value={condition.pattern} />
+						<Input
+							class="max-w-md flex-1 font-mono {targetClass(rule, condition, 'pattern')}"
+							placeholder="^BOLT\.EU/P/(\d+)"
+							bind:value={condition.pattern}
+							onfocus={targetOnFocus({
+								rule,
+								owner: condition,
+								part: "pattern",
+								textFor: (path) => {
+									const value = sample && getTextByPath(sample, path);
+									return value && condition.operator === "regex" ? escapeRegex(value) : value;
+								},
+								replaces: false,
+								write: (pattern) => (condition.pattern = pattern),
+							})}
+						/>
 						{#if sample}
 							{@const holds = matchRule({ txTypes: null, conditions: [condition] }, sample)}
 							<span
@@ -427,15 +509,18 @@
 						<Label for="{field.key}-{index}">{field.label}</Label>
 						<Input
 							id="{field.key}-{index}"
-							class="font-mono"
+							class="font-mono {targetClass(rule, field.key, 'template')}"
 							placeholder={field.placeholder}
 							value={rule.set[field.key] ?? ""}
 							oninput={(event) => setTemplate(rule, field.key, event.currentTarget.value)}
-							onfocus={() =>
-								(fieldTarget = {
-									rule,
-									insert: (path) => setTemplate(rule, field.key, `${rule.set[field.key] ?? ""}{${path}}`),
-								})}
+							onfocus={targetOnFocus({
+								rule,
+								owner: field.key,
+								part: "template",
+								textFor: (path) => `{${path}}`,
+								replaces: false,
+								write: (template) => setTemplate(rule, field.key, template),
+							})}
 						/>
 						{#if sample && captures && rule.set[field.key] !== undefined}
 							<p class="truncate text-xs text-muted-foreground" title="For the sample transaction">
@@ -451,26 +536,43 @@
 					Fields of the parsed bank transaction ({ruleFields.length})
 				</summary>
 				<p class="py-2 text-xs text-muted-foreground">
-					Click a field to put it into the condition or template you used last. A field marked with
-					<code>?</code> is not always there.
-					{#if sample}The values are those of the sample transaction.{/if}
+					Click a field to put it into the input you used last, which stays outlined: its name into the
+					field of a condition, its value in the sample transaction into the pattern of a condition, and
+					a placeholder for it into a template. A field marked with
+					<code class="text-amber-700 dark:text-amber-300">?</code> is not always there.
+					{#if sample}
+						The values are those of the sample transaction.
+					{:else}
+						Values show up once a sample transaction is loaded.
+					{/if}
 				</p>
-				<div class="grid gap-1 sm:grid-cols-2">
+				<div class="grid grid-cols-[max-content_max-content_minmax(0,1fr)] gap-x-4 text-xs">
+					<div class="col-span-full grid grid-cols-subgrid border-b px-2 py-1 font-medium text-muted-foreground">
+						<span>Field</span>
+						<span>Type</span>
+						<span>Value in the sample</span>
+					</div>
 					{#each ruleFields as field (field.path)}
 						{@const value = sample && getTextByPath(sample, field.path)}
+						<!-- Without the default of mousedown the click leaves the focus, and with it the caret, in the input -->
 						<button
 							type="button"
-							class="flex items-baseline gap-2 rounded border px-2 py-1 text-left text-xs hover:bg-muted"
-							title="{field.type}{field.optional ? ', optional' : ''}"
+							class="col-span-full grid cursor-pointer grid-cols-subgrid items-baseline rounded px-2 py-1 text-left even:bg-muted/40 hover:bg-muted"
+							onmousedown={(event) => event.preventDefault()}
 							onclick={() => insertField(rule, field.path)}
 						>
-							<span class="shrink-0 font-mono">{field.path}{field.optional ? "?" : ""}</span>
-							{#if sample}
-								<span class="truncate {value === undefined ? 'italic text-muted-foreground' : ''}">
-									{value === undefined ? "not there" : value || "(empty)"}
-								</span>
+							<span class="font-mono text-blue-700 dark:text-blue-300">
+								{field.path}{#if field.optional}<span class="text-amber-700 dark:text-amber-300">?</span>{/if}
+							</span>
+							<span class="text-muted-foreground">{field.type}</span>
+							{#if !sample}
+								<span></span>
+							{:else if value === undefined}
+								<span class="italic text-muted-foreground">not there</span>
+							{:else if value === ""}
+								<span class="italic text-muted-foreground">(empty)</span>
 							{:else}
-								<span class="text-muted-foreground">{field.type}</span>
+								<span class="truncate text-emerald-700 dark:text-emerald-300" title={value}>{value}</span>
 							{/if}
 						</button>
 					{/each}
