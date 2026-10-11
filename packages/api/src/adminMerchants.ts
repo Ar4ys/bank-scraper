@@ -1,8 +1,9 @@
 import { zValidator } from "@hono/zod-validator";
-import { count, eq, isNotNull } from "drizzle-orm";
-import { Hono } from "hono";
+import { count, eq, isNotNull, TransactionRollbackError } from "drizzle-orm";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 
+import { reportJson } from "./adminRules.ts";
 import { db, tables } from "./db/db.ts";
 import { sqlDateTimeNow, TransactionVersionCause, type Merchant } from "./db/schema.ts";
 import { merchantKey } from "./processing/merchants.ts";
@@ -12,21 +13,64 @@ const { merchants, merchantNames, transactions } = tables;
 
 const idParam = zValidator("param", z.object({ id: z.string() }));
 
-const notFound = { message: "Merchant not found" };
+const dryRunQuery = zValidator(
+	"query",
+	z.object({
+		/** Report what would change without writing anything */
+		dryRun: z.stringbool().default(false),
+	}),
+);
+
+type Rejection = { rejected: { status: 400 | 404 | 409; message: string } };
+
+const reject = (status: Rejection["rejected"]["status"], message: string): Rejection => ({
+	rejected: { status, message },
+});
+
+const notFound = reject(404, "Merchant not found");
 
 const findMerchant = (id: string) => db.select().from(merchants).where(eq(merchants.id, id)).get();
 
 /**
- * Derives every transaction again after merchants changed, so that they get their new merchant and
- * a version that records it.
+ * Runs a change of merchants and derives every transaction again, so that they get their new
+ * merchant and a version that records it. Returns what `change` returned together with the report
+ * of that processing, or the rejection of `change`, which must not have written anything then.
+ *
+ * With `dryRun` all of it is rolled back, and the report says what would change.
  */
-function reprocess() {
-	const report = processBankTransactions(listBankTransactionKeys(), {
-		cause: TransactionVersionCause.Merchants,
-	});
+function changeMerchants<T extends object>(dryRun: boolean, change: () => Rejection | T) {
+	const outcome: { value?: Rejection | (T & ReturnType<typeof reportJson>) } = {};
 
-	return { changedTransactions: report.changes.length };
+	try {
+		db.transaction((tx) => {
+			const changed = change();
+
+			if ("rejected" in changed) {
+				outcome.value = changed;
+				return;
+			}
+
+			const report = processBankTransactions(listBankTransactionKeys(), {
+				cause: TransactionVersionCause.Merchants,
+			});
+			outcome.value = { ...changed, ...reportJson(report) };
+
+			// A dry run that only pretended could report something else than the real run does
+			if (dryRun) tx.rollback();
+		});
+	} catch (error) {
+		if (!(error instanceof TransactionRollbackError)) throw error;
+	}
+
+	if (!outcome.value) throw new Error("The change of merchants has no outcome");
+
+	return outcome.value;
 }
+
+const respond = <T extends object>(c: Context, result: Rejection | T) =>
+	"rejected" in result
+		? c.json({ message: result.rejected.message }, result.rejected.status)
+		: c.json(result, 200);
 
 const describeMerchant = (merchant: Merchant) =>
 	`"${merchant.name}"${merchant.deletedAt ? " (deleted)" : ""}`;
@@ -68,14 +112,15 @@ export const adminMerchantsApi = new Hono()
 	.patch(
 		"/:id",
 		idParam,
+		dryRunQuery,
 		zValidator("json", z.object({ name: z.string().trim().nonempty() })),
 		(c) => {
 			const { id } = c.req.valid("param");
 			const { name } = c.req.valid("json");
 
-			return db.transaction(() => {
+			const result = changeMerchants(c.req.valid("query").dryRun, () => {
 				const merchant = findMerchant(id);
-				if (!merchant) return c.json(notFound, 404);
+				if (!merchant) return notFound;
 
 				const key = merchantKey(name);
 				const known = db.select().from(merchantNames).where(eq(merchantNames.key, key)).get();
@@ -83,11 +128,9 @@ export const adminMerchantsApi = new Hono()
 				if (known && known.merchantId !== id) {
 					const owner = findMerchant(known.merchantId);
 
-					return c.json(
-						{
-							message: `"${name}" is already a name of the merchant ${owner ? describeMerchant(owner) : known.merchantId}. Merge the two merchants instead.`,
-						},
+					return reject(
 						409,
+						`"${name}" is already a name of the merchant ${owner ? describeMerchant(owner) : known.merchantId}. Merge the two merchants instead.`,
 					);
 				}
 
@@ -99,8 +142,10 @@ export const adminMerchantsApi = new Hono()
 					.where(eq(merchants.id, id))
 					.run();
 
-				return c.json(reprocess(), 200);
+				return {};
 			});
+
+			return respond(c, result);
 		},
 	)
 
@@ -108,6 +153,7 @@ export const adminMerchantsApi = new Hono()
 	.post(
 		"/:id/merge",
 		idParam,
+		dryRunQuery,
 		zValidator(
 			"json",
 			z.object({
@@ -121,13 +167,13 @@ export const adminMerchantsApi = new Hono()
 
 			if (id === intoId) return c.json({ message: "Cannot merge a merchant into itself" }, 400);
 
-			return db.transaction(() => {
+			const result = changeMerchants(c.req.valid("query").dryRun, () => {
 				const merchant = findMerchant(id);
 				const into = findMerchant(intoId);
-				if (!merchant || !into) return c.json(notFound, 404);
+				if (!merchant || !into) return notFound;
 
 				if (merchant.deletedAt || into.deletedAt) {
-					return c.json({ message: "Restore a deleted merchant before merging it" }, 409);
+					return reject(409, "Restore a deleted merchant before merging it");
 				}
 
 				db.update(merchantNames)
@@ -141,8 +187,10 @@ export const adminMerchantsApi = new Hono()
 					.run();
 				db.delete(merchants).where(eq(merchants.id, id)).run();
 
-				return c.json(reprocess(), 200);
+				return {};
 			});
+
+			return respond(c, result);
 		},
 	)
 
@@ -150,6 +198,7 @@ export const adminMerchantsApi = new Hono()
 	.post(
 		"/:id/detach",
 		idParam,
+		dryRunQuery,
 		zValidator(
 			"json",
 			z.object({
@@ -161,17 +210,15 @@ export const adminMerchantsApi = new Hono()
 			const { id } = c.req.valid("param");
 			const { key } = c.req.valid("json");
 
-			return db.transaction(() => {
+			const result = changeMerchants(c.req.valid("query").dryRun, () => {
 				const merchant = findMerchant(id);
-				if (!merchant) return c.json(notFound, 404);
+				if (!merchant) return notFound;
 
 				const name = db.select().from(merchantNames).where(eq(merchantNames.key, key)).get();
-				if (name?.merchantId !== id) {
-					return c.json({ message: "The merchant has no such name" }, 404);
-				}
+				if (name?.merchantId !== id) return reject(404, "The merchant has no such name");
 
 				if (key === merchantKey(merchant.name)) {
-					return c.json({ message: "Cannot detach the name the merchant is shown with" }, 400);
+					return reject(400, "Cannot detach the name the merchant is shown with");
 				}
 
 				const detached = db.insert(merchants).values({ name: name.name }).returning().get();
@@ -180,18 +227,20 @@ export const adminMerchantsApi = new Hono()
 					.where(eq(merchantNames.key, key))
 					.run();
 
-				return c.json({ merchantId: detached.id, ...reprocess() }, 200);
+				return { merchantId: detached.id };
 			});
+
+			return respond(c, result);
 		},
 	)
 
 	/** DELETE /api/admin/merchants/:id */
-	.delete("/:id", idParam, (c) => {
+	.delete("/:id", idParam, dryRunQuery, (c) => {
 		const { id } = c.req.valid("param");
 
-		return db.transaction(() => {
+		const result = changeMerchants(c.req.valid("query").dryRun, () => {
 			const merchant = findMerchant(id);
-			if (!merchant) return c.json(notFound, 404);
+			if (!merchant) return notFound;
 
 			if (!merchant.deletedAt) {
 				db.update(merchants)
@@ -200,22 +249,26 @@ export const adminMerchantsApi = new Hono()
 					.run();
 			}
 
-			return c.json(reprocess(), 200);
+			return {};
 		});
+
+		return respond(c, result);
 	})
 
 	/** POST /api/admin/merchants/:id/restore */
-	.post("/:id/restore", idParam, (c) => {
+	.post("/:id/restore", idParam, dryRunQuery, (c) => {
 		const { id } = c.req.valid("param");
 
-		return db.transaction(() => {
-			if (!findMerchant(id)) return c.json(notFound, 404);
+		const result = changeMerchants(c.req.valid("query").dryRun, () => {
+			if (!findMerchant(id)) return notFound;
 
 			db.update(merchants)
 				.set({ deletedAt: null, updatedAt: sqlDateTimeNow })
 				.where(eq(merchants.id, id))
 				.run();
 
-			return c.json(reprocess(), 200);
+			return {};
 		});
+
+		return respond(c, result);
 	});

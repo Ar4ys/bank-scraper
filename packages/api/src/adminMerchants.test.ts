@@ -74,13 +74,45 @@ describe("admin merchants API", () => {
 		);
 	});
 
+	it("previews a change without writing anything", async () => {
+		const mcDonalds = await merchantByName("McDonald's");
+		const paypal = await merchantByName("PAYPAL *MCD");
+		const before = await listMerchants();
+
+		const merge = await request(`/merchants/${paypal.id}/merge?dryRun=true`, "POST", {
+			intoId: mcDonalds.id,
+		});
+
+		assert.equal(merge.status, 200);
+		assert.deepEqual(
+			merge.body.changes.map((change: any) => [
+				change.bankId,
+				change.cause,
+				change.before.merchant,
+				change.after.merchant,
+			]),
+			[["mcd-2", "merchants", "PAYPAL *MCD", "McDonald's"]],
+		);
+
+		const remove = await request(`/merchants/${mcDonalds.id}?dryRun=true`, "DELETE");
+
+		assert.deepEqual(
+			remove.body.changes.map((change: any) => [change.bankId, change.after.merchant]),
+			[["mcd-1", null]],
+		);
+
+		assert.deepEqual(await listMerchants(), before);
+		assert.deepEqual(await versionCauses("mcd-1"), [["raw", "McDonald's"]]);
+		assert.deepEqual(await versionCauses("mcd-2"), [["raw", "PAYPAL *MCD"]]);
+	});
+
 	it("renames a merchant in its transactions and records that in their history", async () => {
 		const lidl = await merchantByName("Lidl");
 		const { status, body } = await request(`/merchants/${lidl.id}`, "PATCH", {
 			name: " Lidl Polska ",
 		});
 
-		assert.deepEqual([status, body], [200, { changedTransactions: 1 }]);
+		assert.deepEqual([status, body.changes.length], [200, 1]);
 		assert.deepEqual(await versionCauses("lidl-1"), [
 			["raw", "Lidl"],
 			["merchants", "Lidl Polska"],
@@ -128,7 +160,7 @@ describe("admin merchants API", () => {
 			intoId: mcDonalds.id,
 		});
 
-		assert.deepEqual([status, body], [200, { changedTransactions: 1 }]);
+		assert.deepEqual([status, body.changes.length], [200, 1]);
 		assert.equal(await merchantByName("PAYPAL *MCD"), undefined);
 
 		const merged = await merchantByName("McDonald's");
@@ -184,7 +216,7 @@ describe("admin merchants API", () => {
 		assert.equal((await detach("lidl")).status, 404);
 
 		const { status, body } = await detach("paypal *mcd");
-		assert.deepEqual([status, body.changedTransactions], [200, 2]);
+		assert.deepEqual([status, body.changes.length], [200, 2]);
 
 		const detached = await merchantByName("PAYPAL *MCD");
 		assert.deepEqual([detached.id, detached.transactionCount], [body.merchantId, 2]);
@@ -195,7 +227,7 @@ describe("admin merchants API", () => {
 		const paypal = await merchantByName("PAYPAL *MCD");
 		const { status, body } = await request(`/merchants/${paypal.id}`, "DELETE");
 
-		assert.deepEqual([status, body], [200, { changedTransactions: 2 }]);
+		assert.deepEqual([status, body.changes.length], [200, 2]);
 
 		await ingest([cardPayment("mcd-4", "PAYPAL *MCD")]);
 
@@ -229,7 +261,7 @@ describe("admin merchants API", () => {
 		const paypal = await merchantByName("PAYPAL *MCD");
 		const { status, body } = await request(`/merchants/${paypal.id}/restore`, "POST");
 
-		assert.deepEqual([status, body], [200, { changedTransactions: 3 }]);
+		assert.deepEqual([status, body.changes.length], [200, 3]);
 
 		const restored = await merchantByName("PAYPAL *MCD");
 		assert.deepEqual([restored.deletedAt, restored.transactionCount], [null, 3]);

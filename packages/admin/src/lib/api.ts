@@ -68,21 +68,38 @@ export const updateAccount = (
 export type Merchant = Awaited<ReturnType<typeof loadMerchants>>[number];
 export const loadMerchants = () => unwrap(api.merchants.$get());
 
-export const renameMerchant = (id: string, name: string) =>
-	unwrap(api.merchants[":id"].$patch({ param: { id }, json: { name } }));
+/**
+ * Changes of merchants derive every transaction again and report what changed. With `dryRun`
+ * nothing is written, and the report says what would change.
+ */
+export type MerchantChangeReport = Awaited<ReturnType<typeof deleteMerchant>>;
+const dryRunQuery = (dryRun: boolean) => ({ dryRun: String(dryRun) });
+
+export const renameMerchant = (id: string, name: string, dryRun: boolean) =>
+	unwrap(
+		api.merchants[":id"].$patch({ param: { id }, query: dryRunQuery(dryRun), json: { name } }),
+	);
 
 /** Leaves only `intoId`, which takes over the names and transactions of `id` */
-export const mergeMerchant = (id: string, intoId: string) =>
-	unwrap(api.merchants[":id"].merge.$post({ param: { id }, json: { intoId } }));
+export const mergeMerchant = (id: string, intoId: string, dryRun: boolean) =>
+	unwrap(
+		api.merchants[":id"].merge.$post({
+			param: { id },
+			query: dryRunQuery(dryRun),
+			json: { intoId },
+		}),
+	);
 
-export const detachMerchantName = (id: string, key: string) =>
-	unwrap(api.merchants[":id"].detach.$post({ param: { id }, json: { key } }));
+export const detachMerchantName = (id: string, key: string, dryRun: boolean) =>
+	unwrap(
+		api.merchants[":id"].detach.$post({ param: { id }, query: dryRunQuery(dryRun), json: { key } }),
+	);
 
-export const deleteMerchant = (id: string) =>
-	unwrap(api.merchants[":id"].$delete({ param: { id } }));
+export const deleteMerchant = (id: string, dryRun: boolean) =>
+	unwrap(api.merchants[":id"].$delete({ param: { id }, query: dryRunQuery(dryRun) }));
 
-export const restoreMerchant = (id: string) =>
-	unwrap(api.merchants[":id"].restore.$post({ param: { id } }));
+export const restoreMerchant = (id: string, dryRun: boolean) =>
+	unwrap(api.merchants[":id"].restore.$post({ param: { id }, query: dryRunQuery(dryRun) }));
 
 export type RulesState = Awaited<ReturnType<typeof loadRules>>;
 export type Rule = RulesState["rules"][number];

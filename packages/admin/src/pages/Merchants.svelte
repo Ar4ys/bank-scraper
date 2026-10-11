@@ -7,7 +7,10 @@
 		renameMerchant,
 		restoreMerchant,
 		type Merchant,
+		type MerchantChangeReport,
 	} from "$lib/api";
+	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
+	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
 	import { Badge } from "$lib/components/ui/badge";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
@@ -16,6 +19,13 @@
 	import { formatInstant } from "$lib/format";
 	import { p } from "$lib/router";
 
+	/** A change of merchants that is shown as a preview first and written only when applied */
+	type Proposal = {
+		title: string;
+		description: string;
+		run: (dryRun: boolean) => Promise<MerchantChangeReport>;
+	};
+
 	let merchants = $state<Merchant[]>([]);
 	let names = $state<Record<string, string>>({});
 	let filter = $state("");
@@ -23,9 +33,17 @@
 	let error = $state<string>();
 	let notice = $state<string>();
 
+	let proposal = $state<Proposal>();
+	let preview = $state<MerchantChangeReport>();
+	let previewOpen = $state(false);
+	let previewError = $state<string>();
+
 	let mergeOpen = $state(false);
 	let mergeSource = $state<Merchant>();
 	let mergeFilter = $state("");
+
+	let transactionsOpen = $state(false);
+	let transactionsOf = $state<Merchant>();
 
 	const matches = (merchant: Merchant, text: string) => {
 		const needle = text.trim().toLowerCase();
@@ -58,21 +76,72 @@
 		}
 	}
 
-	async function change(what: string, action: () => Promise<{ changedTransactions: number }>) {
+	async function propose(proposed: Proposal) {
 		busy = true;
 		error = undefined;
 		notice = undefined;
+		previewError = undefined;
 
 		try {
-			const { changedTransactions } = await action();
-			notice = `${what}. Transactions changed: ${changedTransactions}`;
-			await load();
+			preview = await proposed.run(true);
+			proposal = proposed;
+			previewOpen = true;
 		} catch (e) {
 			error = String(e);
 		} finally {
 			busy = false;
 		}
 	}
+
+	async function apply() {
+		if (!proposal) return;
+
+		busy = true;
+		previewError = undefined;
+
+		try {
+			const report = await proposal.run(false);
+			notice = `${proposal.title}. Transactions changed: ${report.changes.length}`;
+			previewOpen = false;
+			await load();
+		} catch (e) {
+			previewError = String(e);
+		} finally {
+			busy = false;
+		}
+	}
+
+	const rename = (merchant: Merchant) => {
+		const name = (names[merchant.id] ?? "").trim();
+
+		return propose({
+			title: `Rename "${merchant.name}" to "${name}"`,
+			description: `Its transactions get the new name. "${merchant.name}" stays a name of the merchant, so whatever still derives it ends up here.`,
+			run: (dryRun) => renameMerchant(merchant.id, name, dryRun),
+		});
+	};
+
+	const detach = (merchant: Merchant, other: Merchant["otherNames"][number]) =>
+		propose({
+			title: `Detach "${other.name}" from "${merchant.name}"`,
+			description: `"${other.name}" becomes a merchant of its own again and takes the transactions that derive that name.`,
+			run: (dryRun) => detachMerchantName(merchant.id, other.key, dryRun),
+		});
+
+	const remove = (merchant: Merchant) =>
+		propose({
+			title: `Delete "${merchant.name}"`,
+			description:
+				"These transactions lose their merchant, and so do later ones with its names, until the merchant is restored.",
+			run: (dryRun) => deleteMerchant(merchant.id, dryRun),
+		});
+
+	const restore = (merchant: Merchant) =>
+		propose({
+			title: `Restore "${merchant.name}"`,
+			description: "The transactions that derive its names get the merchant back.",
+			run: (dryRun) => restoreMerchant(merchant.id, dryRun),
+		});
 
 	function startMerge(merchant: Merchant) {
 		mergeSource = merchant;
@@ -85,9 +154,16 @@
 		if (!source) return;
 
 		mergeOpen = false;
-		await change(`Merged "${source.name}" into "${target.name}"`, () =>
-			mergeMerchant(source.id, target.id),
-		);
+		await propose({
+			title: `Merge "${source.name}" into "${target.name}"`,
+			description: `Only "${target.name}" is left. It takes over the transactions and the names of "${source.name}", so later transactions with those names get it too.`,
+			run: (dryRun) => mergeMerchant(source.id, target.id, dryRun),
+		});
+	}
+
+	function viewTransactions(merchant: Merchant) {
+		transactionsOf = merchant;
+		transactionsOpen = true;
 	}
 
 	void load();
@@ -98,7 +174,7 @@
 	The merchant that rules and defaults derive for a transaction is looked up here by name, ignoring
 	case. Merging a merchant into another one makes its names stand for that merchant, for existing
 	and future transactions. A deleted merchant leaves its transactions without a merchant until it is
-	restored.
+	restored. Every change shows the transactions it affects before it is applied.
 </p>
 
 <Input class="max-w-xs" placeholder="Name" bind:value={filter} />
@@ -123,59 +199,44 @@
 	<Table.Body>
 		{#each active as merchant (merchant.id)}
 			<Table.Row>
-				<Table.Cell><Input class="min-w-64" bind:value={names[merchant.id]} /></Table.Cell>
+				<Table.Cell><Input class="min-w-56" bind:value={names[merchant.id]} /></Table.Cell>
 				<Table.Cell>
 					<Button
 						size="sm"
 						disabled={busy || !names[merchant.id]?.trim() || names[merchant.id] === merchant.name}
-						onclick={() =>
-							change(`Renamed "${merchant.name}"`, () =>
-								renameMerchant(merchant.id, names[merchant.id] ?? ""),
-							)}
+						onclick={() => rename(merchant)}
 					>
 						Rename
 					</Button>
 				</Table.Cell>
-				<Table.Cell class="text-right tabular-nums">
-					<a
-						class="underline-offset-4 hover:underline"
-						href={p("/transactions", { search: { merchantId: merchant.id } })}
-					>
-						{merchant.transactionCount}
-					</a>
-				</Table.Cell>
+				<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
 				<Table.Cell>
-					<span class="flex flex-wrap gap-1">
+					<span class="flex flex-wrap gap-1.5">
 						{#each merchant.otherNames as other (other.key)}
-							<Badge variant="secondary" class="h-6 pr-0.5">
+							<span class="inline-flex items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-0.5 pl-2 text-xs font-medium">
 								{other.name}
 								<Button
-									variant="ghost"
+									variant="outline"
 									size="xs"
-									class="h-5 px-1.5"
+									class="cursor-pointer"
 									title="Make it a merchant of its own again"
 									disabled={busy}
-									onclick={() =>
-										change(`Detached "${other.name}" from "${merchant.name}"`, () =>
-											detachMerchantName(merchant.id, other.key),
-										)}
+									onclick={() => detach(merchant, other)}
 								>
 									Detach
 								</Button>
-							</Badge>
+							</span>
 						{/each}
 					</span>
 				</Table.Cell>
 				<Table.Cell class="whitespace-nowrap text-right">
+					<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
+						View transactions
+					</Button>
 					<Button variant="outline" size="sm" disabled={busy} onclick={() => startMerge(merchant)}>
 						Merge into…
 					</Button>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={busy}
-						onclick={() => change(`Deleted "${merchant.name}"`, () => deleteMerchant(merchant.id))}
-					>
+					<Button variant="outline" size="sm" disabled={busy} onclick={() => remove(merchant)}>
 						Delete
 					</Button>
 				</Table.Cell>
@@ -215,13 +276,7 @@
 						{merchant.deletedAt ? formatInstant(merchant.deletedAt) : ""}
 					</Table.Cell>
 					<Table.Cell class="text-right">
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={busy}
-							onclick={() =>
-								change(`Restored "${merchant.name}"`, () => restoreMerchant(merchant.id))}
-						>
+						<Button variant="outline" size="sm" disabled={busy} onclick={() => restore(merchant)}>
 							Restore
 						</Button>
 					</Table.Cell>
@@ -231,13 +286,40 @@
 	</Table.Root>
 {/if}
 
+<Dialog.Root bind:open={previewOpen}>
+	<Dialog.Content
+		class="flex max-h-[85vh] flex-col sm:max-w-4xl"
+		onOpenAutoFocus={(event) => event.preventDefault()}
+	>
+		<Dialog.Header>
+			<Dialog.Title>{proposal?.title}</Dialog.Title>
+			<Dialog.Description>
+				{proposal?.description} This is a preview. Nothing is written until you apply it.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto">
+			{#if previewError}
+				<p class="text-sm text-destructive">{previewError}</p>
+			{/if}
+			{#if preview}
+				<MerchantChanges report={preview} />
+			{/if}
+		</div>
+
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (previewOpen = false)}>Cancel</Button>
+			<Button disabled={busy} onclick={apply}>Apply</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
 <Dialog.Root bind:open={mergeOpen}>
 	<Dialog.Content class="flex max-h-[85vh] flex-col sm:max-w-lg">
 		<Dialog.Header>
 			<Dialog.Title>Merge "{mergeSource?.name}" into…</Dialog.Title>
 			<Dialog.Description>
-				Only the merchant you pick is left. It takes over the transactions and the names of
-				"{mergeSource?.name}", so future transactions with those names get it too.
+				Pick the merchant that is left. You see the affected transactions before anything is written.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -246,7 +328,7 @@
 		<div class="min-h-0 flex-1 overflow-y-auto">
 			{#each mergeTargets as target (target.id)}
 				<button
-					class="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+					class="flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
 					onclick={() => mergeInto(target)}
 				>
 					<span class="font-medium">{target.name}</span>
@@ -260,5 +342,34 @@
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (mergeOpen = false)}>Cancel</Button>
 		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={transactionsOpen}>
+	<Dialog.Content
+		class="flex max-h-[85vh] flex-col sm:max-w-3xl"
+		onOpenAutoFocus={(event) => event.preventDefault()}
+	>
+		<Dialog.Header>
+			<Dialog.Title>Transactions of "{transactionsOf?.name}"</Dialog.Title>
+			<Dialog.Description>
+				{#if transactionsOf}
+					<a
+						class="underline underline-offset-4"
+						href={p("/transactions", { search: { merchantId: transactionsOf.id } })}
+					>
+						Open in Transactions
+					</a>
+				{/if}
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto">
+			{#if transactionsOf}
+				{#key transactionsOf.id}
+					<MerchantTransactions merchantId={transactionsOf.id} />
+				{/key}
+			{/if}
+		</div>
 	</Dialog.Content>
 </Dialog.Root>

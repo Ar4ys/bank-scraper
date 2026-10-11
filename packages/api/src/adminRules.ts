@@ -63,7 +63,7 @@ function getWorkingRules(): Rule[] {
 		}));
 }
 
-const reportJson = (report: ProcessingReport) => ({
+export const reportJson = (report: ProcessingReport) => ({
 	...report,
 	errors: report.errors.map(({ error, ...rest }) => ({
 		...rest,
