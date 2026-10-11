@@ -2,7 +2,8 @@
 	"_about": [
 		"Bank transactions as iPKO sends them, used by the tests. Keyed by the example they come from.",
 		"Source: local/examples (one sample per shape of transaction) and one hold, with every identifying detail, amount, date and reference number replaced by a made-up one.",
-		"The hold keeps every field the bank sends; the other examples lack the fields tools/filterFlatFields.ts removes."
+		"The hold keeps every field the bank sends; the other examples lack the fields tools/filterFlatFields.ts removes.",
+		"MOBILE_TRANSACTION/blik_contactless_foreign is not from local/examples: it has the shape of a real payment, but its merchant, amount, dates and ids are made up."
 	],
 	"transactions": {
 		"CARD_TRANSACTION/+merchant-subcategory": {
@@ -404,6 +405,42 @@
 				"country": "POLSKA",
 				"country_code": "PL",
 				"atm": "S1XX4718"
+			},
+			"other_side": "Płatność mobilna",
+			"is_hold": false
+		},
+		"MOBILE_TRANSACTION/blik_contactless_foreign": {
+			"operation_id": "3100",
+			"title": "SumUp  *CornerCafe, Manchester, WIELKA BRYTANIA",
+			"money": {
+				"amount": "-48.20",
+				"currency": "PLN"
+			},
+			"operation_kind": {
+				"code": "BLIK_CONTACTLESS_PAYMENT_FOREIGN",
+				"side": "DEBIT"
+			},
+			"operation_type": "MOBILE_TRANSACTION",
+			"details": {
+				"order_date": "2025-07-02",
+				"exec_date": "2025-07-04",
+				"operation_kind": {
+					"code": "BLIK_CONTACTLESS_PAYMENT_FOREIGN",
+					"side": "DEBIT"
+				},
+				"money": {
+					"amount": "-48.20",
+					"currency": "PLN"
+				},
+				"title": "00000012345678901",
+				"phone_number": {
+					"country_code": "48",
+					"number": "123456789"
+				},
+				"address": "SumUp  *CornerCafe",
+				"city": "Manchester",
+				"country": "WIELKA BRYTANIA",
+				"country_code": "GB"
 			},
 			"other_side": "Płatność mobilna",
 			"is_hold": false

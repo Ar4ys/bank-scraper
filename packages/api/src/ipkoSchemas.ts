@@ -141,6 +141,8 @@ export const cardTransferSend = z
 export type MobileOperationSubType = DefineEnum<typeof MobileOperationSubType>;
 export const MobileOperationSubType = Object.freeze({
 	BlikContactlessPayment: "BLIK_CONTACTLESS_PAYMENT",
+	/** Paid abroad. The bank reports it in the account's currency only, without the original amount */
+	BlikContactlessForeignPayment: "BLIK_CONTACTLESS_PAYMENT_FOREIGN",
 	BlikContactlessReturn: "BLIK_CONTACTLESS_PAYMENT_RETURN",
 	AtmPayment: "MOBILE_PAYMENT_ATM_TX_CODE",
 	PosPayment: "MOBILE_PAYMENT_POS_TX_CODE",
@@ -156,6 +158,7 @@ export const mobileTransaction = z
 		operation_kind: z.object({
 			code: z.literal([
 				MobileOperationSubType.BlikContactlessPayment,
+				MobileOperationSubType.BlikContactlessForeignPayment,
 				MobileOperationSubType.BlikContactlessReturn,
 				MobileOperationSubType.PosPayment,
 				MobileOperationSubType.PosNoCardPayment,

@@ -79,6 +79,13 @@ describe("deriveTransaction defaults", () => {
 			"-500.00",
 			"2024-03-29",
 		],
+		[
+			"MOBILE_TRANSACTION/blik_contactless_foreign",
+			null,
+			"SumUp  *CornerCafe, Manchester, WIELKA BRYTANIA",
+			"-48.20",
+			"2025-07-02",
+		],
 		["MOBILE_TRANSACTION/default", null, "orange.flex.pl/", "-1.00", "2022-02-03"],
 		[
 			"OTHER/-recepient_name_and_address",
