@@ -255,6 +255,32 @@ export const adminMerchantsApi = new Hono()
 		return respond(c, result);
 	})
 
+	/** DELETE /api/admin/merchants/:id/permanent */
+	.delete("/:id/permanent", idParam, dryRunQuery, (c) => {
+		const { id } = c.req.valid("param");
+
+		const result = changeMerchants(c.req.valid("query").dryRun, () => {
+			const merchant = findMerchant(id);
+			if (!merchant) return notFound;
+
+			if (!merchant.deletedAt) {
+				return reject(409, "Delete the merchant before removing it permanently");
+			}
+
+			// Its names are forgotten too, so a transaction that still derives one gets a new merchant
+			db.delete(merchantNames).where(eq(merchantNames.merchantId, id)).run();
+			db.update(transactions)
+				.set({ merchantId: null })
+				.where(eq(transactions.merchantId, id))
+				.run();
+			db.delete(merchants).where(eq(merchants.id, id)).run();
+
+			return {};
+		});
+
+		return respond(c, result);
+	})
+
 	/** POST /api/admin/merchants/:id/restore */
 	.post("/:id/restore", idParam, dryRunQuery, (c) => {
 		const { id } = c.req.valid("param");

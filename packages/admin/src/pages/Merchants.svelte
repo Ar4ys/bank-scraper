@@ -4,6 +4,7 @@
 		detachMerchantName,
 		loadMerchants,
 		mergeMerchant,
+		removeMerchantPermanently,
 		renameMerchant,
 		restoreMerchant,
 		type Merchant,
@@ -15,6 +16,8 @@
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { Input } from "$lib/components/ui/input";
+	import { Label } from "$lib/components/ui/label";
+	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
 	import { formatInstant } from "$lib/format";
 	import { p } from "$lib/router";
@@ -23,12 +26,15 @@
 	type Proposal = {
 		title: string;
 		description: string;
+		/** It takes something away that applying another change does not bring back as it was */
+		destructive?: boolean;
 		run: (dryRun: boolean) => Promise<MerchantChangeReport>;
 	};
 
 	let merchants = $state<Merchant[]>([]);
 	let names = $state<Record<string, string>>({});
 	let filter = $state("");
+	let showDeleted = $state(false);
 	let busy = $state(false);
 	let error = $state<string>();
 	let notice = $state<string>();
@@ -133,7 +139,17 @@
 			title: `Delete "${merchant.name}"`,
 			description:
 				"These transactions lose their merchant, and so do later ones with its names, until the merchant is restored.",
+			destructive: true,
 			run: (dryRun) => deleteMerchant(merchant.id, dryRun),
+		});
+
+	const removePermanently = (merchant: Merchant) =>
+		propose({
+			title: `Permanently remove "${merchant.name}"`,
+			description:
+				"The merchant and its names are removed for good and cannot be restored. A transaction that still derives one of its names gets a new merchant with that name.",
+			destructive: true,
+			run: (dryRun) => removeMerchantPermanently(merchant.id, dryRun),
 		});
 
 	const restore = (merchant: Merchant) =>
@@ -177,7 +193,15 @@
 	restored. Every change shows the transactions it affects before it is applied.
 </p>
 
-<Input class="max-w-xs" placeholder="Name" bind:value={filter} />
+<div class="flex flex-wrap items-center gap-4">
+	<Input class="max-w-xs" placeholder="Name" bind:value={filter} />
+	<span class="flex items-center gap-2">
+		<Switch id="show-deleted" bind:checked={showDeleted} />
+		<Label for="show-deleted">
+			Show deleted ({merchants.filter((merchant) => merchant.deletedAt).length})
+		</Label>
+	</span>
+</div>
 
 {#if error}
 	<p class="text-sm text-destructive">{error}</p>
@@ -236,7 +260,7 @@
 					<Button variant="outline" size="sm" disabled={busy} onclick={() => startMerge(merchant)}>
 						Merge into…
 					</Button>
-					<Button variant="outline" size="sm" disabled={busy} onclick={() => remove(merchant)}>
+					<Button variant="destructive" size="sm" disabled={busy} onclick={() => remove(merchant)}>
 						Delete
 					</Button>
 				</Table.Cell>
@@ -249,7 +273,7 @@
 	</Table.Body>
 </Table.Root>
 
-{#if deleted.length}
+{#if showDeleted}
 	<h2 class="pt-4 text-lg font-semibold">Deleted</h2>
 
 	<Table.Root>
@@ -275,11 +299,23 @@
 					<Table.Cell class="whitespace-nowrap">
 						{merchant.deletedAt ? formatInstant(merchant.deletedAt) : ""}
 					</Table.Cell>
-					<Table.Cell class="text-right">
+					<Table.Cell class="whitespace-nowrap text-right">
 						<Button variant="outline" size="sm" disabled={busy} onclick={() => restore(merchant)}>
 							Restore
 						</Button>
+						<Button
+							variant="destructive"
+							size="sm"
+							disabled={busy}
+							onclick={() => removePermanently(merchant)}
+						>
+							Permanently remove
+						</Button>
 					</Table.Cell>
+				</Table.Row>
+			{:else}
+				<Table.Row>
+					<Table.Cell colspan={4} class="text-muted-foreground">No deleted merchants</Table.Cell>
 				</Table.Row>
 			{/each}
 		</Table.Body>
@@ -309,7 +345,13 @@
 
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (previewOpen = false)}>Cancel</Button>
-			<Button disabled={busy} onclick={apply}>Apply</Button>
+			<Button
+				variant={proposal?.destructive ? "destructive" : "default"}
+				disabled={busy}
+				onclick={apply}
+			>
+				Apply
+			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

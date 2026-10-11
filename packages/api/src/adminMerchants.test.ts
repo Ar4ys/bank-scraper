@@ -266,4 +266,37 @@ describe("admin merchants API", () => {
 		const restored = await merchantByName("PAYPAL *MCD");
 		assert.deepEqual([restored.deletedAt, restored.transactionCount], [null, 3]);
 	});
+
+	it("removes only a deleted merchant permanently", async () => {
+		const lidl = await merchantByName("Lidl Polska");
+		const { status } = await request(`/merchants/${lidl.id}/permanent`, "DELETE");
+
+		assert.equal(status, 409);
+		assert.ok(await merchantByName("Lidl Polska"));
+	});
+
+	it("forgets a permanently removed merchant, so names that are still derived start anew", async () => {
+		const lidl = await merchantByName("Lidl Polska");
+		await request(`/merchants/${lidl.id}`, "DELETE");
+
+		const { status, body } = await request(`/merchants/${lidl.id}/permanent`, "DELETE");
+
+		assert.equal(status, 200);
+		assert.deepEqual(
+			body.changes.map((change: any) => [
+				change.bankId,
+				change.before.merchant,
+				change.after.merchant,
+			]),
+			[
+				["lidl-1", null, "Lidl"],
+				["lidl-2", null, "Lidl"],
+			],
+		);
+		assert.equal(await merchantByName("Lidl Polska"), undefined);
+
+		const anew = await merchantByName("Lidl");
+		assert.notEqual(anew.id, lidl.id);
+		assert.deepEqual([anew.transactionCount, anew.otherNames, anew.deletedAt], [2, [], null]);
+	});
 });

@@ -98,6 +98,10 @@ export const detachMerchantName = (id: string, key: string, dryRun: boolean) =>
 export const deleteMerchant = (id: string, dryRun: boolean) =>
 	unwrap(api.merchants[":id"].$delete({ param: { id }, query: dryRunQuery(dryRun) }));
 
+/** Removes a deleted merchant and its names for good */
+export const removeMerchantPermanently = (id: string, dryRun: boolean) =>
+	unwrap(api.merchants[":id"].permanent.$delete({ param: { id }, query: dryRunQuery(dryRun) }));
+
 export const restoreMerchant = (id: string, dryRun: boolean) =>
 	unwrap(api.merchants[":id"].restore.$post({ param: { id }, query: dryRunQuery(dryRun) }));
 

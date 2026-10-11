@@ -3,7 +3,7 @@
 	import Pagination from "$lib/components/Pagination.svelte";
 	import * as Table from "$lib/components/ui/table";
 	import { amountClass } from "$lib/format";
-	import { navigate } from "$lib/router";
+	import { p } from "$lib/router";
 
 	let { merchantId }: { merchantId: string } = $props();
 
@@ -11,6 +11,10 @@
 	let offset = $state(0);
 
 	const page = $derived(loadTransactions({ limit, offset, merchantId }));
+
+	// A preview is looked at next to what it previews, so its rows open elsewhere
+	const openTransaction = (id: string) =>
+		window.open(p("/transactions/:id", { params: { id } }), "_blank", "noopener");
 </script>
 
 {#await page}
@@ -28,7 +32,8 @@
 			{#each data.items as transaction (transaction.id)}
 				<Table.Row
 					class="cursor-pointer"
-					onclick={() => navigate("/transactions/:id", { params: { id: transaction.id } })}
+					title="Open the transaction in a new tab"
+					onclick={() => openTransaction(transaction.id)}
 				>
 					<Table.Cell class="whitespace-nowrap tabular-nums">{transaction.date}</Table.Cell>
 					<Table.Cell class="max-w-md truncate" title={transaction.description}>
