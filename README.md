@@ -76,7 +76,7 @@ that method in your Sure build so it returns your base URL, `http://<host>:8585/
 enter the `LUNCHFLOW_API_KEY` as the Lunch Flow API key in Sure.
 
 Sure re-fetches only the transactions of about the last week on each sync, so a rule or merchant
-change that rewrites older transactions does not reach Sure (see `plans/todo.md`).
+change that rewrites older transactions does not reach Sure.
 
 ### Backup
 
@@ -169,4 +169,3 @@ A pnpm workspace:
 - `packages/shared` code used by more than one package: codecs for dates and amounts, rule and
   transaction schemas, the template renderer and the JSON diff
 - `packages/admin` the admin app
-- `plans/todo.md` deferred work

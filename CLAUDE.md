@@ -5,7 +5,7 @@ on `ipko.pl` posts what the site loads to a Hono API, which stores it raw, deriv
 from it and serves them to an admin app and to Sure through a Lunch Flow compatible API.
 
 `README.md` is the reference for the data flow, tasks, env vars, routes and deployment. Read it
-before changing behaviour. `plans/todo.md` lists deferred work.
+before changing behaviour.
 
 ## Rules for working here
 
