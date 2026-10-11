@@ -51,6 +51,17 @@
 	let transactionsOpen = $state(false);
 	let transactionsOf = $state<Merchant>();
 
+	type SortKey = "name" | "transactionCount";
+	let sort = $state<{ key: SortKey; descending: boolean }>({ key: "name", descending: false });
+
+	function sortBy(key: SortKey) {
+		sort =
+			sort.key === key
+				? { key, descending: !sort.descending }
+				: // Counts are looked at from the largest, names from A
+					{ key, descending: key === "transactionCount" };
+	}
+
 	const matches = (merchant: Merchant, text: string) => {
 		const needle = text.trim().toLowerCase();
 
@@ -61,7 +72,14 @@
 	};
 
 	const active = $derived(
-		merchants.filter((merchant) => !merchant.deletedAt && matches(merchant, filter)),
+		merchants
+			.filter((merchant) => !merchant.deletedAt && matches(merchant, filter))
+			.toSorted((a, b) => {
+				const byName = a.name.localeCompare(b.name);
+				const order = sort.key === "name" ? byName : a.transactionCount - b.transactionCount;
+
+				return (sort.descending ? -order : order) || byName;
+			}),
 	);
 	const deleted = $derived(
 		merchants.filter((merchant) => merchant.deletedAt && matches(merchant, filter)),
@@ -210,12 +228,27 @@
 	<p class="text-sm text-muted-foreground">{notice}</p>
 {/if}
 
+{#snippet sortButton(key: SortKey, label: string)}
+	<button
+		class="inline-flex cursor-pointer items-center gap-1 hover:underline"
+		title="Sort by this column"
+		onclick={() => sortBy(key)}
+	>
+		{label}
+		<span class="w-3 text-muted-foreground">
+			{sort.key === key ? (sort.descending ? "↓" : "↑") : "↕"}
+		</span>
+	</button>
+{/snippet}
+
 <Table.Root>
 	<Table.Header>
 		<Table.Row>
-			<Table.Head>Name</Table.Head>
+			<Table.Head>{@render sortButton("name", "Name")}</Table.Head>
 			<Table.Head></Table.Head>
-			<Table.Head class="text-right">Transactions</Table.Head>
+			<Table.Head class="text-right">
+				{@render sortButton("transactionCount", "Transactions")}
+			</Table.Head>
 			<Table.Head>Merged names</Table.Head>
 			<Table.Head></Table.Head>
 		</Table.Row>
