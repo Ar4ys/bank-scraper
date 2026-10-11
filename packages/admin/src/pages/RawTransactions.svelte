@@ -1,26 +1,29 @@
 <script lang="ts">
-	import { searchParams } from "sv-router";
-
 	import { loadAccounts, loadRawTransactions, type Account } from "$lib/api";
 	import AccountSelect from "$lib/components/AccountSelect.svelte";
 	import Pagination from "$lib/components/Pagination.svelte";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import * as Table from "$lib/components/ui/table";
 	import { formatInstant } from "$lib/format";
+	import { queryCount, queryOption, queryText } from "$lib/queryState";
 	import { navigate } from "$lib/router";
 
 	const limit = 100;
 	const statuses = ["unprocessed", "processed", "hold", "error"] as const;
-	type Status = (typeof statuses)[number];
-
-	const initialStatus = statuses.find((status) => status === searchParams.get("status"));
 
 	let accounts = $state<Account[]>([]);
-	let accountId = $state("");
-	let status = $state<Status | "">(initialStatus ?? "");
-	let offset = $state(0);
+	const accountId = queryText("accountId");
+	const status = queryOption("status", ["", ...statuses], "");
+	const offset = queryCount("offset");
 
-	const page = $derived(loadRawTransactions({ limit, offset, accountId, status: status || undefined }));
+	const page = $derived(
+		loadRawTransactions({
+			limit,
+			offset: offset.value,
+			accountId: accountId.value,
+			status: status.value || undefined,
+		}),
+	);
 
 	const accountName = (id: number) => accounts.find((account) => account.id === id)?.name ?? id;
 	// Raw data has whatever shape the bank sent, so everything read from it is checked
@@ -42,10 +45,10 @@
 </p>
 
 <div class="flex flex-wrap items-center gap-4">
-	<AccountSelect bind:value={accountId} {accounts} />
+	<AccountSelect bind:value={accountId.value} {accounts} onchange={() => (offset.value = 0)} />
 	<select
-		bind:value={status}
-		onchange={() => (offset = 0)}
+		bind:value={status.value}
+		onchange={() => (offset.value = 0)}
 		class="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
 	>
 		<option value="">All statuses</option>
@@ -106,7 +109,7 @@
 		</Table.Body>
 	</Table.Root>
 
-	<Pagination bind:offset {limit} total={data.total} />
+	<Pagination bind:offset={offset.value} {limit} total={data.total} />
 {:catch error}
 	<p class="text-sm text-destructive">{String(error)}</p>
 {/await}

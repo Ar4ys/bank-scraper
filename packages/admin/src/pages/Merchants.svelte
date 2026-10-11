@@ -20,6 +20,7 @@
 	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
 	import { formatInstant } from "$lib/format";
+	import { queryFlag, queryOption, queryText } from "$lib/queryState";
 	import { p } from "$lib/router";
 
 	/** A change of merchants that is shown as a preview first and written only when applied */
@@ -33,8 +34,8 @@
 
 	let merchants = $state<Merchant[]>([]);
 	let names = $state<Record<string, string>>({});
-	let filter = $state("");
-	let showDeleted = $state(false);
+	const filter = queryText("search");
+	const showDeleted = queryFlag("showDeleted");
 	let busy = $state(false);
 	let error = $state<string>();
 	let notice = $state<string>();
@@ -51,15 +52,19 @@
 	let transactionsOpen = $state(false);
 	let transactionsOf = $state<Merchant>();
 
-	type SortKey = "name" | "transactionCount";
-	let sort = $state<{ key: SortKey; descending: boolean }>({ key: "name", descending: false });
+	const sortKeys = ["name", "transactionCount"] as const;
+	type SortKey = (typeof sortKeys)[number];
+	const sortKey = queryOption("sort", sortKeys, "name");
+	const sortDescending = queryFlag("descending");
 
 	function sortBy(key: SortKey) {
-		sort =
-			sort.key === key
-				? { key, descending: !sort.descending }
-				: // Counts are looked at from the largest, names from A
-					{ key, descending: key === "transactionCount" };
+		if (sortKey.value === key) {
+			sortDescending.value = !sortDescending.value;
+		} else {
+			sortKey.value = key;
+			// Counts are looked at from the largest, names from A
+			sortDescending.value = key === "transactionCount";
+		}
 	}
 
 	const matches = (merchant: Merchant, text: string) => {
@@ -73,16 +78,16 @@
 
 	const active = $derived(
 		merchants
-			.filter((merchant) => !merchant.deletedAt && matches(merchant, filter))
+			.filter((merchant) => !merchant.deletedAt && matches(merchant, filter.value))
 			.toSorted((a, b) => {
 				const byName = a.name.localeCompare(b.name);
-				const order = sort.key === "name" ? byName : a.transactionCount - b.transactionCount;
+				const order = sortKey.value === "name" ? byName : a.transactionCount - b.transactionCount;
 
-				return (sort.descending ? -order : order) || byName;
+				return (sortDescending.value ? -order : order) || byName;
 			}),
 	);
 	const deleted = $derived(
-		merchants.filter((merchant) => merchant.deletedAt && matches(merchant, filter)),
+		merchants.filter((merchant) => merchant.deletedAt && matches(merchant, filter.value)),
 	);
 	const mergeTargets = $derived(
 		merchants.filter(
@@ -212,9 +217,9 @@
 </p>
 
 <div class="flex flex-wrap items-center gap-4">
-	<Input class="max-w-xs" placeholder="Name" bind:value={filter} />
+	<Input class="max-w-xs" placeholder="Name" bind:value={filter.value} />
 	<span class="flex items-center gap-2">
-		<Switch id="show-deleted" bind:checked={showDeleted} />
+		<Switch id="show-deleted" bind:checked={showDeleted.value} />
 		<Label for="show-deleted">
 			Show deleted ({merchants.filter((merchant) => merchant.deletedAt).length})
 		</Label>
@@ -236,7 +241,7 @@
 	>
 		{label}
 		<span class="w-3 text-muted-foreground">
-			{sort.key === key ? (sort.descending ? "↓" : "↑") : "↕"}
+			{sortKey.value === key ? (sortDescending.value ? "↓" : "↑") : "↕"}
 		</span>
 	</button>
 {/snippet}
@@ -306,7 +311,7 @@
 	</Table.Body>
 </Table.Root>
 
-{#if showDeleted}
+{#if showDeleted.value}
 	<h2 class="pt-4 text-lg font-semibold">Deleted</h2>
 
 	<Table.Root>

@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { searchParams } from "sv-router";
-
 	import { loadAccounts, loadTransactions, type Account } from "$lib/api";
 	import AccountSelect from "$lib/components/AccountSelect.svelte";
 	import Pagination from "$lib/components/Pagination.svelte";
@@ -10,25 +8,26 @@
 	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
 	import { amountClass } from "$lib/format";
+	import { queryCount, queryFlag, queryText } from "$lib/queryState";
 	import { navigate } from "$lib/router";
 
 	const limit = 100;
 
 	let accounts = $state<Account[]>([]);
-	let accountId = $state("");
-	let search = $state("");
-	let withoutMerchant = $state(searchParams.get("withoutMerchant") === true);
-	let merchantId = $state(String(searchParams.get("merchantId") ?? ""));
-	let offset = $state(0);
+	const accountId = queryText("accountId");
+	const search = queryText("search");
+	const withoutMerchant = queryFlag("withoutMerchant");
+	const merchantId = queryText("merchantId");
+	const offset = queryCount("offset");
 
 	const page = $derived(
 		loadTransactions({
 			limit,
-			offset,
-			accountId,
-			search,
-			merchantId,
-			withoutMerchant: withoutMerchant || undefined,
+			offset: offset.value,
+			accountId: accountId.value,
+			search: search.value,
+			merchantId: merchantId.value,
+			withoutMerchant: withoutMerchant.value || undefined,
 		}),
 	);
 
@@ -43,21 +42,25 @@
 	<Input
 		class="max-w-xs"
 		placeholder="Merchant, description or bank id"
-		bind:value={search}
-		oninput={() => (offset = 0)}
+		bind:value={search.value}
+		oninput={() => (offset.value = 0)}
 	/>
-	<AccountSelect bind:value={accountId} {accounts} />
+	<AccountSelect bind:value={accountId.value} {accounts} onchange={() => (offset.value = 0)} />
 	<span class="flex items-center gap-2">
-		<Switch id="without-merchant" bind:checked={withoutMerchant} onCheckedChange={() => (offset = 0)} />
+		<Switch
+			id="without-merchant"
+			bind:checked={withoutMerchant.value}
+			onCheckedChange={() => (offset.value = 0)}
+		/>
 		<Label for="without-merchant">Without merchant</Label>
 	</span>
-	{#if merchantId}
+	{#if merchantId.value}
 		<Button
 			variant="outline"
 			size="sm"
 			onclick={() => {
-				merchantId = "";
-				offset = 0;
+				merchantId.value = "";
+				offset.value = 0;
 			}}
 		>
 			Of one merchant ✕
@@ -107,7 +110,7 @@
 		</Table.Body>
 	</Table.Root>
 
-	<Pagination bind:offset {limit} total={data.total} />
+	<Pagination bind:offset={offset.value} {limit} total={data.total} />
 {:catch error}
 	<p class="text-sm text-destructive">{String(error)}</p>
 {/await}
