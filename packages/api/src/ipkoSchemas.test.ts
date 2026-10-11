@@ -84,6 +84,7 @@ describe("ipkoTransactionSchema", () => {
 		"MOBILE_TRANSACTION/+title+tx_id+location": "mobileTransaction",
 		"MOBILE_TRANSACTION/atm-title": "mobileAtmTransaction",
 		"MOBILE_TRANSACTION/atm": "mobileAtmTransaction",
+		"MOBILE_TRANSACTION/blik_contactless_foreign": "mobileTransaction",
 		"MOBILE_TRANSACTION/default": "mobileTransaction",
 		"OTHER/-recepient_name_and_address": "fees",
 		"OTHER/default": "phoneTopUp",
