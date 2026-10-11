@@ -7,6 +7,7 @@
 	import {
 		applyRules,
 		loadAccounts,
+		loadMerchants,
 		loadRawTransaction,
 		loadRuleRevision,
 		loadRuleRevisions,
@@ -64,6 +65,8 @@
 	let savedJson = $state("[]");
 	let revisions = $state<RuleRevisionSummary[]>([]);
 	let accounts = $state<Account[]>([]);
+	/** Suggested for the merchant a rule sets */
+	let merchantNames = $state<string[]>([]);
 
 	let busy = $state(false);
 	let error = $state<string>();
@@ -303,7 +306,17 @@
 	void load();
 	void loadSample();
 	void loadAccounts().then((loaded) => (accounts = loaded));
+	void loadMerchants().then((loaded) => {
+		// A deleted merchant is no suggestion: a rule that sets its name leaves the transaction without one
+		merchantNames = loaded.filter((merchant) => !merchant.deletedAt).map((merchant) => merchant.name);
+	});
 </script>
+
+<datalist id="merchant-names">
+	{#each merchantNames as name (name)}
+		<option value={name}></option>
+	{/each}
+</datalist>
 
 <div class="flex flex-wrap items-center justify-between gap-2">
 	<h1 class="flex items-center gap-2 text-xl font-semibold">
@@ -510,6 +523,7 @@
 						<Input
 							id="{field.key}-{index}"
 							class="font-mono {targetClass(rule, field.key, 'template')}"
+							list={field.key === "merchant" ? "merchant-names" : undefined}
 							placeholder={field.placeholder}
 							value={rule.set[field.key] ?? ""}
 							oninput={(event) => setTemplate(rule, field.key, event.currentTarget.value)}
