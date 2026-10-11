@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { loadTransactions } from "$lib/api";
+	import LoadingBar from "$lib/components/LoadingBar.svelte";
 	import Pagination from "$lib/components/Pagination.svelte";
 	import * as Table from "$lib/components/ui/table";
 	import { amountClass } from "$lib/format";
+	import { latest } from "$lib/latest.svelte";
 	import { p } from "$lib/router";
 
 	let { merchantId }: { merchantId: string } = $props();
@@ -10,16 +12,19 @@
 	const limit = 50;
 	let offset = $state(0);
 
-	const page = $derived(loadTransactions({ limit, offset, merchantId }));
+	const page = latest(() => loadTransactions({ limit, offset, merchantId }));
 
 	// A preview is looked at next to what it previews, so its rows open elsewhere
 	const openTransaction = (id: string) =>
 		window.open(p("/transactions/:id", { params: { id } }), "_blank", "noopener");
 </script>
 
-{#await page}
-	<p class="text-sm text-muted-foreground">Loading…</p>
-{:then data}
+{#if page.error}
+	<p class="text-sm text-destructive">{page.error}</p>
+{/if}
+
+<div>
+	<LoadingBar loading={page.loading} />
 	<Table.Root>
 		<Table.Header>
 			<Table.Row>
@@ -29,7 +34,7 @@
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
-			{#each data.items as transaction (transaction.id)}
+			{#each page.value?.items ?? [] as transaction (transaction.id)}
 				<Table.Row
 					class="cursor-pointer"
 					title="Open the transaction in a new tab"
@@ -47,14 +52,14 @@
 					</Table.Cell>
 				</Table.Row>
 			{:else}
-				<Table.Row>
-					<Table.Cell colspan={3} class="text-muted-foreground">No transactions</Table.Cell>
-				</Table.Row>
+				{#if page.value}
+					<Table.Row>
+						<Table.Cell colspan={3} class="text-muted-foreground">No transactions</Table.Cell>
+					</Table.Row>
+				{/if}
 			{/each}
 		</Table.Body>
 	</Table.Root>
+</div>
 
-	<Pagination bind:offset {limit} total={data.total} />
-{:catch error}
-	<p class="text-sm text-destructive">{String(error)}</p>
-{/await}
+<Pagination bind:offset {limit} total={page.value?.total ?? 0} />

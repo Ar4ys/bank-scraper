@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { loadAccounts, loadRawTransactions, type Account } from "$lib/api";
 	import AccountSelect from "$lib/components/AccountSelect.svelte";
+	import LoadingBar from "$lib/components/LoadingBar.svelte";
 	import Pagination from "$lib/components/Pagination.svelte";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import * as Table from "$lib/components/ui/table";
 	import { formatInstant } from "$lib/format";
+	import { latest } from "$lib/latest.svelte";
 	import { queryCount, queryOption, queryText } from "$lib/queryState";
 	import { navigate } from "$lib/router";
 
@@ -16,7 +18,7 @@
 	const status = queryOption("status", ["", ...statuses], "");
 	const offset = queryCount("offset");
 
-	const page = $derived(
+	const page = latest(() =>
 		loadRawTransactions({
 			limit,
 			offset: offset.value,
@@ -58,9 +60,12 @@
 	</select>
 </div>
 
-{#await page}
-	<p class="text-sm text-muted-foreground">Loading…</p>
-{:then data}
+{#if page.error}
+	<p class="text-sm text-destructive">{page.error}</p>
+{/if}
+
+<div>
+	<LoadingBar loading={page.loading} />
 	<Table.Root>
 		<Table.Header>
 			<Table.Row>
@@ -74,7 +79,7 @@
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
-			{#each data.items as raw (raw.id)}
+			{#each page.value?.items ?? [] as raw (raw.id)}
 				<Table.Row
 					class="cursor-pointer"
 					onclick={() =>
@@ -105,11 +110,15 @@
 					<Table.Cell class="max-w-48 truncate text-muted-foreground">{accountName(raw.accountId)}</Table.Cell>
 					<Table.Cell class="whitespace-nowrap text-muted-foreground">{formatInstant(raw.createdAt)}</Table.Cell>
 				</Table.Row>
+			{:else}
+				{#if page.value}
+					<Table.Row>
+						<Table.Cell colspan={7} class="text-muted-foreground">No raw transactions</Table.Cell>
+					</Table.Row>
+				{/if}
 			{/each}
 		</Table.Body>
 	</Table.Root>
+</div>
 
-	<Pagination bind:offset={offset.value} {limit} total={data.total} />
-{:catch error}
-	<p class="text-sm text-destructive">{String(error)}</p>
-{/await}
+<Pagination bind:offset={offset.value} {limit} total={page.value?.total ?? 0} />

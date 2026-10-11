@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { loadAccounts, loadTransactions, type Account } from "$lib/api";
 	import AccountSelect from "$lib/components/AccountSelect.svelte";
+	import LoadingBar from "$lib/components/LoadingBar.svelte";
 	import Pagination from "$lib/components/Pagination.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import { Input } from "$lib/components/ui/input";
@@ -8,6 +9,7 @@
 	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
 	import { amountClass } from "$lib/format";
+	import { latest } from "$lib/latest.svelte";
 	import { queryCount, queryFlag, queryText } from "$lib/queryState";
 	import { navigate } from "$lib/router";
 
@@ -20,7 +22,7 @@
 	const merchantId = queryText("merchantId");
 	const offset = queryCount("offset");
 
-	const page = $derived(
+	const page = latest(() =>
 		loadTransactions({
 			limit,
 			offset: offset.value,
@@ -68,9 +70,12 @@
 	{/if}
 </div>
 
-{#await page}
-	<p class="text-sm text-muted-foreground">Loading…</p>
-{:then data}
+{#if page.error}
+	<p class="text-sm text-destructive">{page.error}</p>
+{/if}
+
+<div>
+	<LoadingBar loading={page.loading} />
 	<Table.Root>
 		<Table.Header>
 			<Table.Row>
@@ -82,7 +87,7 @@
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
-			{#each data.items as transaction (transaction.id)}
+			{#each page.value?.items ?? [] as transaction (transaction.id)}
 				<Table.Row
 					class="cursor-pointer"
 					onclick={() => navigate("/transactions/:id", { params: { id: transaction.id } })}
@@ -106,11 +111,15 @@
 						{transaction.currency}
 					</Table.Cell>
 				</Table.Row>
+			{:else}
+				{#if page.value}
+					<Table.Row>
+						<Table.Cell colspan={5} class="text-muted-foreground">No transactions</Table.Cell>
+					</Table.Row>
+				{/if}
 			{/each}
 		</Table.Body>
 	</Table.Root>
+</div>
 
-	<Pagination bind:offset={offset.value} {limit} total={data.total} />
-{:catch error}
-	<p class="text-sm text-destructive">{String(error)}</p>
-{/await}
+<Pagination bind:offset={offset.value} {limit} total={page.value?.total ?? 0} />
