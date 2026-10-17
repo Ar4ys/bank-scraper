@@ -200,3 +200,50 @@ describe("POST /api/accounts/balances", () => {
 		);
 	});
 });
+
+const tx = (bankId: string, orderDate: string, isHold = false) => ({
+	bankId,
+	data: { is_hold: isHold, details: { order_date: orderDate } },
+});
+
+describe("GET /api/accounts/:sourceAccount/last-transaction-date", () => {
+	beforeEach(async () => {
+		await db.delete(rawTransactions);
+		await db.delete(accounts);
+	});
+
+	const get = (
+		account: string,
+		headers: Record<string, string> = { "x-api-key": testIngestApiKey },
+	) =>
+		app.request(`/api/accounts/${encodeURIComponent(account)}/last-transaction-date`, { headers });
+
+	it("rejects a request without the ingest key", async () => {
+		assert.equal((await get(sourceAccount, {})).status, 401);
+	});
+
+	it("answers null for an unknown account and one without transactions", async () => {
+		await ingestRawTransactions({ sourceAccount: "empty", transactions: [] });
+
+		for (const account of ["unknown", "empty"]) {
+			const response = await get(account);
+			assert.equal(response.status, 200);
+			assert.deepEqual(await response.json(), { orderDate: null });
+		}
+	});
+
+	it("answers the newest order date of the account, leaving out holds and other accounts", async () => {
+		await ingestRawTransactions({
+			sourceAccount,
+			transactions: [
+				tx("1", "2026-09-01"),
+				tx("2", "2026-10-02"),
+				tx("3", "2026-09-15"),
+				tx("hold", "2026-10-10", true),
+			],
+		});
+		await ingestRawTransactions({ sourceAccount: "other", transactions: [tx("4", "2026-10-12")] });
+
+		assert.deepEqual(await (await get(sourceAccount)).json(), { orderDate: "2026-10-02" });
+	});
+});

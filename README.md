@@ -139,10 +139,30 @@ With the server running, open the transaction history in iPKO: every page of tra
 site loads is sent to the server together with its account, and the result is logged to the browser
 console. Whenever the site loads the list of accounts, their names and balances are sent too.
 
+### Sync
+
+On the transaction history the userscript shows a floating "Sync" button. It asks the server for the
+newest `order_date` stored for the account the history shows, sets iPKO's date filter from 30 days
+before that until today, and then presses "Load More" until the button is gone or the table does not
+change within 10 seconds. The overlap catches transactions that iPKO lists late. For an account
+without stored transactions it asks for the start date.
+
+It pauses before every step like a person would (mostly 0.6-2.5 s, sometimes 3-8 s), scrolls in
+wheel-sized steps, clicks with the full sequence of pointer and mouse events, and waits while the tab
+is hidden. The events are still untrusted (`isTrusted: false`), as every event a script dispatches is.
+
+A sync stops with an error when a page could not be stored on the server, when the history switches
+to another account or when the page leaves the history. Pressing "Stop" ends it after the current
+step.
+
 ## API
 
 `POST /api/transactions/raw` stores `{ sourceAccount, transactions: [{ bankId, data }] }` and returns
 the rows that were new. It needs the ingest key in the `x-api-key` header.
+
+`GET /api/accounts/:sourceAccount/last-transaction-date` answers `{ orderDate }`: the newest
+`order_date` among the stored transactions of the account, holds left out, or `null`. It takes the
+same key; the userscript's sync starts from it.
 
 `POST /api/accounts/balances` stores `{ accounts: [{ sourceAccount, name, currency, balance, ledger }] }`
 with the same key. `balance` and `ledger` are the bank's two amounts: the money on the account, and

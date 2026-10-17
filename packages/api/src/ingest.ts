@@ -1,5 +1,5 @@
 import { type accountBalancesBodySchema, type IngestBody } from "@bank-scraper/shared";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { type z } from "zod";
 
 import { db, tables } from "./db/db.ts";
@@ -90,4 +90,26 @@ export async function ingestAccountBalances({ accounts }: AccountBalances) {
 	}
 
 	return { updated: accounts.length };
+}
+
+/**
+ * The newest `order_date` among the stored transactions of an account, or `null` while none is
+ * stored. It is the date iPKO's history filter applies to. Holds are left out.
+ */
+export async function getLastOrderDate(sourceAccount: string): Promise<string | null> {
+	const { accounts, rawTransactions } = tables;
+	const field = (path: string) => sql`json_extract(cast(${rawTransactions.data} as text), ${path})`;
+
+	const [row] = await db
+		.select({ orderDate: sql<string | null>`max(${field("$.details.order_date")})` })
+		.from(rawTransactions)
+		.innerJoin(accounts, eq(accounts.id, rawTransactions.accountId))
+		.where(
+			and(
+				eq(accounts.sourceAccount, sourceAccount),
+				sql`coalesce(${field("$.is_hold")}, false) = false`,
+			),
+		);
+
+	return row?.orderDate ?? null;
 }

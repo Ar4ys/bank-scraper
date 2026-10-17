@@ -2,7 +2,9 @@ import "./global";
 import { type AccountBalancesBody, type IngestBody } from "@bank-scraper/shared";
 import { z } from "zod/mini";
 
-import { asyncSpyOn, defer } from "./utils";
+import { requestServer } from "./server";
+import { mountSyncPanel, trackOperationsPage } from "./sync";
+import { asyncSpyOn } from "./utils";
 
 const OPERATIONS_URL = "/ipko3/accounts/operations/completed/full";
 // The page calls this route for many things; the one we want answers with the accounts themselves
@@ -40,6 +42,9 @@ const fullCompletedOperationsSchema = z.pipe(
 	})),
 );
 
+// Only to show how far back a sync got, so a transaction without it is not an error
+const orderDateSchema = z.object({ details: z.object({ order_date: z.string() }) });
+
 const operationsResBodySchema = z.object({
 	httpStatus: z.literal(200),
 	response: z.object({ data: fullCompletedOperationsSchema }),
@@ -64,53 +69,6 @@ const accountsResBodySchema = z.object({
 	}),
 });
 
-// Firemonkey drops a `@var` that has no default, so the key needs a placeholder to be declared at all
-const unsetIngestApiKey = "changeme";
-
-/** Sends scraped data to the server. Returns its answer, or `undefined` after logging what failed. */
-async function postToServer(path: string, body: unknown): Promise<unknown> {
-	if (ingestApiKey === unsetIngestApiKey) {
-		console.error(
-			'Ingest key is not set: fill in "Ingest API key" in the User Variables of the userscript',
-		);
-		return undefined;
-	}
-
-	const response = await GM.fetch(new URL(path, serverUrl), {
-		method: "POST",
-		body: JSON.stringify(body),
-		headers: {
-			"Content-Type": "application/json",
-			"x-api-key": ingestApiKey,
-		},
-	});
-
-	if (!response.ok) {
-		console.error(`Request to ${path} failed (see below for more info)`);
-		console.groupCollapsed("Request Info");
-		using _ = defer(() => console.groupEnd());
-
-		console.log("Request Body", body);
-		console.log("Response", response);
-
-		const responseData = await response
-			.json()
-			.then((value) => value ?? response.text())
-			.catch(() => "<failed to read response body>");
-
-		console.log("Response Body", responseData);
-		return undefined;
-	}
-
-	try {
-		const resBody: unknown = await response.json();
-		return resBody;
-	} catch (e) {
-		console.error(`Could not parse the response of ${path} as json`, e);
-		return undefined;
-	}
-}
-
 async function processOperations(body: unknown) {
 	const { data, error } = operationsResBodySchema.safeParse(body);
 
@@ -119,25 +77,40 @@ async function processOperations(body: unknown) {
 		return;
 	}
 
+	const { items, ref_operations_download_preferences: preferences } = data.response.data;
+
 	const ingestBody = {
-		sourceAccount: data.response.data.ref_operations_download_preferences.data.source_account,
-		transactions: data.response.data.items.map((transaction) => ({
+		sourceAccount: preferences.data.source_account,
+		transactions: items.map((transaction) => ({
 			bankId: transaction.operation_id,
 			// oxlint-disable-next-line typescript/no-unsafe-type-assertion
 			data: transaction as IngestBody["transactions"][number]["data"],
 		})),
 	} satisfies IngestBody;
 
+	const stored = storeTransactions(ingestBody);
+
+	const orderDates = items.flatMap(
+		(t) => orderDateSchema.safeParse(t).data?.details.order_date ?? [],
+	);
+	trackOperationsPage(ingestBody.sourceAccount, orderDates.toSorted()[0], stored);
+
+	await stored;
+}
+
+/** Resolves to whether the server stored the transactions */
+async function storeTransactions(ingestBody: IngestBody) {
 	const created = z
 		.array(z.unknown())
-		.safeParse(await postToServer("/api/transactions/raw", ingestBody));
-	if (!created.success) return;
+		.safeParse(await requestServer("/api/transactions/raw", ingestBody));
+	if (!created.success) return false;
 
 	if (created.data.length) {
 		console.log(`Created new transactions: ${created.data.length}`);
 	} else {
 		console.log("No new transactions created");
 	}
+	return true;
 }
 
 async function processAccounts(body: unknown) {
@@ -158,7 +131,7 @@ async function processAccounts(body: unknown) {
 
 	if (!balancesBody.accounts.length) return;
 
-	if ((await postToServer("/api/accounts/balances", balancesBody)) !== undefined) {
+	if ((await requestServer("/api/accounts/balances", balancesBody)) !== undefined) {
 		console.log(`Sent balances of accounts: ${balancesBody.accounts.length}`);
 	}
 }
@@ -190,3 +163,5 @@ asyncSpyOn(unsafeWindow, "fetch", async ([url, options], response) => {
 		console.error("Unable to process response:", e);
 	}
 });
+
+mountSyncPanel();

@@ -9,7 +9,7 @@ import { prettyJSON } from "hono/pretty-json";
 import { adminApi } from "./admin.ts";
 import { apiKeyAuth } from "./auth.ts";
 import { config } from "./config.ts";
-import { ingestAccountBalances, ingestRawTransactions } from "./ingest.ts";
+import { getLastOrderDate, ingestAccountBalances, ingestRawTransactions } from "./ingest.ts";
 import { lunchflowApi } from "./lunchflow.ts";
 import { zValidatorHook } from "./utils.ts";
 
@@ -35,6 +35,13 @@ app.post(
 	apiKeyAuth(config.INGEST_API_KEY),
 	zValidator("json", accountBalancesBodySchema, zValidatorHook),
 	async (c) => c.json(await ingestAccountBalances(c.req.valid("json"))),
+);
+
+/** GET /api/accounts/:sourceAccount/last-transaction-date */
+app.get(
+	"/api/accounts/:sourceAccount/last-transaction-date",
+	apiKeyAuth(config.INGEST_API_KEY),
+	async (c) => c.json({ orderDate: await getLastOrderDate(c.req.param("sourceAccount")) }),
 );
 
 app.route("/api/lunchflow", lunchflowApi);
