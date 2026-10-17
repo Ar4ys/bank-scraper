@@ -73,7 +73,8 @@ A pnpm workspace, `@bank-scraper/*`:
   transaction schemas, the template renderer, the JSON diff.
 - `packages/admin` Svelte 5 app with Tailwind 4, shadcn-svelte (`src/lib/components/ui/`) and
   sv-router. It imports the types of the admin API from `@bank-scraper/api/admin`.
-- `packages/userscript` the Firemonkey userscript, bundled with tsdown.
+- `packages/userscript` the Firemonkey userscript, bundled with tsdown. Its code and metadata block
+  (`meta.txt`) are in `src/`, the version bump of its build in `tools/`.
 
 ## Conventions
 

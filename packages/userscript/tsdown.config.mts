@@ -2,21 +2,21 @@ import fs from "node:fs/promises";
 
 import { defineConfig } from "tsdown";
 
-import { buildVersion, versionPlaceholder } from "./buildVersion.mts";
+import { buildVersion, versionPlaceholder } from "./tools/buildVersion.mts";
 
 const outFile = "dist/userscript.js";
 
 export default defineConfig({
 	clean: true,
 	entry: {
-		userscript: "userscript.ts",
+		userscript: "src/userscript.ts",
 	},
 	format: "esm",
 	outputOptions: {},
 	dts: false,
 	target: false,
 	platform: "browser",
-	banner: await fs.readFile("./meta.txt", "utf8"),
+	banner: await fs.readFile("./src/meta.txt", "utf8"),
 	hooks: {
 		/** Sets `@version`, bumping it in `package.json` when the bundle changed */
 		async "build:done"() {
@@ -37,7 +37,7 @@ export default defineConfig({
 			}
 
 			if (!code.includes(versionPlaceholder))
-				throw new Error("meta.txt has no @version placeholder");
+				throw new Error("src/meta.txt has no @version placeholder");
 			await fs.writeFile(outFile, code.replace(versionPlaceholder, version));
 		},
 	},

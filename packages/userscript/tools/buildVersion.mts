@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-/** `@version` of `meta.txt`, which the build replaces with the version it computes */
+/** `@version` of `src/meta.txt`, which the build replaces with the version it computes */
 export const versionPlaceholder = "{{version}}";
 
 type VersionedPackage = { version: string; versionHash?: string };
