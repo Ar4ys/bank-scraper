@@ -35,30 +35,31 @@ The server applies pending migrations when it starts.
 
 ## Tasks
 
-| Task                        | What it does                                                    |
-| --------------------------- | --------------------------------------------------------------- |
-| `mise run start-server`     | Starts the API on `127.0.0.1:8585`                              |
-| `mise run watch-server`     | Same, restarting on file changes                                |
-| `mise run test`             | Runs the tests, each test file against its own temp SQLite file |
-| `mise run typecheck`        | Typechecks all packages                                         |
-| `mise run db-generate`      | Generates a migration from `packages/api/src/db/schema.ts`      |
-| `mise run db-migrate`       | Applies migrations without starting the server                  |
-| `mise run db-push`          | `db-generate` followed by `db-migrate`                          |
-| `mise run build-userscript` | Bundles the userscript into `packages/userscript/dist/`         |
-| `mise run dev-admin`        | Starts the admin app with hot reload                            |
-| `mise run build-admin`      | Builds the admin app into `packages/admin/dist`                 |
+| Task                        | What it does                                                       |
+| --------------------------- | ------------------------------------------------------------------ |
+| `mise run start-server`     | Starts the API on `127.0.0.1:8585`                                 |
+| `mise run watch-server`     | Same, restarting on file changes                                   |
+| `mise run test`             | Runs the tests, each test file against its own temp SQLite file    |
+| `mise run typecheck`        | Typechecks all packages                                            |
+| `mise run db-generate`      | Generates a migration from `packages/api/src/db/schema.ts`         |
+| `mise run db-migrate`       | Applies migrations without starting the server                     |
+| `mise run db-push`          | `db-generate` followed by `db-migrate`                             |
+| `mise run build-userscript` | Bundles the userscript into `packages/userscript/dist/`, see below |
+| `mise run dev-admin`        | Starts the admin app with hot reload                               |
+| `mise run build-admin`      | Builds the admin app into `packages/admin/dist`                    |
 
 ## Configuration
 
-| Env var             | Default          | Meaning                                                                  |
-| ------------------- | ---------------- | ------------------------------------------------------------------------ |
-| `HTTP_HOST`         | `127.0.0.1`      | Address the HTTP server listens on                                       |
-| `HTTP_PORT`         | `8585`           | Port the HTTP server listens on                                          |
-| `SQLITE_DB_PATH`    | `./local/dev.db` | Path of the SQLite database file, relative to `packages/api`             |
-| `INGEST_API_KEY`    | required         | Key the userscript has to send to store scraped transactions             |
-| `LUNCHFLOW_API_KEY` | required         | Key Sure has to send to the Lunch Flow API                               |
-| `ADMIN_APP_DIR`     | `../admin/dist`  | Directory of the built admin app, relative to `packages/api`             |
-| `APP_GIT_COMMIT`    | `unknown`        | Git commit of the running build, recorded with every transaction version |
+| Env var             | Default                            | Meaning                                                                  |
+| ------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| `HTTP_HOST`         | `127.0.0.1`                        | Address the HTTP server listens on                                       |
+| `HTTP_PORT`         | `8585`                             | Port the HTTP server listens on                                          |
+| `SQLITE_DB_PATH`    | `./local/dev.db`                   | Path of the SQLite database file, relative to `packages/api`             |
+| `INGEST_API_KEY`    | required                           | Key the userscript has to send to store scraped transactions             |
+| `LUNCHFLOW_API_KEY` | required                           | Key Sure has to send to the Lunch Flow API                               |
+| `ADMIN_APP_DIR`     | `../admin/dist`                    | Directory of the built admin app, relative to `packages/api`             |
+| `APP_GIT_COMMIT`    | `unknown`                          | Git commit of the running build, recorded with every transaction version |
+| `USERSCRIPT_PATH`   | `../userscript/dist/userscript.js` | Built userscript to serve, relative to `packages/api`                    |
 
 ## Deployment
 
@@ -66,7 +67,12 @@ The server applies pending migrations when it starts.
 database in the `/data` volume. `compose.example.yaml` is a service to put next to Sure.
 
 The admin app and `/api/admin` have no auth of their own. Put the service behind a reverse proxy
-that protects everything except `/api/lunchflow` and `/api/transactions/raw`, which check their keys.
+that protects everything except the routes that check a key or token of their own: `/api/lunchflow`,
+`/api/transactions/raw`, `/api/accounts/` and `/api/userscript/`. The proxy should set
+`X-Forwarded-Proto` and `X-Forwarded-Host`, which give the userscript its server URL.
+
+The image build fails when the userscript changed but its version was not bumped, see "Versions"
+under "Userscript".
 
 ### Sure
 
@@ -129,11 +135,30 @@ It needs a browser that has `Temporal`.
 
 ## Userscript
 
-Build it with `mise run build-userscript` and install `packages/userscript/dist/userscript.js` in a userscript manager
-that provides `GM.fetch`, `exportFunction` and `@var` user variables (it is written against
-Firemonkey). In the options of Firemonkey, open the script and fill in its User Variables: "Ingest
-API key" with the `INGEST_API_KEY` of the server and, unless the server runs on
-`http://localhost:8585`, "Server URL".
+It runs in [FireMonkey](https://erosman.github.io/firemonkey/) (it needs `GM.fetch`,
+`exportFunction`, `GM.info` and `@var` user variables). The server serves it:
+
+1. Press "Install userscript" in the admin app and confirm in the tab FireMonkey opens. The served
+   script has this server's URL (as the browser reached it) and its `INGEST_API_KEY` as the defaults
+   of its User Variables "Server URL" and "Ingest API key", which can be changed in FireMonkey.
+2. FireMonkey keeps the install URL as the update URL and turns on Auto-Update for the script. It
+   checks only if "Auto-Update Interval" in its options is set to a number of days, and only while
+   Firefox is idle.
+3. When the installed version differs from the one the server serves, the panel in iPKO says so
+   instead of offering a sync, and how to press Update in FireMonkey.
+
+FireMonkey takes the defaults of User Variables only on the first install; updates keep the values
+it stored. The install URL contains a token derived from `INGEST_API_KEY`, because FireMonkey
+fetches updates without any key. After the key changed, remove the script in FireMonkey and install
+it again from the admin app: reinstalling over it would keep the old update URL and key.
+
+### Versions
+
+`mise run build-userscript` hashes the bundle and compares it with `versionHash` in
+`packages/userscript/package.json`. When they differ it increments the last number of `version`,
+records the new hash and writes the version into `@version`. Commit `package.json` together with the
+change. A build whose bundle did not change (a comment, a type) keeps the version. The Docker build
+runs the same check with `CHECK_USERSCRIPT_VERSION=1`, which fails instead of bumping.
 
 With the server running, open the transaction history in iPKO: every page of transactions that the
 site loads is sent to the server together with its account, and the result is logged to the browser
@@ -167,6 +192,11 @@ same key; the userscript's sync starts from it.
 `POST /api/accounts/balances` stores `{ accounts: [{ sourceAccount, name, currency, balance, ledger }] }`
 with the same key. `balance` and `ledger` are the bank's two amounts: the money on the account, and
 that amount with holds deducted. The name is used only while the account was not renamed.
+
+`GET /api/userscript/version` answers `{ version }` of the userscript the server serves, without a
+key. `GET /api/userscript/:token/bank-scraper.user.js` serves the script itself with this server's
+URL and key filled in, for any other token it answers 404. The admin app gets the install path from
+`GET /api/admin/userscript`.
 
 `/api/admin` is the JSON API of the admin app. It has no auth of its own, so the reverse proxy in
 front of the service has to protect it together with the admin app.

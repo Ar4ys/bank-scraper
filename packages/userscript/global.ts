@@ -159,5 +159,15 @@ declare global {
 	// oxlint-disable-next-line typescript/no-extraneous-class
 	export class GM {
 		static fetch(this: GM, input: string | URL, init?: GM.RequestInit): Promise<GM.Response>;
+
+		/** Available without `@grant`. Only the fields this script reads are declared. */
+		static readonly info: {
+			script: {
+				/** `@name` of the script */
+				name: string;
+				/** `@version` of the installed script */
+				version: string;
+			};
+		};
 	}
 }

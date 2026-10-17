@@ -26,6 +26,9 @@ export async function unwrap<R extends ClientResponse<unknown>>(request: Promise
 export type Dashboard = Awaited<ReturnType<typeof loadDashboard>>;
 export const loadDashboard = () => unwrap(api.dashboard.$get());
 
+export type Userscript = Awaited<ReturnType<typeof loadUserscript>>;
+export const loadUserscript = () => unwrap(api.userscript.$get());
+
 export type Account = Awaited<ReturnType<typeof loadAccounts>>[number];
 export const loadAccounts = () => unwrap(api.accounts.$get());
 

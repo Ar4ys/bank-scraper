@@ -17,6 +17,7 @@ import {
 import { parseForRules } from "./processing/derive.ts";
 import { listBankTransactionKeys, processBankTransactions } from "./processing/process.ts";
 import { defaultFieldSource } from "./processing/rules.ts";
+import { readUserscript, userscriptInstallPath, userscriptVersion } from "./userscript.ts";
 import { escapeLikePattern } from "./utils.ts";
 
 const { accounts, rawTransactions, ruleRevisions, transactions, transactionVersions } = tables;
@@ -112,6 +113,20 @@ export const adminApi = new Hono()
 				),
 				transactions: totals?.transactions ?? 0,
 				transactionsWithoutMerchant: totals?.withoutMerchant ?? 0,
+			},
+			200,
+		);
+	})
+
+	/** GET /api/admin/userscript */
+	.get("/userscript", async (c) => {
+		const script = await readUserscript();
+
+		return c.json(
+			{
+				installPath: userscriptInstallPath(),
+				/** `null` while the userscript is not built */
+				version: script === undefined ? null : userscriptVersion(script),
 			},
 			200,
 		);

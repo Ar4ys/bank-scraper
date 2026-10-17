@@ -1,7 +1,8 @@
 # Example service to put next to Sure. Copy it into your compose file and set the two keys.
 #
 # The admin app and /api/admin have no auth of their own: publish the port only to a reverse proxy
-# that protects everything except /api/lunchflow and /api/transactions/raw, which have their keys.
+# that protects everything except /api/lunchflow, /api/transactions/raw, /api/accounts/ and
+# /api/userscript/, which check keys or tokens of their own.
 
 services:
   bank-scraper:

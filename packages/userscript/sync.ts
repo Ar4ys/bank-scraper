@@ -25,6 +25,7 @@ const tableUpdateTimeoutMs = 10_000;
 const elementTimeoutMs = 5000;
 
 const lastOrderDateSchema = z.object({ orderDate: z.nullable(z.string()) });
+const versionSchema = z.object({ version: z.nullable(z.string()) });
 
 /** A date as `YYYY-MM-DD` */
 type IsoDate = string;
@@ -287,6 +288,33 @@ async function fetchLastOrderDate(sourceAccount: string) {
 	return parsed.data.orderDate;
 }
 
+/**
+ * Why this copy of the userscript must not sync: a message when its version differs from the one
+ * the server serves, `undefined` when they are the same. Throws when the server does not answer.
+ */
+async function versionProblem(): Promise<string | undefined> {
+	const parsed = versionSchema.safeParse(
+		await requestServer("/api/userscript/version", { withKey: false }),
+	);
+	if (!parsed.success)
+		throw new Error("Could not check the version of the userscript, see the console");
+
+	const installed = GM.info.script.version;
+	const served = parsed.data.version ?? "unknown";
+	if (installed === served) return undefined;
+
+	// FireMonkey compares versions the same way and updates only to a higher one
+	if (installed.localeCompare(served, undefined, { numeric: true }) > 0) {
+		return `This userscript is version ${installed}, newer than the ${served} the server has. Deploy the server, then reload this page.`;
+	}
+
+	return (
+		`This userscript is version ${installed}, the server has ${served}. To update it, open the ` +
+		`options of FireMonkey, pick "${GM.info.script.name}" under Scripts and press Update (the ` +
+		"download arrow). Then reload this page."
+	);
+}
+
 function createElement<K extends keyof HTMLElementTagNameMap>(
 	tag: K,
 	style: Partial<CSSStyleDeclaration> = {},
@@ -349,15 +377,37 @@ export function mountSyncPanel() {
 	function idle(message: string) {
 		currentSync = undefined;
 		dateRow.style.display = "none";
+		button.style.display = "";
 		button.textContent = "Sync";
 		button.disabled = false;
 		onButton = startSync;
 		showStatus(message);
 	}
 
+	/** Replaces the Sync button with what to do when this copy of the script is outdated */
+	async function checkVersion(): Promise<boolean> {
+		let problem: string | undefined;
+		try {
+			problem = await versionProblem();
+		} catch (error) {
+			idle(error instanceof Error ? error.message : String(error));
+			return false;
+		}
+
+		if (!problem) return true;
+
+		idle(problem);
+		button.style.display = "none";
+		return false;
+	}
+
 	async function startSync() {
 		const sourceAccount = lastSourceAccount;
 		if (!sourceAccount) return idle("Wait for the history to load, then try again");
+
+		button.disabled = true;
+		showStatus("Checking the version of the userscript…");
+		if (!(await checkVersion())) return;
 
 		button.disabled = true;
 		showStatus("Asking the server for the last transaction…");
@@ -418,7 +468,10 @@ export function mountSyncPanel() {
 
 	setInterval(() => {
 		const onHistory = document.querySelector(selectors.historyPage) !== null;
-		if (onHistory && !panel.isConnected) document.body.append(panel);
+		if (onHistory && !panel.isConnected) {
+			document.body.append(panel);
+			void checkVersion();
+		}
 		// A running sync notices on its own that the history is gone and reports it in the panel
 		if (!onHistory && panel.isConnected && !currentSync) panel.remove();
 	}, 1000);

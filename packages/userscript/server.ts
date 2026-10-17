@@ -4,29 +4,34 @@ import { defer } from "./utils";
 // Firemonkey drops a `@var` that has no default, so the key needs a placeholder to be declared at all
 const unsetIngestApiKey = "changeme";
 
-/**
- * Calls the server with the ingest key: a POST of `body` as JSON when it is given, a GET otherwise.
- * Returns its answer, or `undefined` after logging what failed.
- */
-export async function requestServer(path: string, body?: unknown): Promise<unknown> {
-	if (ingestApiKey === unsetIngestApiKey) {
+type RequestOptions = {
+	/** Sent as JSON in a POST; without it the request is a GET */
+	body?: unknown;
+	/** Whether the route needs the ingest key */
+	withKey?: boolean;
+};
+
+/** Calls the server. Returns its answer, or `undefined` after logging what failed. */
+export async function requestServer(
+	path: string,
+	{ body, withKey = true }: RequestOptions = {},
+): Promise<unknown> {
+	if (withKey && ingestApiKey === unsetIngestApiKey) {
 		console.error(
 			'Ingest key is not set: fill in "Ingest API key" in the User Variables of the userscript',
 		);
 		return undefined;
 	}
 
+	const headers: Record<string, string> = withKey ? { "x-api-key": ingestApiKey } : {};
 	const response = await GM.fetch(
 		new URL(path, serverUrl),
 		body === undefined
-			? { headers: { "x-api-key": ingestApiKey } }
+			? { headers }
 			: {
 					method: "POST",
 					body: JSON.stringify(body),
-					headers: {
-						"Content-Type": "application/json",
-						"x-api-key": ingestApiKey,
-					},
+					headers: { ...headers, "Content-Type": "application/json" },
 				},
 	);
 

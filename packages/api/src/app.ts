@@ -11,6 +11,7 @@ import { apiKeyAuth } from "./auth.ts";
 import { config } from "./config.ts";
 import { getLastOrderDate, ingestAccountBalances, ingestRawTransactions } from "./ingest.ts";
 import { lunchflowApi } from "./lunchflow.ts";
+import { userscriptApi } from "./userscript.ts";
 import { zValidatorHook } from "./utils.ts";
 
 export const app = new Hono();
@@ -44,6 +45,7 @@ app.get(
 	async (c) => c.json({ orderDate: await getLastOrderDate(c.req.param("sourceAccount")) }),
 );
 
+app.route("/api/userscript", userscriptApi);
 app.route("/api/lunchflow", lunchflowApi);
 app.route("/api/admin", adminApi);
 

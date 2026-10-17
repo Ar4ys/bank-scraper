@@ -86,3 +86,5 @@ A pnpm workspace, `@bank-scraper/*`:
   drizzle-kit, which makes every table `STRICT` and, unless it has an `integer PRIMARY KEY`,
   `WITHOUT ROWID`.
 - Formatting is oxfmt's: tabs, 100 columns, sorted imports.
+- `mise run build-userscript` bumps `version` in `packages/userscript/package.json` whenever the
+  bundle changed. Commit that file with the change, or the Docker build fails.

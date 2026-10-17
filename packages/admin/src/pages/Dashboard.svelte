@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { loadAccounts, loadDashboard, loadRawTransactions } from "$lib/api";
+	import InstallUserscriptButton from "$lib/components/InstallUserscriptButton.svelte";
 	import ReprocessButton from "$lib/components/ReprocessButton.svelte";
 	import * as Card from "$lib/components/ui/card";
 	import { formatInstant } from "$lib/format";
@@ -93,6 +94,32 @@
 						<li class="py-2 text-muted-foreground">Nothing was scraped yet.</li>
 					{/each}
 				</ul>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root>
+			<Card.Header>
+				<Card.Title class="text-base">Userscript</Card.Title>
+				<Card.Description>Scrapes iPKO from the browser, in FireMonkey.</Card.Description>
+				<Card.Action>
+					<InstallUserscriptButton size="sm" />
+				</Card.Action>
+			</Card.Header>
+			<Card.Content>
+				<ol class="list-decimal space-y-1 pl-5 text-sm">
+					<li>
+						Press "Install userscript" and confirm in the tab FireMonkey opens. The URL of this server
+						and the ingest key are filled in, and can be changed under User Variables of the script.
+					</li>
+					<li>
+						For automatic updates, set "Auto-Update Interval" in the options of FireMonkey to a number
+						of days. Otherwise the panel in iPKO says when to press Update on the script.
+					</li>
+					<li>
+						After the ingest key changed, remove the script in FireMonkey and install it again from
+						here: the install link contains a token derived from the key.
+					</li>
+				</ol>
 			</Card.Content>
 		</Card.Root>
 

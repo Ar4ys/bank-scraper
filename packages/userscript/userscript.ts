@@ -102,7 +102,7 @@ async function processOperations(body: unknown) {
 async function storeTransactions(ingestBody: IngestBody) {
 	const created = z
 		.array(z.unknown())
-		.safeParse(await requestServer("/api/transactions/raw", ingestBody));
+		.safeParse(await requestServer("/api/transactions/raw", { body: ingestBody }));
 	if (!created.success) return false;
 
 	if (created.data.length) {
@@ -131,7 +131,7 @@ async function processAccounts(body: unknown) {
 
 	if (!balancesBody.accounts.length) return;
 
-	if ((await requestServer("/api/accounts/balances", balancesBody)) !== undefined) {
+	if ((await requestServer("/api/accounts/balances", { body: balancesBody })) !== undefined) {
 		console.log(`Sent balances of accounts: ${balancesBody.accounts.length}`);
 	}
 }

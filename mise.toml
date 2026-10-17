@@ -6,7 +6,7 @@ pnpm = "12"
 _.path = ['{{config_root}}/node_modules/.bin']
 
 [tasks]
-test = "node --test 'packages/*/src/**/*.test.ts'"
+test = "node --test 'packages/*/src/**/*.test.ts' 'packages/userscript/*.test.mts'"
 typecheck = "tsc -b && pnpm --filter @bank-scraper/admin run check"
 
 [tasks.build-userscript]

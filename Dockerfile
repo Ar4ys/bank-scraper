@@ -14,6 +14,8 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm --filter @bank-scraper/admin run build
+# Fails when the userscript's sources changed but its version in package.json was not bumped
+RUN CHECK_USERSCRIPT_VERSION=1 pnpm --filter @bank-scraper/userscript exec tsdown
 
 ARG APP_GIT_COMMIT=unknown
 ENV APP_GIT_COMMIT=$APP_GIT_COMMIT \

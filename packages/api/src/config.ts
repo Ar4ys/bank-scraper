@@ -13,6 +13,11 @@ const configSchema = z.object({
 	LUNCHFLOW_API_KEY: z.string().nonempty(),
 	/** Directory of the built admin app, relative to the working directory. Not served if missing. */
 	ADMIN_APP_DIR: z.string().default("../admin/dist"),
+	/**
+	 * Built userscript, served for installing and updating it, relative to the working directory. Not
+	 * served if missing.
+	 */
+	USERSCRIPT_PATH: z.string().default("../userscript/dist/userscript.js"),
 	/** Git commit of the running build, recorded with every transaction version */
 	APP_GIT_COMMIT: z.string().default("unknown"),
 });

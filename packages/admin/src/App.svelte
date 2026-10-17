@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Router } from "sv-router";
 
+	import InstallUserscriptButton from "$lib/components/InstallUserscriptButton.svelte";
 	import { isActive, p } from "$lib/router";
 
 	const links = [
@@ -25,6 +26,9 @@
 					{link.label}
 				</a>
 			{/each}
+			<span class="ml-auto">
+				<InstallUserscriptButton size="sm" />
+			</span>
 		</nav>
 	</header>
 
