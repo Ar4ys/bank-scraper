@@ -10,10 +10,7 @@ import { createTestDb } from "./testDb.ts";
 const { db, cleanup } = await createTestDb();
 after(cleanup);
 
-const [account] = await db
-	.insert(accounts)
-	.values({ sourceAccount: "1", name: "Main" })
-	.returning();
+const [account] = await db.insert(accounts).values({ number: "1", name: "Main" }).returning();
 assert.ok(account);
 const accountId = account.id;
 

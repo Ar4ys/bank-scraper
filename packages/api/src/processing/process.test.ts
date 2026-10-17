@@ -14,11 +14,11 @@ const { linkTransactionsToMerchants, listBankTransactionKeys, processBankTransac
 	await import("./process.ts");
 after(cleanup);
 
-const sourceAccount = "PL00";
+const accountNumber = "PL00";
 
 const ingest = (data: ReturnType<typeof rawCardTransaction>) =>
 	ingestRawTransactions({
-		sourceAccount,
+		accountNumber,
 		transactions: [
 			{ bankId: typeof data.operation_id === "string" ? data.operation_id : "", data },
 		],

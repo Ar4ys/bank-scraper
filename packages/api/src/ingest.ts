@@ -6,14 +6,11 @@ import { db, tables } from "./db/db.ts";
 import { processBankTransactions } from "./processing/process.ts";
 import { jsonSha256 } from "./utils.ts";
 
-async function findOrCreateAccount(sourceAccount: string) {
-	await db
-		.insert(tables.accounts)
-		.values({ sourceAccount, name: sourceAccount })
-		.onConflictDoNothing();
+async function findOrCreateAccount(number: string) {
+	await db.insert(tables.accounts).values({ number, name: number }).onConflictDoNothing();
 
-	const account = await db.query.accounts.findFirst({ where: { sourceAccount } });
-	if (!account) throw new Error(`Account "${sourceAccount}" is missing right after its insert`);
+	const account = await db.query.accounts.findFirst({ where: { number } });
+	if (!account) throw new Error(`Account "${number}" is missing right after its insert`);
 
 	return account;
 }
@@ -24,8 +21,8 @@ async function findOrCreateAccount(sourceAccount: string) {
  * stored as a new row next to the old one, which keeps a log of how the bank's data changes over
  * time.
  */
-export async function ingestRawTransactions({ sourceAccount, transactions }: IngestBody) {
-	const account = await findOrCreateAccount(sourceAccount);
+export async function ingestRawTransactions({ accountNumber, transactions }: IngestBody) {
+	const account = await findOrCreateAccount(accountNumber);
 
 	if (!transactions.length) return [];
 
@@ -63,7 +60,7 @@ export async function ingestAccountBalances({ accounts }: AccountBalances) {
 	const balanceAt = Temporal.Now.instant();
 
 	for (const scraped of accounts) {
-		const account = await findOrCreateAccount(scraped.sourceAccount);
+		const account = await findOrCreateAccount(scraped.accountNumber);
 
 		await db
 			.update(tables.accounts)
@@ -80,13 +77,11 @@ export async function ingestAccountBalances({ accounts }: AccountBalances) {
 			.set({ currency: scraped.currency })
 			.where(and(eq(tables.accounts.id, account.id), isNull(tables.accounts.currency)));
 
-		// The default name is the bank's identifier, see findOrCreateAccount
+		// The default name is the account number, see findOrCreateAccount
 		await db
 			.update(tables.accounts)
 			.set({ name: scraped.name })
-			.where(
-				and(eq(tables.accounts.id, account.id), eq(tables.accounts.name, account.sourceAccount)),
-			);
+			.where(and(eq(tables.accounts.id, account.id), eq(tables.accounts.name, account.number)));
 	}
 
 	return { updated: accounts.length };
@@ -96,7 +91,7 @@ export async function ingestAccountBalances({ accounts }: AccountBalances) {
  * The newest `order_date` among the stored transactions of an account, or `null` while none is
  * stored. It is the date iPKO's history filter applies to. Holds are left out.
  */
-export async function getLastOrderDate(sourceAccount: string): Promise<string | null> {
+export async function getLastOrderDate(accountNumber: string): Promise<string | null> {
 	const { accounts, rawTransactions } = tables;
 	const field = (path: string) => sql`json_extract(cast(${rawTransactions.data} as text), ${path})`;
 
@@ -105,10 +100,7 @@ export async function getLastOrderDate(sourceAccount: string): Promise<string | 
 		.from(rawTransactions)
 		.innerJoin(accounts, eq(accounts.id, rawTransactions.accountId))
 		.where(
-			and(
-				eq(accounts.sourceAccount, sourceAccount),
-				sql`coalesce(${field("$.is_hold")}, false) = false`,
-			),
+			and(eq(accounts.number, accountNumber), sql`coalesce(${field("$.is_hold")}, false) = false`),
 		);
 
 	return row?.orderDate ?? null;

@@ -13,18 +13,15 @@ const { app } = await import("./app.ts");
 after(cleanup);
 
 await ingestRawTransactions({
-	sourceAccount: "PL00",
+	accountNumber: "PL00",
 	transactions: [
 		{ bankId: "card-1", data: rawCardTransaction() },
 		{ bankId: "transfer-1", data: rawTransferSend() },
 	],
 });
-await ingestRawTransactions({ sourceAccount: "empty", transactions: [] });
+await ingestRawTransactions({ accountNumber: "empty", transactions: [] });
 
-const [account] = await db
-	.select()
-	.from(tables.accounts)
-	.where(eq(tables.accounts.sourceAccount, "PL00"));
+const [account] = await db.select().from(tables.accounts).where(eq(tables.accounts.number, "PL00"));
 assert.ok(account);
 
 async function get(
@@ -127,7 +124,7 @@ describe("Lunch Flow API", () => {
 			body: JSON.stringify({
 				accounts: [
 					{
-						sourceAccount: "PL00",
+						accountNumber: "PL00",
 						name: "Konto",
 						currency: "PLN",
 						balance: "1200.15",

@@ -2,9 +2,18 @@ import { z } from "zod";
 
 import { zTransactionAmount } from "./codecs.ts";
 
+/**
+ * An account number. Whitespace is removed, so that the same number formatted differently stays one
+ * account.
+ */
+export const accountNumberSchema = z
+	.string()
+	.transform((value) => value.replaceAll(/\s/g, ""))
+	.pipe(z.string().nonempty());
+
 export const ingestBodySchema = z.object({
-	/** The bank's identifier of the account the transactions belong to */
-	sourceAccount: z.string().nonempty(),
+	/** Number of the account the transactions belong to */
+	accountNumber: accountNumberSchema,
 	transactions: z.array(
 		z.object({
 			/** The bank's identifier of the transaction */
@@ -18,8 +27,7 @@ export type IngestBody = z.infer<typeof ingestBodySchema>;
 export const accountBalancesBodySchema = z.object({
 	accounts: z.array(
 		z.object({
-			/** The bank's identifier of the account */
-			sourceAccount: z.string().nonempty(),
+			accountNumber: accountNumberSchema,
 			/** What the bank calls the account: its nickname if it has one, else the product name */
 			name: z.string().nonempty(),
 			currency: z.string().nonempty(),

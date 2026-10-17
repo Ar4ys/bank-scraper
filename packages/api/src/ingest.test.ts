@@ -9,7 +9,7 @@ const { ingestRawTransactions } = await import("./ingest.ts");
 const { app } = await import("./app.ts");
 after(cleanup);
 
-const sourceAccount = "PL00 0000 0000";
+const accountNumber = "PL00000000";
 
 describe("ingestRawTransactions", () => {
 	beforeEach(async () => {
@@ -19,7 +19,7 @@ describe("ingestRawTransactions", () => {
 
 	it("inserts new transactions as unprocessed", async () => {
 		const inserted = await ingestRawTransactions({
-			sourceAccount,
+			accountNumber,
 			transactions: [
 				{ bankId: "1", data: { title: "first" } },
 				{ bankId: "2", data: { title: "second" } },
@@ -36,15 +36,15 @@ describe("ingestRawTransactions", () => {
 	});
 
 	it("creates one account per source account and names it after it", async () => {
-		await ingestRawTransactions({ sourceAccount, transactions: [{ bankId: "1", data: {} }] });
-		await ingestRawTransactions({ sourceAccount, transactions: [{ bankId: "2", data: {} }] });
-		await ingestRawTransactions({ sourceAccount: "other", transactions: [] });
+		await ingestRawTransactions({ accountNumber, transactions: [{ bankId: "1", data: {} }] });
+		await ingestRawTransactions({ accountNumber, transactions: [{ bankId: "2", data: {} }] });
+		await ingestRawTransactions({ accountNumber: "other", transactions: [] });
 
 		const stored = await db.select().from(accounts);
 		assert.deepEqual(
-			stored.map((account) => [account.sourceAccount, account.name]),
+			stored.map((account) => [account.number, account.name]),
 			[
-				[sourceAccount, sourceAccount],
+				[accountNumber, accountNumber],
 				["other", "other"],
 			],
 		);
@@ -55,12 +55,12 @@ describe("ingestRawTransactions", () => {
 
 	it("skips a transaction that is already stored with the same data", async () => {
 		await ingestRawTransactions({
-			sourceAccount,
+			accountNumber,
 			transactions: [{ bankId: "1", data: { title: "first", amount: "1.00" } }],
 		});
 
 		const inserted = await ingestRawTransactions({
-			sourceAccount,
+			accountNumber,
 			transactions: [
 				// Different key order must still count as the same data
 				{ bankId: "1", data: { amount: "1.00", title: "first" } },
@@ -77,7 +77,7 @@ describe("ingestRawTransactions", () => {
 
 	it("stores the same transaction only once when a batch repeats it", async () => {
 		const inserted = await ingestRawTransactions({
-			sourceAccount,
+			accountNumber,
 			transactions: [
 				{ bankId: "1", data: { title: "first" } },
 				{ bankId: "1", data: { title: "first" } },
@@ -89,12 +89,12 @@ describe("ingestRawTransactions", () => {
 
 	it("keeps a new row when the data of a known transaction changes", async () => {
 		await ingestRawTransactions({
-			sourceAccount,
+			accountNumber,
 			transactions: [{ bankId: "1", data: { title: "first" } }],
 		});
 
 		const inserted = await ingestRawTransactions({
-			sourceAccount,
+			accountNumber,
 			transactions: [{ bankId: "1", data: { title: "first", category: "new field" } }],
 		});
 
@@ -112,20 +112,23 @@ describe("ingestRawTransactions", () => {
 
 	it("keeps transactions with the same bank id apart when the accounts differ", async () => {
 		const transactions = [{ bankId: "1", data: { title: "first" } }];
-		await ingestRawTransactions({ sourceAccount, transactions });
+		await ingestRawTransactions({ accountNumber, transactions });
 
-		const inserted = await ingestRawTransactions({ sourceAccount: "other", transactions });
+		const inserted = await ingestRawTransactions({ accountNumber: "other", transactions });
 
 		assert.equal(inserted.length, 1);
 	});
 });
 
 describe("POST /api/transactions/raw", () => {
-	const post = (headers: Record<string, string>) =>
+	const post = (headers: Record<string, string>, number = accountNumber) =>
 		app.request("/api/transactions/raw", {
 			method: "POST",
 			headers: { "Content-Type": "application/json", ...headers },
-			body: JSON.stringify({ sourceAccount, transactions: [{ bankId: "http", data: {} }] }),
+			body: JSON.stringify({
+				accountNumber: number,
+				transactions: [{ bankId: "http", data: {} }],
+			}),
 		});
 
 	it("rejects a request without the ingest key", async () => {
@@ -144,6 +147,19 @@ describe("POST /api/transactions/raw", () => {
 			["http"],
 		);
 	});
+
+	it("stores the account number without whitespace", async () => {
+		await db.delete(rawTransactions);
+		await db.delete(accounts);
+
+		await post({ "x-api-key": testIngestApiKey }, "PL00 0000\t0000");
+
+		const stored = await db.select().from(accounts);
+		assert.deepEqual(
+			stored.map((account) => account.number),
+			["PL0000000000"],
+		);
+	});
 });
 
 describe("POST /api/accounts/balances", () => {
@@ -158,14 +174,14 @@ describe("POST /api/accounts/balances", () => {
 		});
 
 	const scraped = {
-		sourceAccount: "balances",
+		accountNumber: "balances",
 		name: "PKO KONTO",
 		currency: "PLN",
 		balance: "1200.15",
 		ledger: "1000.05",
 	};
 	const stored = async () =>
-		(await db.query.accounts.findFirst({ where: { sourceAccount: "balances" } }))!;
+		(await db.query.accounts.findFirst({ where: { number: "balances" } }))!;
 
 	it("rejects a request without the ingest key and a malformed amount", async () => {
 		assert.equal((await post([scraped], {})).status, 401);
@@ -206,7 +222,7 @@ const tx = (bankId: string, orderDate: string, isHold = false) => ({
 	data: { is_hold: isHold, details: { order_date: orderDate } },
 });
 
-describe("GET /api/accounts/:sourceAccount/last-transaction-date", () => {
+describe("GET /api/accounts/:accountNumber/last-transaction-date", () => {
 	beforeEach(async () => {
 		await db.delete(rawTransactions);
 		await db.delete(accounts);
@@ -219,11 +235,11 @@ describe("GET /api/accounts/:sourceAccount/last-transaction-date", () => {
 		app.request(`/api/accounts/${encodeURIComponent(account)}/last-transaction-date`, { headers });
 
 	it("rejects a request without the ingest key", async () => {
-		assert.equal((await get(sourceAccount, {})).status, 401);
+		assert.equal((await get(accountNumber, {})).status, 401);
 	});
 
 	it("answers null for an unknown account and one without transactions", async () => {
-		await ingestRawTransactions({ sourceAccount: "empty", transactions: [] });
+		await ingestRawTransactions({ accountNumber: "empty", transactions: [] });
 
 		for (const account of ["unknown", "empty"]) {
 			const response = await get(account);
@@ -234,7 +250,7 @@ describe("GET /api/accounts/:sourceAccount/last-transaction-date", () => {
 
 	it("answers the newest order date of the account, leaving out holds and other accounts", async () => {
 		await ingestRawTransactions({
-			sourceAccount,
+			accountNumber,
 			transactions: [
 				tx("1", "2026-09-01"),
 				tx("2", "2026-10-02"),
@@ -242,8 +258,14 @@ describe("GET /api/accounts/:sourceAccount/last-transaction-date", () => {
 				tx("hold", "2026-10-10", true),
 			],
 		});
-		await ingestRawTransactions({ sourceAccount: "other", transactions: [tx("4", "2026-10-12")] });
+		await ingestRawTransactions({ accountNumber: "other", transactions: [tx("4", "2026-10-12")] });
 
-		assert.deepEqual(await (await get(sourceAccount)).json(), { orderDate: "2026-10-02" });
+		assert.deepEqual(await (await get(accountNumber)).json(), { orderDate: "2026-10-02" });
+	});
+
+	it("finds the account by its number written with whitespace", async () => {
+		await ingestRawTransactions({ accountNumber, transactions: [tx("1", "2026-09-01")] });
+
+		assert.deepEqual(await (await get("PL00 0000 00")).json(), { orderDate: "2026-09-01" });
 	});
 });

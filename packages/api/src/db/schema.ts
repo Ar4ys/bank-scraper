@@ -52,8 +52,8 @@ export type Account = typeof accounts.$inferSelect;
 export const accounts = s.snakeCase.table("accounts", {
 	// Lunch Flow account ids are numbers, so this one is not a UUID like the others
 	id: s.integer().primaryKey(),
-	/** The bank's identifier of the account */
-	sourceAccount: s.text().notNull().unique(),
+	/** The account number, without whitespace */
+	number: s.text().notNull().unique(),
 	name: s.text().notNull(),
 	/** Unknown until the first transaction of the account is processed */
 	currency: s.text(),

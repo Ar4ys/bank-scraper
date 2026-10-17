@@ -1,10 +1,15 @@
 import fs from "node:fs";
 
-import { accountBalancesBodySchema, ingestBodySchema } from "@bank-scraper/shared";
+import {
+	accountBalancesBodySchema,
+	accountNumberSchema,
+	ingestBodySchema,
+} from "@bank-scraper/shared";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { prettyJSON } from "hono/pretty-json";
+import { z } from "zod";
 
 import { adminApi } from "./admin.ts";
 import { apiKeyAuth } from "./auth.ts";
@@ -38,11 +43,12 @@ app.post(
 	async (c) => c.json(await ingestAccountBalances(c.req.valid("json"))),
 );
 
-/** GET /api/accounts/:sourceAccount/last-transaction-date */
+/** GET /api/accounts/:accountNumber/last-transaction-date */
 app.get(
-	"/api/accounts/:sourceAccount/last-transaction-date",
+	"/api/accounts/:accountNumber/last-transaction-date",
 	apiKeyAuth(config.INGEST_API_KEY),
-	async (c) => c.json({ orderDate: await getLastOrderDate(c.req.param("sourceAccount")) }),
+	zValidator("param", z.object({ accountNumber: accountNumberSchema })),
+	async (c) => c.json({ orderDate: await getLastOrderDate(c.req.valid("param").accountNumber) }),
 );
 
 app.route("/api/userscript", userscriptApi);

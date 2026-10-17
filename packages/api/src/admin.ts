@@ -41,7 +41,7 @@ const transactionJson = (transaction: Transaction) => ({
 
 const accountJson = (account: Account) => ({
 	id: account.id,
-	sourceAccount: account.sourceAccount,
+	number: account.number,
 	name: account.name,
 	currency: account.currency,
 	balance:

@@ -59,7 +59,7 @@
 			<Table.Head class="text-right">Balance</Table.Head>
 			<Table.Head>Reported to Sure</Table.Head>
 			<Table.Head>Scraped</Table.Head>
-			<Table.Head>Bank's id</Table.Head>
+			<Table.Head>Number</Table.Head>
 		</Table.Row>
 	</Table.Header>
 	<Table.Body>
@@ -95,8 +95,8 @@
 				<Table.Cell class="whitespace-nowrap">
 					{account.balanceAt ? formatInstant(account.balanceAt) : "never"}
 				</Table.Cell>
-				<Table.Cell class="max-w-40 truncate font-mono text-xs" title={account.sourceAccount}>
-					{account.sourceAccount}
+				<Table.Cell class="max-w-40 truncate font-mono text-xs" title={account.number}>
+					{account.number}
 				</Table.Cell>
 			</Table.Row>
 		{/each}

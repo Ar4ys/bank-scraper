@@ -10,7 +10,7 @@ const { app } = await import("./app.ts");
 after(cleanup);
 
 await ingestRawTransactions({
-	sourceAccount: "PL00",
+	accountNumber: "PL00",
 	transactions: [
 		{ bankId: "card-1", data: rawCardTransaction() },
 		{ bankId: "transfer-1", data: rawTransferSend() },

@@ -9,10 +9,10 @@ const { ingestRawTransactions } = await import("./ingest.ts");
 const { app } = await import("./app.ts");
 after(cleanup);
 
-const sourceAccount = "PL00";
+const accountNumber = "PL00";
 
 await ingestRawTransactions({
-	sourceAccount,
+	accountNumber,
 	transactions: [
 		{ bankId: "card-1", data: rawCardTransaction() },
 		{ bankId: "transfer-1", data: rawTransferSend() },
@@ -21,7 +21,7 @@ await ingestRawTransactions({
 	],
 });
 await ingestRawTransactions({
-	sourceAccount,
+	accountNumber,
 	transactions: [
 		{ bankId: "card-1", data: rawCardTransaction({ details: { merchant_name: "Bolt" } }) },
 	],
@@ -54,8 +54,8 @@ describe("admin API", () => {
 		assert.deepEqual(body, [
 			{
 				id: body[0].id,
-				sourceAccount,
-				name: sourceAccount,
+				number: accountNumber,
+				name: accountNumber,
 				currency: "PLN",
 				balance: null,
 				ledger: null,

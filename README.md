@@ -7,7 +7,9 @@ Collects my PKO Bank Polski (iPKO) transactions from the web UI into a local SQL
 2. The server stores each payload as is in `raw_transactions`. A payload that is already stored
    with the same content is skipped. If the content of a known transaction changes, a new row is
    added next to the old one, so the table doubles as a log of shape changes. Accounts are created
-   from the account the bank reports for each scraped page.
+   from the account the bank reports for each scraped page, identified by the account number:
+   the id iPKO uses for an account changes between sessions, so the userscript maps it to the
+   number from the accounts the page loaded.
 3. Every new raw transaction is parsed with strict schemas (`packages/api/src/ipkoSchemas.ts`) and
    turned into a row of `transactions`, which has our own id. Each time the fields of a transaction
    change, a row of `transaction_versions` records the new fields and what caused the change: a new
@@ -186,14 +188,15 @@ step.
 
 ## API
 
-`POST /api/transactions/raw` stores `{ sourceAccount, transactions: [{ bankId, data }] }` and returns
-the rows that were new. It needs the ingest key in the `x-api-key` header.
+`POST /api/transactions/raw` stores `{ accountNumber, transactions: [{ bankId, data }] }` and returns
+the rows that were new. It needs the ingest key in the `x-api-key` header. Whitespace in account
+numbers is ignored here and in the routes below, so `PL61 1090 …` and `PL611090…` are one account.
 
-`GET /api/accounts/:sourceAccount/last-transaction-date` answers `{ orderDate }`: the newest
+`GET /api/accounts/:accountNumber/last-transaction-date` answers `{ orderDate }`: the newest
 `order_date` among the stored transactions of the account, holds left out, or `null`. It takes the
 same key; the userscript's sync starts from it.
 
-`POST /api/accounts/balances` stores `{ accounts: [{ sourceAccount, name, currency, balance, ledger }] }`
+`POST /api/accounts/balances` stores `{ accounts: [{ accountNumber, name, currency, balance, ledger }] }`
 with the same key. `balance` and `ledger` are the bank's two amounts: the money on the account, and
 that amount with holds deducted. The name is used only while the account was not renamed.
 

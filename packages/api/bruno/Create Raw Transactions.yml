@@ -13,7 +13,7 @@ http:
     type: json
     data: |-
       {
-        "sourceAccount": "{{sourceAccount}}",
+        "accountNumber": "{{accountNumber}}",
         "transactions": [{
           "bankId": "1",
           "data": {{transaction}}

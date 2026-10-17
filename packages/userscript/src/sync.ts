@@ -105,7 +105,7 @@ function waitForTableUpdate(): Promise<boolean> {
 }
 
 type Sync = {
-	sourceAccount: string;
+	accountNumber: string;
 	stopped: boolean;
 	/** Why the sync has to stop, found outside its own steps */
 	failure?: string;
@@ -115,7 +115,7 @@ type Sync = {
 	showProgress: () => void;
 };
 
-let lastSourceAccount: string | undefined;
+let lastAccountNumber: string | undefined;
 let currentSync: Sync | undefined;
 
 class SyncStopped extends Error {}
@@ -134,16 +134,16 @@ function checkpoint(sync: Sync) {
  * sync which account the history shows, how far back it got, and whether storing failed.
  */
 export function trackOperationsPage(
-	sourceAccount: string,
+	accountNumber: string,
 	oldestDate: IsoDate | undefined,
 	stored: Promise<boolean>,
 ) {
-	lastSourceAccount = sourceAccount;
+	lastAccountNumber = accountNumber;
 
 	const sync = currentSync;
 	if (!sync) return;
 
-	if (sourceAccount !== sync.sourceAccount) {
+	if (accountNumber !== sync.accountNumber) {
 		sync.failure ??= "The history switched to another account";
 	}
 	if (oldestDate && (!sync.oldestDate || oldestDate < sync.oldestDate)) {
@@ -159,6 +159,13 @@ export function trackOperationsPage(
 				sync.failure ??= "A page of transactions was not stored on the server, see the console";
 		})
 		.finally(() => sync.pendingStores.delete(stored));
+}
+
+/** Records a page of transactions of an account the page did not list, which was not stored */
+export function reportUnknownAccount() {
+	lastAccountNumber = undefined;
+	if (currentSync)
+		currentSync.failure ??= "The page did not list the account of the history, reload it";
 }
 
 const pickerQuery = (selector: string) =>
@@ -291,9 +298,9 @@ async function runSync(sync: Sync, from: IsoDate) {
 	scrollToBottom(document.querySelector(selectors.table) ?? document.body);
 }
 
-async function fetchLastOrderDate(sourceAccount: string) {
+async function fetchLastOrderDate(accountNumber: string) {
 	const answer = await requestServer(
-		`/api/accounts/${encodeURIComponent(sourceAccount)}/last-transaction-date`,
+		`/api/accounts/${encodeURIComponent(accountNumber)}/last-transaction-date`,
 	);
 	const parsed = lastOrderDateSchema.safeParse(answer);
 	if (!parsed.success) throw new Error("Could not get the last transaction date, see the console");
@@ -414,8 +421,12 @@ export function mountSyncPanel() {
 	}
 
 	async function startSync() {
-		const sourceAccount = lastSourceAccount;
-		if (!sourceAccount) return idle("Wait for the history to load, then try again");
+		const accountNumber = lastAccountNumber;
+		if (!accountNumber) {
+			return idle(
+				"The account of the history is not known yet: wait for it to load, or reload the page",
+			);
+		}
 
 		button.disabled = true;
 		showStatus("Checking the version of the userscript…");
@@ -426,12 +437,12 @@ export function mountSyncPanel() {
 
 		let lastOrderDate: string | null;
 		try {
-			lastOrderDate = await fetchLastOrderDate(sourceAccount);
+			lastOrderDate = await fetchLastOrderDate(accountNumber);
 		} catch (error) {
 			return idle(error instanceof Error ? error.message : String(error));
 		}
 
-		if (lastOrderDate) return run(sourceAccount, addDays(lastOrderDate, -overlapDays));
+		if (lastOrderDate) return run(accountNumber, addDays(lastOrderDate, -overlapDays));
 
 		showStatus("");
 		dateInput.max = today();
@@ -441,13 +452,13 @@ export function mountSyncPanel() {
 		onButton = async () => {
 			if (!dateInput.value) return showStatus("Pick a date first");
 			dateRow.style.display = "none";
-			await run(sourceAccount, dateInput.value);
+			await run(accountNumber, dateInput.value);
 		};
 	}
 
-	async function run(sourceAccount: string, from: IsoDate) {
+	async function run(accountNumber: string, from: IsoDate) {
 		const sync: Sync = {
-			sourceAccount,
+			accountNumber,
 			stopped: false,
 			pages: 0,
 			pendingStores: new Set(),

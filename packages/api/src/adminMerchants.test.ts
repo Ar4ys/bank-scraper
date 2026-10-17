@@ -15,7 +15,7 @@ const cardPayment = (bankId: string, merchantName: string) => ({
 });
 
 const ingest = (transactions: Parameters<typeof ingestRawTransactions>[0]["transactions"]) =>
-	ingestRawTransactions({ sourceAccount: "PL00", transactions });
+	ingestRawTransactions({ accountNumber: "PL00", transactions });
 
 await ingest([
 	cardPayment("mcd-1", "McDonald's"),

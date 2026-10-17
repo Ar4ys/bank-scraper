@@ -2,7 +2,7 @@ name: local
 variables:
   - name: baseUrl
     value: http://localhost:8585
-  - name: sourceAccount
+  - name: accountNumber
     value: "00 0000 0000 0000 0000 0000 0000"
   - name: accountId
     value: "1"

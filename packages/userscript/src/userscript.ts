@@ -3,7 +3,7 @@ import { type AccountBalancesBody, type IngestBody } from "@bank-scraper/shared"
 import { z } from "zod/mini";
 
 import { requestServer } from "./server";
-import { mountSyncPanel, trackOperationsPage } from "./sync";
+import { mountSyncPanel, reportUnknownAccount, trackOperationsPage } from "./sync";
 import { asyncSpyOn } from "./utils";
 
 const OPERATIONS_URL = "/ipko3/accounts/operations/completed/full";
@@ -50,7 +50,8 @@ const operationsResBodySchema = z.object({
 	response: z.object({ data: fullCompletedOperationsSchema }),
 });
 
-// Keyed by the same id that the operations response calls `source_account`
+// Keyed by the same id that the operations response calls `source_account`. iPKO changes that id
+// between sessions, so only the account number identifies an account.
 const accountsResBodySchema = z.object({
 	httpStatus: z.literal(200),
 	response: z.object({
@@ -58,6 +59,9 @@ const accountsResBodySchema = z.object({
 			accounts: z.record(
 				z.string(),
 				z.object({
+					number: z.object({
+						value: z.string(),
+					}),
 					name: z.string(),
 					nickname: z.nullable(z.string()),
 					currency: z.string(),
@@ -69,6 +73,9 @@ const accountsResBodySchema = z.object({
 	}),
 });
 
+/** Account number by the id the page uses for the account, from the accounts the page loaded */
+const accountNumbers = new Map<string, string>();
+
 async function processOperations(body: unknown) {
 	const { data, error } = operationsResBodySchema.safeParse(body);
 
@@ -79,8 +86,17 @@ async function processOperations(body: unknown) {
 
 	const { items, ref_operations_download_preferences: preferences } = data.response.data;
 
+	const accountNumber = accountNumbers.get(preferences.data.source_account);
+	if (!accountNumber) {
+		console.error(
+			`Not sent: the page did not list the account "${preferences.data.source_account}" of these transactions, reload it`,
+		);
+		reportUnknownAccount();
+		return;
+	}
+
 	const ingestBody = {
-		sourceAccount: preferences.data.source_account,
+		accountNumber,
 		transactions: items.map((transaction) => ({
 			bankId: transaction.operation_id,
 			// oxlint-disable-next-line typescript/no-unsafe-type-assertion
@@ -93,7 +109,7 @@ async function processOperations(body: unknown) {
 	const orderDates = items.flatMap(
 		(t) => orderDateSchema.safeParse(t).data?.details.order_date ?? [],
 	);
-	trackOperationsPage(ingestBody.sourceAccount, orderDates.toSorted()[0], stored);
+	trackOperationsPage(accountNumber, orderDates.toSorted()[0], stored);
 
 	await stored;
 }
@@ -119,9 +135,14 @@ async function processAccounts(body: unknown) {
 	// Any other answer of the init route is not about accounts, so it is not an error
 	if (!data) return;
 
+	const scraped = Object.entries(data.response.data.accounts);
+
+	accountNumbers.clear();
+	for (const [id, account] of scraped) accountNumbers.set(id, account.number.value);
+
 	const balancesBody = {
-		accounts: Object.entries(data.response.data.accounts).map(([sourceAccount, account]) => ({
-			sourceAccount,
+		accounts: scraped.map(([, account]) => ({
+			accountNumber: account.number.value,
 			name: account.nickname || account.name,
 			currency: account.currency,
 			balance: account.balance,
