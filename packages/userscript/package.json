@@ -1,7 +1,7 @@
 {
 	"name": "@bank-scraper/userscript",
-	"version": "1.5",
-	"versionHash": "721113707b9b5fd5",
+	"version": "1.6",
+	"versionHash": "e7324230a8cdd595",
 	"private": true,
 	"license": "ISC",
 	"type": "module",

@@ -1,3 +1,11 @@
+/**
+ * Whether the sync scrolls, waits and clicks like a person. Off, it waits a flat 0.5 s before each
+ * press and scrolls in one smooth go. Hardcoded until there is a setting for it.
+ */
+export const humanLikeInput = false;
+
+const fastPauseMs = 500;
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const uniform = (min: number, max: number) => min + Math.random() * (max - min);
@@ -7,8 +15,7 @@ function standardNormal() {
 	return Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
 }
 
-/** Resolves once the tab is visible, right away when it already is */
-export function whenVisible(): Promise<void> {
+function whenVisible(): Promise<void> {
 	if (document.visibilityState === "visible") return Promise.resolve();
 
 	return new Promise((resolve) => {
@@ -25,7 +32,7 @@ export function whenVisible(): Promise<void> {
  * Waits like a person between two actions: log-normal around 1.1 s within 0.6-2.5 s, and about one
  * wait in ten 3-8 s long, as if reading the rows. Also waits for the tab to be visible.
  */
-export async function humanPause() {
+async function humanPause() {
 	// Reaction times are skewed: mostly short, with a long tail, which a uniform delay is not
 	const ms =
 		Math.random() < 0.1
@@ -36,6 +43,12 @@ export async function humanPause() {
 	await whenVisible();
 }
 
+/** Waits before pressing something */
+export const pauseBeforePress = () => (humanLikeInput ? humanPause() : sleep(fastPauseMs));
+
+/** Waits after new rows arrived, as a person reading them would; not at all without human-like input */
+export const pauseAfterLoad = () => (humanLikeInput ? humanPause() : Promise.resolve());
+
 function scrollParent(element: Element): Element {
 	for (let parent = element.parentElement; parent; parent = parent.parentElement) {
 		const { overflowY } = getComputedStyle(parent);
@@ -45,7 +58,7 @@ function scrollParent(element: Element): Element {
 }
 
 /** Scrolls until the element is in the lower half of the view, in wheel-sized steps */
-export async function humanScrollTo(element: Element) {
+async function humanScrollTo(element: Element) {
 	const scroller = scrollParent(element);
 	const isRoot = scroller === document.scrollingElement || scroller === document.documentElement;
 	const view = isRoot
@@ -69,11 +82,23 @@ export async function humanScrollTo(element: Element) {
 	}
 }
 
+/** Brings the element into view: in wheel-sized steps, or in one smooth scroll */
+export async function scrollToElement(element: Element) {
+	if (humanLikeInput) return await humanScrollTo(element);
+	element.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+/** Smoothly scrolls whatever scrolls the element to its bottom, in one go */
+export function scrollToBottom(element: Element) {
+	const scroller = scrollParent(element);
+	scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+}
+
 /**
  * Clicks at a random point near the middle of the element, with the pointer and mouse events a real
  * click fires. They are still untrusted (`isTrusted: false`) like every event a script dispatches.
  */
-export async function humanClick(element: Element) {
+async function humanClick(element: Element) {
 	const rect = element.getBoundingClientRect();
 	const position = {
 		bubbles: true,
@@ -103,4 +128,14 @@ export async function humanClick(element: Element) {
 	element.dispatchEvent(new PointerEvent("pointerup", position));
 	element.dispatchEvent(new MouseEvent("mouseup", position));
 	element.dispatchEvent(new MouseEvent("click", position));
+}
+
+export async function click(element: Element) {
+	if (humanLikeInput) return await humanClick(element);
+
+	if (element instanceof HTMLElement) element.click();
+	else
+		element.dispatchEvent(
+			new MouseEvent("click", { bubbles: true, cancelable: true, view: window }),
+		);
 }

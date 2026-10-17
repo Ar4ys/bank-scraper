@@ -172,9 +172,13 @@ before that until today, and then presses "Load More" until the button is gone o
 change within 10 seconds. The overlap catches transactions that iPKO lists late. For an account
 without stored transactions it asks for the start date.
 
-It pauses before every step like a person would (mostly 0.6-2.5 s, sometimes 3-8 s), scrolls in
-wheel-sized steps, clicks with the full sequence of pointer and mouse events, and waits while the tab
-is hidden. The events are still untrusted (`isTrusted: false`), as every event a script dispatches is.
+By default it waits 0.5 s before every press and scrolls to the bottom of the page in one smooth
+scroll. With `humanLikeInput` in `packages/userscript/src/input.ts` set to `true`, it instead pauses
+like a person would (mostly 0.6-2.5 s, sometimes 3-8 s), scrolls in wheel-sized steps, clicks with
+the full sequence of pointer and mouse events, and waits while the tab is hidden. Either way the
+events are untrusted (`isTrusted: false`), as every event a script dispatches is.
+
+When it finished, it scrolls to the bottom of the table.
 
 A sync stops with an error when a page could not be stored on the server, when the history switches
 to another account or when the page leaves the history. Pressing "Stop" ends it after the current

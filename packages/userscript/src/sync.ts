@@ -1,7 +1,14 @@
 import "./global";
 import { z } from "zod/mini";
 
-import { humanClick, humanPause, humanScrollTo } from "./human";
+import {
+	click,
+	humanLikeInput,
+	pauseAfterLoad,
+	pauseBeforePress,
+	scrollToBottom,
+	scrollToElement,
+} from "./input";
 import { requestServer } from "./server";
 
 // iPKO's class names are generated, so these lean on structure, roles and attributes
@@ -177,9 +184,9 @@ async function pickOption(sync: Sync, kind: "year" | "month" | "day", prefix: st
 	const option = options.find(({ value }) => value.startsWith(prefix));
 	if (!option?.enabled) throw new Error(`The date picker does not offer the ${kind} ${prefix}`);
 
-	await humanPause();
+	await pauseBeforePress();
 	checkpoint(sync);
-	await humanClick(option.label);
+	await click(option.label);
 }
 
 /** Pages through the picker's years until `year` is shown, then clicks it */
@@ -204,9 +211,9 @@ async function pickYear(sync: Sync, year: string) {
 			"the arrows of the date picker",
 		);
 
-		await humanPause();
+		await pauseBeforePress();
 		checkpoint(sync);
-		await humanClick(button);
+		await click(button);
 		await waitFor(() => pickerOptions("year")[0]?.value.slice(0, 4) !== firstShown, "other years");
 	}
 
@@ -221,15 +228,15 @@ async function setFilterDate(sync: Sync, which: "from" | "to", date: IsoDate) {
 	const input = await waitFor(findInput, `the "${which}" date of the filter`);
 	if (parseInputDate(input.value) === date) return;
 
-	await humanScrollTo(input);
-	await humanPause();
+	await scrollToElement(input);
+	await pauseBeforePress();
 	checkpoint(sync);
-	await humanClick(input);
+	await click(input);
 
 	await waitFor(() => pickerQuery(selectors.pickerYearsButton), "the date picker");
-	await humanPause();
+	await pauseBeforePress();
 	checkpoint(sync);
-	await humanClick(pickerQuery(selectors.pickerYearsButton)!);
+	await click(pickerQuery(selectors.pickerYearsButton)!);
 
 	const [year, month] = date.split("-");
 	await pickYear(sync, year);
@@ -255,17 +262,19 @@ async function loadAllPages(sync: Sync) {
 		const button = document.querySelector(selectors.loadMore);
 		if (!button) return;
 
-		await humanScrollTo(button);
-		await humanPause();
+		// "Load More" is the last thing on the page
+		if (humanLikeInput) await scrollToElement(button);
+		else scrollToBottom(button);
+		await pauseBeforePress();
 		checkpoint(sync);
 
 		const tableUpdated = waitForTableUpdate();
-		await humanClick(button);
+		await click(button);
 		if (!(await tableUpdated)) return;
 
 		sync.pages++;
 		sync.showProgress();
-		await humanPause();
+		await pauseAfterLoad();
 	}
 }
 
@@ -277,6 +286,9 @@ async function runSync(sync: Sync, from: IsoDate) {
 
 	await Promise.all(sync.pendingStores);
 	checkpoint(sync);
+
+	// The end of the table shows that nothing is left to load
+	scrollToBottom(document.querySelector(selectors.table) ?? document.body);
 }
 
 async function fetchLastOrderDate(sourceAccount: string) {
