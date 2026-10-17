@@ -1,6 +1,7 @@
 {
 	"name": "@bank-scraper/userscript",
 	"version": "1.5",
+	"versionHash": "721113707b9b5fd5",
 	"private": true,
 	"license": "ISC",
 	"type": "module",
@@ -11,6 +12,5 @@
 		"@bank-scraper/shared": "workspace:*",
 		"@types/node": "26",
 		"tsdown": "^0.22.14"
-	},
-	"versionHash": "721113707b9b5fd5"
+	}
 }
