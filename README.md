@@ -102,8 +102,9 @@ transaction. This writes a consistent copy while the server runs:
 docker compose exec bank-scraper node tools/backup.ts /data/backup.db
 ```
 
-After a restore, transactions that were scraped after the backup come back by scrolling through the
-history in iPKO again; scraping the same transaction twice is harmless.
+After a restore, "Auto-Sync" in iPKO brings back the transactions scraped after the backup: the
+date it starts from is restored with the backup, so it starts early enough. Scraping the same
+transaction twice is harmless.
 
 ## Admin app
 
@@ -164,15 +165,26 @@ runs the same check with `CHECK_USERSCRIPT_VERSION=1`, which fails instead of bu
 
 With the server running, open the transaction history in iPKO: every page of transactions that the
 site loads is sent to the server together with its account, and the result is logged to the browser
-console. Whenever the site loads the list of accounts, their names and balances are sent too.
+console. That includes the first page the history loads on its own, and pages loaded by setting the
+filter and scrolling by hand. Whenever the site loads the list of accounts, their names and balances
+are sent too.
 
 ### Sync
 
-On the transaction history the userscript shows a floating "Sync" button. It asks the server for the
-newest `order_date` stored for the account the history shows, sets iPKO's date filter from 30 days
-before that until today, and then presses "Load More" until the button is gone or the table does not
-change within 10 seconds. The overlap catches transactions that iPKO lists late. For an account
-without stored transactions it asks for the start date.
+On the transaction history the userscript shows a floating panel with two buttons. Both set iPKO's
+date filter from a start date until today, and then press "Load More" until the button is gone.
+
+- "Auto-Sync" starts 30 days before the last finished sync of the account the history shows, which
+  catches transactions that iPKO lists late. Its tooltip shows that date. Before the first finished
+  sync it asks for the start date.
+- "Sync from…" asks for the start date, prefilled with the one "Auto-Sync" would use.
+
+The server records how far the syncs got (`accounts.synced_through`) when a sync finishes: the "to"
+date of the sync, but only when nothing is recorded yet or the sync started on or before the
+recorded date. A sync that started later left a gap before it, which "Auto-Sync" still has to
+cover, and the panel says so. Transactions sent outside a sync, such as the first page of the
+history, do not count, and neither does a sync that was stopped or failed, because the history
+loads newest first and such a sync leaves out older transactions.
 
 By default it waits 0.5 s before every press and scrolls to the bottom of the page in one smooth
 scroll. With `humanLikeInput` in `packages/userscript/src/input.ts` set to `true`, it instead pauses
@@ -182,9 +194,9 @@ events are untrusted (`isTrusted: false`), as every event a script dispatches is
 
 When it finished, it scrolls to the bottom of the table.
 
-A sync stops with an error when a page could not be stored on the server, when the history switches
-to another account or when the page leaves the history. Pressing "Stop" ends it after the current
-step.
+A sync stops with an error when a page could not be stored on the server, when "Load More" loads
+nothing within 10 seconds, when the history switches to another account or when the page leaves the
+history. Pressing "Stop" ends it after the current step.
 
 ## API
 
@@ -192,9 +204,10 @@ step.
 the rows that were new. It needs the ingest key in the `x-api-key` header. Whitespace in account
 numbers is ignored here and in the routes below, so `PL61 1090 …` and `PL611090…` are one account.
 
-`GET /api/accounts/:accountNumber/last-transaction-date` answers `{ orderDate }`: the newest
-`order_date` among the stored transactions of the account, holds left out, or `null`. It takes the
-same key; the userscript's sync starts from it.
+`GET /api/accounts/:accountNumber/synced-through` answers `{ syncedThrough }`: up to which date the
+finished syncs of the account loaded its history, or `null` before the first. `POST` to the same path
+with `{ from, through }` records a finished sync from the dates of its filter and answers the same
+shape afterwards. Both take the same key.
 
 `POST /api/accounts/balances` stores `{ accounts: [{ accountNumber, name, currency, balance, ledger }] }`
 with the same key. `balance` and `ledger` are the bank's two amounts: the money on the account, and

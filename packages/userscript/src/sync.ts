@@ -1,4 +1,5 @@
 import "./global";
+import { type FinishedSyncBody } from "@bank-scraper/shared";
 import { z } from "zod/mini";
 
 import {
@@ -26,12 +27,12 @@ const selectors = {
 	loadMore: "form button[value='next']",
 };
 
-/** How far before the newest stored transaction a sync starts, for transactions iPKO adds late */
+/** How far before the last finished sync Auto-Sync starts, for transactions iPKO adds late */
 const overlapDays = 30;
 const tableUpdateTimeoutMs = 10_000;
 const elementTimeoutMs = 5000;
 
-const lastOrderDateSchema = z.object({ orderDate: z.nullable(z.string()) });
+const syncedThroughSchema = z.object({ syncedThrough: z.nullable(z.string()) });
 const versionSchema = z.object({ version: z.nullable(z.string()) });
 
 /** A date as `YYYY-MM-DD` */
@@ -277,7 +278,12 @@ async function loadAllPages(sync: Sync) {
 
 		const tableUpdated = waitForTableUpdate();
 		await click(button);
-		if (!(await tableUpdated)) return;
+		// iPKO removes "Load More" after the last page, so a click that loads nothing is a failure
+		if (!(await tableUpdated)) {
+			throw new Error(
+				`iPKO did not load more transactions within ${tableUpdateTimeoutMs / 1000} seconds`,
+			);
+		}
 
 		sync.pages++;
 		sync.showProgress();
@@ -285,9 +291,9 @@ async function loadAllPages(sync: Sync) {
 	}
 }
 
-async function runSync(sync: Sync, from: IsoDate) {
+async function runSync(sync: Sync, from: IsoDate, through: IsoDate) {
 	// "to" first: an older "to" could make the picker refuse a newer "from"
-	await setFilterDate(sync, "to", today());
+	await setFilterDate(sync, "to", through);
 	await setFilterDate(sync, "from", from);
 	await loadAllPages(sync);
 
@@ -298,14 +304,33 @@ async function runSync(sync: Sync, from: IsoDate) {
 	scrollToBottom(document.querySelector(selectors.table) ?? document.body);
 }
 
-async function fetchLastOrderDate(accountNumber: string) {
-	const answer = await requestServer(
-		`/api/accounts/${encodeURIComponent(accountNumber)}/last-transaction-date`,
+const syncedThroughPath = (accountNumber: string) =>
+	`/api/accounts/${encodeURIComponent(accountNumber)}/synced-through`;
+
+/** Up to which date the finished syncs of the account loaded its history, `null` before the first */
+async function fetchSyncedThrough(accountNumber: string) {
+	const parsed = syncedThroughSchema.safeParse(
+		await requestServer(syncedThroughPath(accountNumber)),
 	);
-	const parsed = lastOrderDateSchema.safeParse(answer);
-	if (!parsed.success) throw new Error("Could not get the last transaction date, see the console");
-	return parsed.data.orderDate;
+	if (!parsed.success)
+		throw new Error("Could not ask the server for the last sync, see the console");
+	return parsed.data.syncedThrough;
 }
+
+/** Resolves to the account's `syncedThrough` after the server recorded the sync, `undefined` if not */
+async function recordFinishedSync(accountNumber: string, body: FinishedSyncBody) {
+	try {
+		const answer = await requestServer(syncedThroughPath(accountNumber), { body });
+		return syncedThroughSchema.safeParse(answer).data?.syncedThrough;
+	} catch (error) {
+		console.error("Could not record the sync:", error);
+		return undefined;
+	}
+}
+
+const autoSyncStart = (syncedThrough: IsoDate) => addDays(syncedThrough, -overlapDays);
+
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
  * Why this copy of the userscript must not sync: a message when its version differs from the one
@@ -345,7 +370,7 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
 	return element;
 }
 
-const buttonStyle: Partial<CSSStyleDeclaration> = {
+const buttonStyle = {
 	padding: "6px 14px",
 	border: "none",
 	borderRadius: "6px",
@@ -353,12 +378,20 @@ const buttonStyle: Partial<CSSStyleDeclaration> = {
 	color: "#fff",
 	font: "inherit",
 	cursor: "pointer",
-};
+} satisfies Partial<CSSStyleDeclaration>;
+
+const secondaryButtonStyle = {
+	...buttonStyle,
+	background: "#fff",
+	color: "#004c9a",
+	boxShadow: "inset 0 0 0 1px #004c9a",
+} satisfies Partial<CSSStyleDeclaration>;
 
 /**
- * Shows a floating "Sync" panel while the transaction history is open. A sync sets the filter from
- * 30 days before the newest stored transaction of the shown account until today, then presses "Load
- * More" until it disappears or the table stops changing.
+ * Shows a floating sync panel while the transaction history is open. "Auto-Sync" sets the filter
+ * from 30 days before the last finished sync of the shown account until today, or asks for the
+ * start date before the first one; "Sync from…" always asks. Either then presses "Load More" until
+ * it disappears.
  */
 export function mountSyncPanel() {
 	const panel = createElement("div", {
@@ -379,48 +412,92 @@ export function mountSyncPanel() {
 	});
 	const status = createElement("div", { display: "none" });
 	const dateRow = createElement("label", { display: "none", flexDirection: "column", gap: "4px" });
+	const dateText = createElement("span");
 	const dateInput = createElement("input", { font: "inherit" });
 	dateInput.type = "date";
-	dateRow.append("No transactions of this account are stored yet. Sync from:", dateInput);
-	const button = createElement("button", buttonStyle, "Sync");
-	panel.append(status, dateRow, button);
+	dateRow.append(dateText, dateInput);
+	const buttons = createElement("div", { display: "flex", gap: "8px" });
+	const button = createElement("button", buttonStyle);
+	const secondaryButton = createElement("button", secondaryButtonStyle);
+	buttons.append(button, secondaryButton);
+	panel.append(status, dateRow, buttons);
 
 	const showStatus = (text: string) => {
 		status.textContent = text;
 		status.style.display = text ? "block" : "none";
 	};
 
-	let onButton = startSync;
+	let onButton: () => unknown = startAutoSync;
+	let onSecondaryButton: () => unknown = startSyncFrom;
 	button.addEventListener("click", () => void onButton());
+	secondaryButton.addEventListener("click", () => void onSecondaryButton());
+
+	// Read from the server on every hover, so that it never shows a date a sync in between moved
+	let tooltipRequest = 0;
+	button.addEventListener("mouseenter", () => {
+		const request = ++tooltipRequest;
+		void autoSyncTooltip().then((text) => {
+			if (request === tooltipRequest && onButton === startAutoSync) button.title = text;
+		});
+	});
+	button.addEventListener("mouseleave", () => {
+		tooltipRequest++;
+		button.title = "";
+	});
+
+	function setButtons(primary: string, secondary?: string) {
+		button.title = "";
+		button.textContent = primary;
+		button.disabled = false;
+		secondaryButton.textContent = secondary ?? "";
+		secondaryButton.style.display = secondary ? "" : "none";
+		secondaryButton.disabled = false;
+	}
 
 	function idle(message: string) {
 		currentSync = undefined;
 		dateRow.style.display = "none";
-		button.style.display = "";
-		button.textContent = "Sync";
-		button.disabled = false;
-		onButton = startSync;
+		buttons.style.display = "flex";
+		setButtons("Auto-Sync", "Sync from…");
+		onButton = startAutoSync;
+		onSecondaryButton = startSyncFrom;
 		showStatus(message);
 	}
 
-	/** Replaces the Sync button with what to do when this copy of the script is outdated */
+	/** Replaces the sync buttons with what to do when this copy of the script is outdated */
 	async function checkVersion(): Promise<boolean> {
 		let problem: string | undefined;
 		try {
 			problem = await versionProblem();
 		} catch (error) {
-			idle(error instanceof Error ? error.message : String(error));
+			idle(errorMessage(error));
 			return false;
 		}
 
 		if (!problem) return true;
 
 		idle(problem);
-		button.style.display = "none";
+		buttons.style.display = "none";
 		return false;
 	}
 
-	async function startSync() {
+	async function autoSyncTooltip() {
+		const accountNumber = lastAccountNumber;
+		if (!accountNumber) return "The account of the history is not known yet";
+
+		try {
+			const syncedThrough = await fetchSyncedThrough(accountNumber);
+			return syncedThrough
+				? `Syncs transactions from ${formatDate(autoSyncStart(syncedThrough))} until today. ` +
+						"Transactions that are already stored are skipped."
+				: "No sync of this account finished yet, so it asks where to start";
+		} catch (error) {
+			return errorMessage(error);
+		}
+	}
+
+	/** The account to sync and its `syncedThrough`, or `undefined` after showing why there is none */
+	async function prepareSync() {
 		const accountNumber = lastAccountNumber;
 		if (!accountNumber) {
 			return idle(
@@ -429,34 +506,53 @@ export function mountSyncPanel() {
 		}
 
 		button.disabled = true;
+		secondaryButton.disabled = true;
 		showStatus("Checking the version of the userscript…");
 		if (!(await checkVersion())) return;
 
-		button.disabled = true;
-		showStatus("Asking the server for the last transaction…");
-
-		let lastOrderDate: string | null;
+		showStatus("Asking the server for the last sync…");
 		try {
-			lastOrderDate = await fetchLastOrderDate(accountNumber);
+			return { accountNumber, syncedThrough: await fetchSyncedThrough(accountNumber) };
 		} catch (error) {
-			return idle(error instanceof Error ? error.message : String(error));
+			return idle(errorMessage(error));
 		}
+	}
 
-		if (lastOrderDate) return run(accountNumber, addDays(lastOrderDate, -overlapDays));
+	async function startAutoSync() {
+		const prepared = await prepareSync();
+		if (!prepared) return;
 
+		const { accountNumber, syncedThrough } = prepared;
+		if (syncedThrough) return run(accountNumber, autoSyncStart(syncedThrough));
+
+		askForDate(accountNumber, "No sync of this account finished yet. Sync from:", "");
+	}
+
+	async function startSyncFrom() {
+		const prepared = await prepareSync();
+		if (!prepared) return;
+
+		const { accountNumber, syncedThrough } = prepared;
+		askForDate(accountNumber, "Sync from:", syncedThrough ? autoSyncStart(syncedThrough) : "");
+	}
+
+	function askForDate(accountNumber: string, text: string, value: IsoDate) {
 		showStatus("");
+		dateText.textContent = text;
 		dateInput.max = today();
+		dateInput.value = value;
 		dateRow.style.display = "flex";
-		button.textContent = "Start";
-		button.disabled = false;
+
+		setButtons("Start", "Cancel");
 		onButton = async () => {
 			if (!dateInput.value) return showStatus("Pick a date first");
-			dateRow.style.display = "none";
 			await run(accountNumber, dateInput.value);
 		};
+		onSecondaryButton = () => idle("");
 	}
 
 	async function run(accountNumber: string, from: IsoDate) {
+		const through = today();
 		const sync: Sync = {
 			accountNumber,
 			stopped: false,
@@ -470,24 +566,42 @@ export function mountSyncPanel() {
 		};
 		currentSync = sync;
 
-		button.textContent = "Stop";
-		button.disabled = false;
+		dateRow.style.display = "none";
+		setButtons("Stop");
 		onButton = async () => {
 			sync.stopped = true;
 			button.disabled = true;
 			showStatus("Stopping…");
 		};
-		showStatus(`Setting the filter to ${formatDate(from)} – ${formatDate(today())}…`);
+		showStatus(`Setting the filter to ${formatDate(from)} – ${formatDate(through)}…`);
 
 		try {
-			await runSync(sync, from);
-			idle(`Done: loaded ${pagesText(sync.pages)} since ${formatDate(from)}`);
+			await runSync(sync, from, through);
 		} catch (error) {
 			if (error instanceof SyncStopped) return idle(`Stopped after ${pagesText(sync.pages)}`);
 			console.error("Sync failed:", error);
-			idle(`Sync failed: ${error instanceof Error ? error.message : String(error)}`);
+			return idle(`Sync failed: ${errorMessage(error)}`);
 		}
+
+		button.disabled = true;
+		showStatus("Recording the sync on the server…");
+		const syncedThrough = await recordFinishedSync(accountNumber, { from, through });
+
+		const done = `Done: loaded ${pagesText(sync.pages)} since ${formatDate(from)}`;
+		if (syncedThrough === undefined) {
+			return idle(`${done}, but the server did not record it, see the console`);
+		}
+		// The server keeps the date of the last sync when this one started after it
+		if (syncedThrough !== null && syncedThrough < through) {
+			return idle(
+				`${done}. It started after the last sync ended, so Auto-Sync still starts from ` +
+					`${formatDate(autoSyncStart(syncedThrough))}.`,
+			);
+		}
+		idle(done);
 	}
+
+	idle("");
 
 	setInterval(() => {
 		const onHistory = document.querySelector(selectors.historyPage) !== null;

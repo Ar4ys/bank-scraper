@@ -66,6 +66,11 @@ export const accounts = s.snakeCase.table("accounts", {
 	balanceAt: instant(),
 	/** Which of the two amounts the Lunch Flow API reports as the balance */
 	balanceSource: s.text().$type<BalanceSource>().notNull().default(BalanceSource.Ledger),
+	/**
+	 * Up to which date the userscript's syncs loaded the history without a gap, `null` until the
+	 * first sync finished. See `recordFinishedSync`.
+	 */
+	syncedThrough: plainDate(),
 	createdAt: instant().notNull().default(sqlDateTimeNow),
 });
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { zTransactionAmount } from "./codecs.ts";
+import { zPlainDate, zTransactionAmount } from "./codecs.ts";
 
 /**
  * An account number. Whitespace is removed, so that the same number formatted differently stays one
@@ -40,3 +40,18 @@ export const accountBalancesBodySchema = z.object({
 });
 /** JSON form: the amounts are text like `1200.15` */
 export type AccountBalancesBody = z.input<typeof accountBalancesBodySchema>;
+
+/** A sync of the userscript that loaded every page of the history from `from` to `through` */
+export const finishedSyncBodySchema = z
+	.object({
+		/** The "from" date of iPKO's history filter */
+		from: zPlainDate,
+		/** The "to" date of iPKO's history filter */
+		through: zPlainDate,
+	})
+	.refine(({ from, through }) => Temporal.PlainDate.compare(from, through) <= 0, {
+		message: "from must not be after through",
+		path: ["from"],
+	});
+/** JSON form: the dates are `YYYY-MM-DD` */
+export type FinishedSyncBody = z.input<typeof finishedSyncBodySchema>;

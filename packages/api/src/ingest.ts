@@ -1,5 +1,9 @@
-import { type accountBalancesBodySchema, type IngestBody } from "@bank-scraper/shared";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import {
+	type accountBalancesBodySchema,
+	type finishedSyncBodySchema,
+	type IngestBody,
+} from "@bank-scraper/shared";
+import { and, eq, gte, isNull, lt, or } from "drizzle-orm";
 import { type z } from "zod";
 
 import { db, tables } from "./db/db.ts";
@@ -87,21 +91,36 @@ export async function ingestAccountBalances({ accounts }: AccountBalances) {
 	return { updated: accounts.length };
 }
 
-/**
- * The newest `order_date` among the stored transactions of an account, or `null` while none is
- * stored. It is the date iPKO's history filter applies to. Holds are left out.
- */
-export async function getLastOrderDate(accountNumber: string): Promise<string | null> {
-	const { accounts, rawTransactions } = tables;
-	const field = (path: string) => sql`json_extract(cast(${rawTransactions.data} as text), ${path})`;
+/** Up to which date the syncs of an account loaded its history, `null` while none finished */
+export async function getSyncedThrough(accountNumber: string) {
+	const account = await db.query.accounts.findFirst({ where: { number: accountNumber } });
+	return account?.syncedThrough ?? null;
+}
 
-	const [row] = await db
-		.select({ orderDate: sql<string | null>`max(${field("$.details.order_date")})` })
-		.from(rawTransactions)
-		.innerJoin(accounts, eq(accounts.id, rawTransactions.accountId))
+/**
+ * Records a finished sync and returns the account's `syncedThrough` afterwards. It moves to the
+ * sync's `through` only while nothing is recorded yet or the sync started on or before the recorded
+ * date: a sync that started later left a gap before it, which the next sync has to cover.
+ */
+export async function recordFinishedSync(
+	accountNumber: string,
+	{ from, through }: z.output<typeof finishedSyncBodySchema>,
+) {
+	const account = await findOrCreateAccount(accountNumber);
+	const { accounts } = tables;
+
+	await db
+		.update(accounts)
+		.set({ syncedThrough: through })
 		.where(
-			and(eq(accounts.number, accountNumber), sql`coalesce(${field("$.is_hold")}, false) = false`),
+			and(
+				eq(accounts.id, account.id),
+				or(
+					isNull(accounts.syncedThrough),
+					and(gte(accounts.syncedThrough, from), lt(accounts.syncedThrough, through)),
+				),
+			),
 		);
 
-	return row?.orderDate ?? null;
+	return await getSyncedThrough(accountNumber);
 }

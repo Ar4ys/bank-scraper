@@ -217,55 +217,71 @@ describe("POST /api/accounts/balances", () => {
 	});
 });
 
-const tx = (bankId: string, orderDate: string, isHold = false) => ({
-	bankId,
-	data: { is_hold: isHold, details: { order_date: orderDate } },
-});
+const path = (account: string) => `/api/accounts/${encodeURIComponent(account)}/synced-through`;
 
-describe("GET /api/accounts/:accountNumber/last-transaction-date", () => {
+describe("/api/accounts/:accountNumber/synced-through", () => {
 	beforeEach(async () => {
 		await db.delete(rawTransactions);
 		await db.delete(accounts);
 	});
 
-	const get = (
-		account: string,
-		headers: Record<string, string> = { "x-api-key": testIngestApiKey },
-	) =>
-		app.request(`/api/accounts/${encodeURIComponent(account)}/last-transaction-date`, { headers });
+	const headers = { "x-api-key": testIngestApiKey };
+	const get = async (account: string) =>
+		await (await app.request(path(account), { headers })).json();
+	const post = (account: string, body: unknown, requestHeaders: Record<string, string> = headers) =>
+		app.request(path(account), {
+			method: "POST",
+			headers: { "Content-Type": "application/json", ...requestHeaders },
+			body: JSON.stringify(body),
+		});
+	const record = async (from: string, through: string) =>
+		await (await post(accountNumber, { from, through })).json();
 
-	it("rejects a request without the ingest key", async () => {
-		assert.equal((await get(accountNumber, {})).status, 401);
+	it("rejects requests without the ingest key, malformed dates and from after through", async () => {
+		assert.equal((await app.request(path(accountNumber))).status, 401);
+		assert.equal(
+			(await post(accountNumber, { from: "2026-01-01", through: "2026-02-01" }, {})).status,
+			401,
+		);
+		assert.equal(
+			(await post(accountNumber, { from: "yesterday", through: "2026-02-01" })).status,
+			400,
+		);
+		assert.equal(
+			(await post(accountNumber, { from: "2026-02-02", through: "2026-02-01" })).status,
+			400,
+		);
 	});
 
-	it("answers null for an unknown account and one without transactions", async () => {
+	it("answers null for an unknown account and one without a finished sync", async () => {
 		await ingestRawTransactions({ accountNumber: "empty", transactions: [] });
 
-		for (const account of ["unknown", "empty"]) {
-			const response = await get(account);
-			assert.equal(response.status, 200);
-			assert.deepEqual(await response.json(), { orderDate: null });
-		}
+		assert.deepEqual(await get("unknown"), { syncedThrough: null });
+		assert.deepEqual(await get("empty"), { syncedThrough: null });
 	});
 
-	it("answers the newest order date of the account, leaving out holds and other accounts", async () => {
-		await ingestRawTransactions({
-			accountNumber,
-			transactions: [
-				tx("1", "2026-09-01"),
-				tx("2", "2026-10-02"),
-				tx("3", "2026-09-15"),
-				tx("hold", "2026-10-10", true),
-			],
-		});
-		await ingestRawTransactions({ accountNumber: "other", transactions: [tx("4", "2026-10-12")] });
+	it("records the first sync whatever it started from, also for an unknown account", async () => {
+		assert.deepEqual(await record("2026-05-01", "2026-06-01"), { syncedThrough: "2026-06-01" });
+		assert.deepEqual(await get(accountNumber), { syncedThrough: "2026-06-01" });
+	});
 
-		assert.deepEqual(await (await get(accountNumber)).json(), { orderDate: "2026-10-02" });
+	it("moves forward after a sync that started on or before the recorded date", async () => {
+		await record("2026-01-01", "2026-06-01");
+
+		assert.deepEqual(await record("2026-05-02", "2026-07-01"), { syncedThrough: "2026-07-01" });
+		assert.deepEqual(await record("2026-07-01", "2026-07-15"), { syncedThrough: "2026-07-15" });
+	});
+
+	it("stays after a sync that started later, which left a gap, or ended earlier", async () => {
+		await record("2026-01-01", "2026-06-01");
+
+		assert.deepEqual(await record("2026-06-02", "2026-07-01"), { syncedThrough: "2026-06-01" });
+		assert.deepEqual(await record("2026-03-01", "2026-04-01"), { syncedThrough: "2026-06-01" });
 	});
 
 	it("finds the account by its number written with whitespace", async () => {
-		await ingestRawTransactions({ accountNumber, transactions: [tx("1", "2026-09-01")] });
+		await record("2026-01-01", "2026-06-01");
 
-		assert.deepEqual(await (await get("PL00 0000 00")).json(), { orderDate: "2026-09-01" });
+		assert.deepEqual(await get("PL00 0000 00"), { syncedThrough: "2026-06-01" });
 	});
 });

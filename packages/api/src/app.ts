@@ -3,6 +3,7 @@ import fs from "node:fs";
 import {
 	accountBalancesBodySchema,
 	accountNumberSchema,
+	finishedSyncBodySchema,
 	ingestBodySchema,
 } from "@bank-scraper/shared";
 import { serveStatic } from "@hono/node-server/serve-static";
@@ -14,7 +15,12 @@ import { z } from "zod";
 import { adminApi } from "./admin.ts";
 import { apiKeyAuth } from "./auth.ts";
 import { config } from "./config.ts";
-import { getLastOrderDate, ingestAccountBalances, ingestRawTransactions } from "./ingest.ts";
+import {
+	getSyncedThrough,
+	ingestAccountBalances,
+	ingestRawTransactions,
+	recordFinishedSync,
+} from "./ingest.ts";
 import { lunchflowApi } from "./lunchflow.ts";
 import { userscriptApi } from "./userscript.ts";
 import { zValidatorHook } from "./utils.ts";
@@ -43,12 +49,30 @@ app.post(
 	async (c) => c.json(await ingestAccountBalances(c.req.valid("json"))),
 );
 
-/** GET /api/accounts/:accountNumber/last-transaction-date */
+/** GET /api/accounts/:accountNumber/synced-through */
 app.get(
-	"/api/accounts/:accountNumber/last-transaction-date",
+	"/api/accounts/:accountNumber/synced-through",
 	apiKeyAuth(config.INGEST_API_KEY),
 	zValidator("param", z.object({ accountNumber: accountNumberSchema })),
-	async (c) => c.json({ orderDate: await getLastOrderDate(c.req.valid("param").accountNumber) }),
+	async (c) => {
+		const syncedThrough = await getSyncedThrough(c.req.valid("param").accountNumber);
+		return c.json({ syncedThrough: syncedThrough?.toString() ?? null });
+	},
+);
+
+/** POST /api/accounts/:accountNumber/synced-through */
+app.post(
+	"/api/accounts/:accountNumber/synced-through",
+	apiKeyAuth(config.INGEST_API_KEY),
+	zValidator("param", z.object({ accountNumber: accountNumberSchema })),
+	zValidator("json", finishedSyncBodySchema, zValidatorHook),
+	async (c) => {
+		const syncedThrough = await recordFinishedSync(
+			c.req.valid("param").accountNumber,
+			c.req.valid("json"),
+		);
+		return c.json({ syncedThrough: syncedThrough?.toString() ?? null });
+	},
 );
 
 app.route("/api/userscript", userscriptApi);
