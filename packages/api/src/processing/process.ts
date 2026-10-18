@@ -5,7 +5,7 @@ import {
 	type Rule,
 	type TransactionFieldsJson,
 } from "@bank-scraper/shared";
-import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { config } from "../config.ts";
@@ -34,16 +34,34 @@ export type TransactionChange = BankTransactionKey & {
 	/** `null` when the change creates the transaction */
 	transactionId: string | null;
 	cause: TransactionVersionCause;
+	/** `$type` of the bank transaction */
+	txType: string;
 	before: TransactionFieldsJson | null;
 	after: TransactionFieldsJson;
+	/** Rule ids, or `defaultFieldSource`, that set the fields of `before` */
+	fieldSourcesBefore: FieldSources | null;
 	fieldSources: FieldSources;
 };
 
 export type ProcessingReport = {
 	changes: TransactionChange[];
-	errors: Array<BankTransactionKey & { rawTransactionId: string; error: ProcessingError }>;
+	errors: Array<
+		BankTransactionKey & {
+			rawTransactionId: string;
+			error: ProcessingError;
+			/** `null` when the bank's data cannot be parsed */
+			txType: string | null;
+			/** The fields without rules, `null` when the bank's data cannot be parsed */
+			fields: TransactionFieldsJson | null;
+		}
+	>;
 	unchanged: number;
 	holds: number;
+	/**
+	 * Names of the rules in the field sources of the changes, by rule id. A rule that is not in the
+	 * rules processed with has the name it had in the revision that set the field.
+	 */
+	ruleNames: Record<string, string>;
 };
 
 export type ProcessOptions = {
@@ -64,6 +82,8 @@ type ProcessContext = {
 	dryRun: boolean;
 	cause: ProcessOptions["cause"];
 	report: ProcessingReport;
+	/** Revisions the `before` of the reported changes were derived with, for the names of their rules */
+	revisionIdsBefore: Set<string>;
 };
 
 const withoutMerchant = (fields: TransactionFieldsJson) => ({ ...fields, merchant: null });
@@ -81,7 +101,14 @@ export function getLatestRuleRevision(): RuleRevisionRef {
 
 function processOne(
 	key: BankTransactionKey,
-	{ ruleRevision, merchantDirectory, dryRun, cause: causeOfCaller, report }: ProcessContext,
+	{
+		ruleRevision,
+		merchantDirectory,
+		dryRun,
+		cause: causeOfCaller,
+		report,
+		revisionIdsBefore,
+	}: ProcessContext,
 ) {
 	const { rawTransactions, transactions, transactionVersions, accounts } = tables;
 
@@ -112,7 +139,13 @@ function processOne(
 	}
 
 	if (derived.status === RawTransactionStatus.Error) {
-		report.errors.push({ ...key, rawTransactionId: raw.id, error: derived.error });
+		report.errors.push({
+			...key,
+			rawTransactionId: raw.id,
+			error: derived.error,
+			txType: derived.context?.txType ?? null,
+			fields: derived.context?.fields ?? null,
+		});
 		setRawStatus(RawTransactionStatus.Error, derived.error);
 		return;
 	}
@@ -177,10 +210,13 @@ function processOne(
 		rawTransactionId: raw.id,
 		transactionId: transaction?.id ?? null,
 		cause,
+		txType: derived.txType,
 		before: latestVersion?.data ?? null,
 		after: derivedFields,
+		fieldSourcesBefore: latestVersion?.fieldSources ?? null,
 		fieldSources: derived.fieldSources,
 	});
+	if (latestVersion?.ruleRevisionId) revisionIdsBefore.add(latestVersion.ruleRevisionId);
 
 	if (dryRun) return;
 
@@ -231,7 +267,13 @@ export function processBankTransactions(
 	keys: readonly BankTransactionKey[],
 	{ dryRun = false, ruleRevision = getLatestRuleRevision(), cause }: ProcessOptions = {},
 ): ProcessingReport {
-	const report: ProcessingReport = { changes: [], errors: [], unchanged: 0, holds: 0 };
+	const report: ProcessingReport = {
+		changes: [],
+		errors: [],
+		unchanged: 0,
+		holds: 0,
+		ruleNames: {},
+	};
 
 	inTransaction(() => {
 		const context = {
@@ -240,12 +282,36 @@ export function processBankTransactions(
 			dryRun,
 			cause,
 			report,
+			revisionIdsBefore: new Set<string>(),
 		};
 
 		for (const key of keys) processOne(key, context);
+
+		report.ruleNames = getRuleNames(ruleRevision.rules, [...context.revisionIdsBefore]);
 	});
 
 	return report;
+}
+
+/** Rule names by id: those of `rules`, then those of older revisions for rules not among them */
+function getRuleNames(rules: readonly Rule[], revisionIds: string[]): Record<string, string> {
+	const { ruleRevisions } = tables;
+
+	const revisions = revisionIds.length
+		? db
+				.select({ rules: ruleRevisions.rules })
+				.from(ruleRevisions)
+				.where(inArray(ruleRevisions.id, revisionIds))
+				.orderBy(ruleRevisions.id)
+				.all()
+		: [];
+
+	return Object.fromEntries(
+		[...revisions.flatMap((revision) => revision.rules), ...rules].map((rule) => [
+			rule.id,
+			rule.name,
+		]),
+	);
 }
 
 /**

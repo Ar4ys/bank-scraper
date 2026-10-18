@@ -110,7 +110,10 @@ transaction twice is harmless.
 
 `packages/admin` is a Svelte app for looking into the data: which raw transaction became which
 transaction, the history of a transaction with what caused each change, and the changes between
-the versions of a raw transaction. Everything that reprocesses shows a preview first.
+the versions of a raw transaction. Everything that reprocesses shows a preview first: every
+transaction that would change, with its date, account, amount, type, merchant and description, the
+fields that change, and the rule (or the code) that sets each value. For the old value that is what
+the transaction's last version recorded. The changes can be filtered by field and by rule.
 
 - `mise run dev-admin` starts the Vite dev server, which proxies `/api` to the API on port 8585.
 - `mise run build-admin` builds it into `packages/admin/dist`, which the API serves at `/`.

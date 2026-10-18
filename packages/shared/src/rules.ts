@@ -3,6 +3,9 @@ import { z } from "zod";
 import { getTextByPath } from "./template.ts";
 import { transactionFieldsSchema, type TransactionField } from "./transaction.ts";
 
+/** What a field was set by when no rule set it, in place of a rule id */
+export const defaultFieldSource = "default";
+
 export type RuleOperator = (typeof ruleOperators)[number];
 export const ruleOperators = ["contains", "equals", "regex"] as const;
 

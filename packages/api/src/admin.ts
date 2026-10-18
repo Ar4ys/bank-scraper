@@ -1,4 +1,8 @@
-import { transactionFieldsSchema, zTransactionAmount } from "@bank-scraper/shared";
+import {
+	defaultFieldSource,
+	transactionFieldsSchema,
+	zTransactionAmount,
+} from "@bank-scraper/shared";
 import { zValidator } from "@hono/zod-validator";
 import { and, count, countDistinct, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -16,7 +20,6 @@ import {
 } from "./db/schema.ts";
 import { parseForRules } from "./processing/derive.ts";
 import { listBankTransactionKeys, processBankTransactions } from "./processing/process.ts";
-import { defaultFieldSource } from "./processing/rules.ts";
 import { readUserscript, userscriptInstallPath, userscriptVersion } from "./userscript.ts";
 import { escapeLikePattern } from "./utils.ts";
 

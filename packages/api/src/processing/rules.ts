@@ -1,4 +1,5 @@
 import {
+	defaultFieldSource,
 	matchRule,
 	renderTemplate,
 	transactionFieldsSchema,
@@ -10,8 +11,6 @@ import {
 import { z } from "zod";
 
 import { type FieldSources } from "../db/schema.ts";
-
-export const defaultFieldSource = "default";
 
 /** Turns the text a template rendered into the JSON value of the field */
 function fieldValueFromText(field: TransactionField, text: string) {

@@ -249,6 +249,43 @@ describe("processing", () => {
 		assert.equal((await db.select().from(tables.merchants)).length, 0);
 	});
 
+	it("reports what set the fields before and after, with the names of the rules", async () => {
+		await ingest(rawCardTransaction());
+		await applyRules([{ ...lidlRule, name: "Lidl, deleted later" }]);
+
+		const report = processBankTransactions(listBankTransactionKeys(), {
+			dryRun: true,
+			ruleRevision: {
+				id: "preview",
+				rules: [{ ...lidlRule, id: "market", name: "Market", set: { merchant: "Market" } }],
+			},
+		});
+
+		const [change] = report.changes;
+		assert.ok(change);
+		assert.deepEqual(
+			[change.txType, change.fieldSourcesBefore?.merchant, change.fieldSources.merchant],
+			["cardTransaction", "lidl", "market"],
+		);
+		assert.deepEqual(report.ruleNames, { lidl: "Lidl, deleted later", market: "Market" });
+	});
+
+	it("reports the type and the fields without rules of a transaction the rules fail on", async () => {
+		await ingest(rawCardTransaction());
+
+		const report = processBankTransactions(listBankTransactionKeys(), {
+			dryRun: true,
+			ruleRevision: { id: "preview", rules: [{ ...lidlRule, set: { date: "{details.title}" } }] },
+		});
+
+		const [failure] = report.errors;
+		assert.ok(failure);
+		assert.deepEqual(
+			[failure.error.stage, failure.txType, failure.fields?.date, failure.fields?.amount],
+			["rules", "cardTransaction", "2022-02-11", "-57.33"],
+		);
+	});
+
 	it("reports nothing when processing again changes nothing", async () => {
 		await ingest(rawCardTransaction());
 

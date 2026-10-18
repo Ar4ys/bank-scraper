@@ -1,5 +1,9 @@
-import { type Rule, type TransactionFieldsJson } from "@bank-scraper/shared";
-import { type z } from "zod";
+import {
+	transactionFieldsSchema,
+	type Rule,
+	type TransactionFieldsJson,
+} from "@bank-scraper/shared";
+import { z } from "zod";
 
 import { RawTransactionStatus, type FieldSources, type ProcessingError } from "../db/schema.ts";
 import { baseTxSchema, ipkoTransactionSchema, ipkoTransactionToJson } from "../ipkoSchemas.ts";
@@ -9,9 +13,15 @@ import { applyRules } from "./rules.ts";
 
 export type DeriveResult =
 	| { status: typeof RawTransactionStatus.Hold }
-	| { status: typeof RawTransactionStatus.Error; error: ProcessingError }
+	| {
+			status: typeof RawTransactionStatus.Error;
+			error: ProcessingError;
+			/** What the transaction is, for an error of the rules: its type and the fields without rules */
+			context?: { txType: string; fields: TransactionFieldsJson };
+	  }
 	| {
 			status: typeof RawTransactionStatus.Processed;
+			txType: string;
 			fields: TransactionFieldsJson;
 			fieldSources: FieldSources;
 	  };
@@ -42,7 +52,8 @@ export function deriveTransaction(rawData: unknown, rules: readonly Rule[]): Der
 	const parsed = ipkoTransactionSchema.safeParse(rawData);
 	if (!parsed.success) return schemaError(parsed.error);
 
-	const result = applyRules(deriveDefaults(parsed.data), ipkoTransactionToJson(parsed.data), rules);
+	const defaults = deriveDefaults(parsed.data);
+	const result = applyRules(defaults, ipkoTransactionToJson(parsed.data), rules);
 
 	if (!result.success) {
 		return {
@@ -52,11 +63,16 @@ export function deriveTransaction(rawData: unknown, rules: readonly Rule[]): Der
 				message: zodPrettifyError(result.error),
 				issues: result.error.issues,
 			},
+			context: {
+				txType: parsed.data.$type,
+				fields: z.encode(transactionFieldsSchema, defaults),
+			},
 		};
 	}
 
 	return {
 		status: RawTransactionStatus.Processed,
+		txType: parsed.data.$type,
 		fields: result.fields,
 		fieldSources: result.fieldSources,
 	};
