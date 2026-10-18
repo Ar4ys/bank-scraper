@@ -13,10 +13,6 @@
 	let offset = $state(0);
 
 	const page = latest(() => loadTransactions({ limit, offset, merchantId }));
-
-	// A preview is looked at next to what it previews, so its rows open elsewhere
-	const openTransaction = (id: string) =>
-		window.open(p("/transactions/:id", { params: { id } }), "_blank", "noopener");
 </script>
 
 {#if page.error}
@@ -35,14 +31,19 @@
 		</Table.Header>
 		<Table.Body>
 			{#each page.value?.items ?? [] as transaction (transaction.id)}
-				<Table.Row
-					class="cursor-pointer"
-					title="Open the transaction in a new tab"
-					onclick={() => openTransaction(transaction.id)}
-				>
+				<Table.Row class="relative">
 					<Table.Cell class="whitespace-nowrap tabular-nums">{transaction.date}</Table.Cell>
-					<Table.Cell class="max-w-md truncate" title={transaction.description}>
-						{transaction.description}
+					<Table.Cell class="max-w-md truncate">
+						<!-- A preview is looked at next to what it previews, so its rows open elsewhere -->
+						<a
+							class="stretched-link"
+							href={p("/transactions/:id", { params: { id: transaction.id } })}
+							target="_blank"
+							rel="noopener"
+							title="Open the transaction in a new tab"
+						>
+							{transaction.description}
+						</a>
 					</Table.Cell>
 					<Table.Cell
 						class="whitespace-nowrap text-right tabular-nums {amountClass(transaction.amount)}"

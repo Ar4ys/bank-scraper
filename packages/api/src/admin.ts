@@ -1,6 +1,6 @@
 import { transactionFieldsSchema, zTransactionAmount } from "@bank-scraper/shared";
 import { zValidator } from "@hono/zod-validator";
-import { and, count, desc, eq, isNull, like, or, sql } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -50,7 +50,11 @@ const accountJson = (account: Account) => ({
 	balanceCurrency: account.balanceCurrency,
 	balanceAt: account.balanceAt?.toString() ?? null,
 	balanceSource: account.balanceSource,
+	syncedThrough: account.syncedThrough?.toString() ?? null,
 });
+
+const countOf = (counts: { accountId: number; count: number }[], accountId: number) =>
+	counts.find((row) => row.accountId === accountId)?.count ?? 0;
 
 const rawTransactionJson = (raw: RawTransaction) => ({
 	id: raw.id,
@@ -134,9 +138,30 @@ export const adminApi = new Hono()
 
 	/** GET /api/admin/accounts */
 	.get("/accounts", async (c) => {
-		const rows = await db.select().from(accounts).orderBy(accounts.id);
+		const [rows, transactionCounts, rawTransactionCounts] = await Promise.all([
+			db.select().from(accounts).orderBy(accounts.id),
+			db
+				.select({ accountId: transactions.accountId, count: count() })
+				.from(transactions)
+				.groupBy(transactions.accountId),
+			// Bank transactions, like the raw transactions list: the versions of one count once
+			db
+				.select({
+					accountId: rawTransactions.accountId,
+					count: countDistinct(rawTransactions.bankId),
+				})
+				.from(rawTransactions)
+				.groupBy(rawTransactions.accountId),
+		]);
 
-		return c.json(rows.map(accountJson), 200);
+		return c.json(
+			rows.map((account) => ({
+				...accountJson(account),
+				transactionCount: countOf(transactionCounts, account.id),
+				rawTransactionCount: countOf(rawTransactionCounts, account.id),
+			})),
+			200,
+		);
 	})
 
 	/** PATCH /api/admin/accounts/:id */

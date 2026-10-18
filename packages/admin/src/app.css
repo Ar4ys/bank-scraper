@@ -127,3 +127,25 @@
 		@apply font-sans;
 	}
 }
+
+/*
+ * A link or button stretched over its nearest positioned ancestor, such as a table row with
+ * `relative`. A row cannot be a link itself, so this makes the whole row the target of the row's
+ * one real link or button, which keeps middle clicks, the keyboard and screen readers working.
+ */
+@utility stretched-link {
+	&::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+	}
+
+	&:focus-visible {
+		outline: none;
+	}
+
+	&:focus-visible::after {
+		outline: 2px solid var(--ring);
+		outline-offset: -2px;
+	}
+}

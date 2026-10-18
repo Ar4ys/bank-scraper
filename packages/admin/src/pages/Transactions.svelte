@@ -11,7 +11,7 @@
 	import { amountClass } from "$lib/format";
 	import { latest } from "$lib/latest.svelte";
 	import { queryCount, queryFlag, queryText } from "$lib/queryState";
-	import { navigate } from "$lib/router";
+	import { p } from "$lib/router";
 
 	const limit = 100;
 
@@ -88,20 +88,19 @@
 		</Table.Header>
 		<Table.Body>
 			{#each page.value?.items ?? [] as transaction (transaction.id)}
-				<Table.Row
-					class="cursor-pointer"
-					onclick={() => navigate("/transactions/:id", { params: { id: transaction.id } })}
-				>
+				<Table.Row class="relative">
 					<Table.Cell class="whitespace-nowrap tabular-nums">{transaction.date}</Table.Cell>
 					<Table.Cell class="max-w-48 truncate text-muted-foreground">
 						{accountName(transaction.accountId)}
 					</Table.Cell>
 					<Table.Cell class="max-w-56 truncate font-medium">
-						{#if transaction.merchant}
-							{transaction.merchant}
-						{:else}
-							<span class="font-normal text-muted-foreground">no merchant</span>
-						{/if}
+						<a class="stretched-link" href={p("/transactions/:id", { params: { id: transaction.id } })}>
+							{#if transaction.merchant}
+								{transaction.merchant}
+							{:else}
+								<span class="font-normal text-muted-foreground">no merchant</span>
+							{/if}
+						</a>
 					</Table.Cell>
 					<Table.Cell class="max-w-md truncate" title={transaction.description}>
 						{transaction.description}

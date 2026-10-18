@@ -49,7 +49,7 @@ describe("admin API", () => {
 		});
 	});
 
-	it("lists and renames accounts", async () => {
+	it("lists accounts with their counts, and renames them", async () => {
 		const { body } = await request("/accounts");
 		assert.deepEqual(body, [
 			{
@@ -62,6 +62,9 @@ describe("admin API", () => {
 				balanceCurrency: null,
 				balanceAt: null,
 				balanceSource: "ledger",
+				syncedThrough: null,
+				transactionCount: 2,
+				rawTransactionCount: 4,
 			},
 		]);
 

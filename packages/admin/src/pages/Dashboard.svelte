@@ -79,9 +79,11 @@
 				<ul class="divide-y text-sm">
 					{#each accounts as account (account.id)}
 						{@const reported = account.balanceSource === "ledger" ? account.ledger : account.balance}
-						<li class="flex items-baseline justify-between gap-4 py-2">
+						<li class="relative flex items-baseline justify-between gap-4 py-2 hover:bg-muted/50">
 							<span>
-								{account.name}
+								<a class="stretched-link" href={p("/accounts", { search: { account: account.id } })}>
+									{account.name}
+								</a>
 								<span class="block text-xs text-muted-foreground">
 									{account.balanceAt ? `balance scraped ${formatInstant(account.balanceAt)}` : "balance never scraped"}
 								</span>

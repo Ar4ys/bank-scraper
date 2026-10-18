@@ -5,10 +5,6 @@
 	import { p } from "$lib/router";
 
 	let { report }: { report: MerchantChangeReport } = $props();
-
-	// A preview is looked at next to what it previews, so its rows open elsewhere
-	const openTransaction = (id: string) =>
-		window.open(p("/transactions/:id", { params: { id } }), "_blank", "noopener");
 </script>
 
 {#snippet merchant(name: string | null | undefined)}
@@ -38,14 +34,23 @@
 		<Table.Body>
 			{#each report.changes as change (change.rawTransactionId)}
 				{@const transactionId = change.transactionId}
-				<Table.Row
-					class={transactionId ? "cursor-pointer" : ""}
-					title={transactionId ? "Open the transaction in a new tab" : undefined}
-					onclick={() => transactionId && openTransaction(transactionId)}
-				>
+				<Table.Row class="relative">
 					<Table.Cell class="whitespace-nowrap tabular-nums">{change.after.date}</Table.Cell>
-					<Table.Cell class="max-w-64 truncate" title={change.after.description}>
-						{change.after.description}
+					<Table.Cell class="max-w-64 truncate" title={transactionId ? undefined : change.after.description}>
+						{#if transactionId}
+							<!-- A preview is looked at next to what it previews, so its rows open elsewhere -->
+							<a
+								class="stretched-link"
+								href={p("/transactions/:id", { params: { id: transactionId } })}
+								target="_blank"
+								rel="noopener"
+								title="Open the transaction in a new tab"
+							>
+								{change.after.description}
+							</a>
+						{:else}
+							{change.after.description}
+						{/if}
 						{#if change.cause !== "merchants"}
 							<span class="block text-xs text-muted-foreground">Other fields change too</span>
 						{/if}

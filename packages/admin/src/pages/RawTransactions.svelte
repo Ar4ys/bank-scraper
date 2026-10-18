@@ -8,7 +8,7 @@
 	import { formatInstant } from "$lib/format";
 	import { latest } from "$lib/latest.svelte";
 	import { queryCount, queryOption, queryText } from "$lib/queryState";
-	import { navigate } from "$lib/router";
+	import { p } from "$lib/router";
 
 	const limit = 100;
 	const statuses = ["unprocessed", "processed", "hold", "error"] as const;
@@ -80,14 +80,17 @@
 		</Table.Header>
 		<Table.Body>
 			{#each page.value?.items ?? [] as raw (raw.id)}
-				<Table.Row
-					class="cursor-pointer"
-					onclick={() =>
-						navigate("/raw/:accountId/:bankId", {
-							params: { accountId: String(raw.accountId), bankId: raw.bankId },
-						})}
-				>
-					<Table.Cell class="font-mono text-xs">{raw.bankId}</Table.Cell>
+				<Table.Row class="relative">
+					<Table.Cell class="font-mono text-xs">
+						<a
+							class="stretched-link"
+							href={p("/raw/:accountId/:bankId", {
+								params: { accountId: String(raw.accountId), bankId: raw.bankId },
+							})}
+						>
+							{raw.bankId}
+						</a>
+					</Table.Cell>
 					<Table.Cell><StatusBadge status={raw.status} /></Table.Cell>
 					<Table.Cell class="tabular-nums">
 						{#if raw.versionCount > 1}
