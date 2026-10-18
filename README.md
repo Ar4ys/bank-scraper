@@ -68,6 +68,15 @@ The server applies pending migrations when it starts.
 `Dockerfile` builds one image that serves the API and the admin app on port 8585 and keeps the
 database in the `/data` volume. `compose.example.yaml` is a service to put next to Sure.
 
+The "Image" workflow (`.github/workflows/image.yml`) runs the tests, typecheck, lint and format check
+on every push to `main` and then publishes the image for amd64 and arm64 as
+`ghcr.io/ar4ys/bank-scraper`:
+
+- `latest`: the newest green build of `main`
+- `sha-<commit>`: immutable, for rolling back
+
+To build it yourself, pass the commit: `docker build --build-arg APP_GIT_COMMIT=$(git rev-parse --short HEAD) .`
+
 The admin app and `/api/admin` have no auth of their own. Put the service behind a reverse proxy
 that protects everything except the routes that check a key or token of their own: `/api/lunchflow`,
 `/api/transactions/raw`, `/api/accounts/` and `/api/userscript/`. The proxy should set

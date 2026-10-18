@@ -6,11 +6,7 @@
 
 services:
   bank-scraper:
-    build:
-      context: .
-      args:
-        # e.g. APP_GIT_COMMIT=$(git rev-parse --short HEAD) docker compose build
-        APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+    image: ghcr.io/ar4ys/bank-scraper:latest
     restart: unless-stopped
     environment:
       INGEST_API_KEY: change-me
