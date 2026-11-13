@@ -16,9 +16,12 @@
 		type MerchantMapEntryInput,
 		type RecurringPlace,
 	} from "$lib/api";
+	import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
+
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
+	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { Switch } from "$lib/components/ui/switch";
@@ -233,11 +236,17 @@
 			{place.firstDate}<br />{place.lastDate}
 		</Table.Cell>
 		<Table.Cell class="min-w-56 font-mono text-xs">
-			{#each shownAddresses as { address, payments } (address)}
-				<div class="whitespace-pre-wrap wrap-anywhere">
-					{address} <span class="text-muted-foreground">×{payments}</span>
-				</div>
-			{/each}
+			<button
+				class="block w-full cursor-pointer text-left hover:underline hover:underline-offset-4"
+				title="View transactions"
+				onclick={() => viewTransactions(place)}
+			>
+				{#each shownAddresses as { address, payments } (address)}
+					<div class="whitespace-pre-wrap wrap-anywhere">
+						{address} <span class="text-muted-foreground">×{payments}</span>
+					</div>
+				{/each}
+			</button>
 			{#if place.addresses.length > 3}
 				<button
 					class="cursor-pointer text-muted-foreground underline underline-offset-4"
@@ -276,24 +285,29 @@
 							Restore
 						</Button>
 					{:else}
-						<Button
-							variant="ghost"
-							size="sm"
-							disabled={busy}
-							title="Hidden until a payment dated after today arrives"
-							onclick={() => ignore(place, false)}
-						>
-							Ignore for now
-						</Button>
-						<Button
-							variant="ghost"
-							size="sm"
-							disabled={busy}
-							title="Hidden even when new payments arrive"
-							onclick={() => ignore(place, true)}
-						>
-							Ignore forever
-						</Button>
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger disabled={busy}>
+								{#snippet child({ props })}
+									<Button {...props} variant="ghost" size="icon-sm" aria-label="More actions">
+										<EllipsisVertical />
+									</Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="end" class="w-auto">
+								<DropdownMenu.Item onSelect={() => ignore(place, false)}>
+									<div>
+										<div>Ignore for now</div>
+										<div class="text-xs whitespace-nowrap text-muted-foreground">Until a payment dated after today</div>
+									</div>
+								</DropdownMenu.Item>
+								<DropdownMenu.Item onSelect={() => ignore(place, true)}>
+									<div>
+										<div>Ignore forever</div>
+										<div class="text-xs whitespace-nowrap text-muted-foreground">Even when new payments arrive</div>
+									</div>
+								</DropdownMenu.Item>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
 					{/if}
 				</div>
 			</Table.Cell>

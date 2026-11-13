@@ -207,8 +207,8 @@ importers:
         specifier: ^3.12.0
         version: 3.12.4
       '@lucide/svelte':
-        specifier: 1.49.0
-        version: 1.49.0(svelte@5.57.1)
+        specifier: 1.72.0
+        version: 1.72.0(svelte@5.57.1)
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.3.1
         version: 7.3.1(svelte@5.57.1)(vite@8.3.2(@types/node@26.2.0)(jiti@2.7.0))
@@ -219,8 +219,8 @@ importers:
         specifier: '26'
         version: 26.2.0
       bits-ui:
-        specifier: ^2.18.0
-        version: 2.19.4(@internationalized/date@3.12.4)(svelte@5.57.1)
+        specifier: ^2.21.0
+        version: 2.21.0(@internationalized/date@3.12.4)(svelte@5.57.1)
       cn:
         specifier: ^0.4.0
         version: 0.4.0
@@ -574,8 +574,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@lucide/svelte@1.49.0':
-    resolution: {integrity: sha512-RFH6Vx7dj6hshcBa1qJ0nKAWwkh385jJbDwF1WVg7yflC89310BsA55SEmJnaSRfr03dAyZMMLUC1EMGBu0Z0Q==}
+  '@lucide/svelte@1.72.0':
+    resolution: {integrity: sha512-DRwtZ5p/m5ZRsNlfCzELJRDzd2z19mc76eMs8rwllx/JWfvykmLoTFs3RyzFN519ldQxHt8Jxum/LKukgzuTLQ==}
     peerDependencies:
       svelte: ^5
 
@@ -1346,8 +1346,8 @@ packages:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
     engines: {node: '>= 0.4'}
 
-  bits-ui@2.19.4:
-    resolution: {integrity: sha512-HTnJAqqxYq6u30c9jrxMjsV4xZfJsUb/KEzmdiENLgC3LEAaSXdDscpx/EKyk48YKmzO2z1+GQ6r/UO1POA6Wg==}
+  bits-ui@2.21.0:
+    resolution: {integrity: sha512-kfJonux4r+XOnqGCBQaqFfhRUvDbuZQgyjXADfk0/QJGc8LlQchkrGc6rCd+ldo1EixCJEXlM7znKVIUtuf7OQ==}
     engines: {node: '>=20'}
     peerDependencies:
       '@internationalized/date': ^3.8.1
@@ -1994,8 +1994,8 @@ packages:
       svelte: ^4.0.0 || ^5.0.0-next.0
       typescript: ^5.0.0 || ^6.0.0
 
-  svelte-toolbelt@0.10.6:
-    resolution: {integrity: sha512-YWuX+RE+CnWYx09yseAe4ZVMM7e7GRFZM6OYWpBKOb++s+SQ8RBIMMe+Bs/CznBMc0QPLjr+vDBxTAkozXsFXQ==}
+  svelte-toolbelt@0.10.7:
+    resolution: {integrity: sha512-gjuUVEEpo38UJCeI1ssE3NxG31tYENczPTcTGTXf4338qAQNdR9I1oAEbQY0KQFmbdUojNIhHuRNix7ThwFNxQ==}
     engines: {node: '>=18', pnpm: '>=8.7.0'}
     peerDependencies:
       svelte: ^5.30.2
@@ -2004,8 +2004,8 @@ packages:
     resolution: {integrity: sha512-Uqj49lWKB+iSSnneuwiYYJ7MZgkB+eXr0LXBhv4uDuAkXqnWmq65Sxflfvp0Lc6MdKjMUxGaeOKWJqz5SNiVIA==}
     engines: {node: '>=18'}
 
-  tabbable@6.5.0:
-    resolution: {integrity: sha512-wieBHXygIm7OyQOu5hQlkk62/WyCFYGlWg7L6/ZCUZwx0o398Zkn4pVmMyfYhfMG8kGrj/Krt8eIk6UKC6VzwA==}
+  tabbable@6.5.1:
+    resolution: {integrity: sha512-dMCuwDUY6Noz3zVKLefBC4wq+aJV20yc7vWmM7uTNGwtQSFF5kX7OUIUsxuVajz/bdt5Xqdah3/0NLjth+cM5A==}
 
   tailwind-variants@3.3.1:
     resolution: {integrity: sha512-4pAvwUtM4HKBiRZftncAbpn6V9Hhwoa5Fl7O2u5zbp7Z5Cvu+/o/6+176WY3WCEES209543quG8zFIcXCsc5Jw==}
@@ -2379,7 +2379,7 @@ snapshots:
   '@libsql/win32-x64-msvc@0.5.29':
     optional: true
 
-  '@lucide/svelte@1.49.0(svelte@5.57.1)':
+  '@lucide/svelte@1.72.0(svelte@5.57.1)':
     dependencies:
       svelte: 5.57.1
 
@@ -2801,7 +2801,7 @@ snapshots:
 
   axobject-query@4.1.0: {}
 
-  bits-ui@2.19.4(@internationalized/date@3.12.4)(svelte@5.57.1):
+  bits-ui@2.21.0(@internationalized/date@3.12.4)(svelte@5.57.1):
     dependencies:
       '@floating-ui/core': 1.8.0
       '@floating-ui/dom': 1.8.0
@@ -2809,8 +2809,8 @@ snapshots:
       esm-env: 1.2.2
       runed: 0.35.1(svelte@5.57.1)
       svelte: 5.57.1
-      svelte-toolbelt: 0.10.6(svelte@5.57.1)
-      tabbable: 6.5.0
+      svelte-toolbelt: 0.10.7(svelte@5.57.1)
+      tabbable: 6.5.1
     transitivePeerDependencies:
       - '@sveltejs/kit'
 
@@ -3306,7 +3306,7 @@ snapshots:
     transitivePeerDependencies:
       - picomatch
 
-  svelte-toolbelt@0.10.6(svelte@5.57.1):
+  svelte-toolbelt@0.10.7(svelte@5.57.1):
     dependencies:
       clsx: 2.1.1
       runed: 0.35.1(svelte@5.57.1)
@@ -3335,7 +3335,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  tabbable@6.5.0: {}
+  tabbable@6.5.1: {}
 
   tailwind-variants@3.3.1(tailwindcss@4.3.3):
     optionalDependencies:
