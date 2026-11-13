@@ -1,13 +1,16 @@
 import {
 	defaultFieldSource,
+	mapEntryIdOfSource,
 	transactionFieldsSchema,
 	zTransactionAmount,
+	type Rule,
 } from "@bank-scraper/shared";
 import { zValidator } from "@hono/zod-validator";
-import { and, count, countDistinct, desc, eq, isNull, like, or, sql } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { adminMerchantMapApi } from "./adminMerchantMap.ts";
 import { adminMerchantsApi } from "./adminMerchants.ts";
 import { adminRulesApi } from "./adminRules.ts";
 import { db, tables } from "./db/db.ts";
@@ -19,7 +22,11 @@ import {
 	type Transaction,
 } from "./db/schema.ts";
 import { parseForRules } from "./processing/derive.ts";
-import { listBankTransactionKeys, processBankTransactions } from "./processing/process.ts";
+import {
+	listBankTransactionKeys,
+	mapEntryLabel,
+	processBankTransactions,
+} from "./processing/process.ts";
 import { readUserscript, userscriptInstallPath, userscriptVersion } from "./userscript.ts";
 import { escapeLikePattern } from "./utils.ts";
 
@@ -91,6 +98,7 @@ const latestRawTransactions = () => {
 export const adminApi = new Hono()
 	.route("/rules", adminRulesApi)
 	.route("/merchants", adminMerchantsApi)
+	.route("/merchant-map", adminMerchantMapApi)
 
 	/** GET /api/admin/dashboard */
 	.get("/dashboard", async (c) => {
@@ -337,6 +345,27 @@ export const adminApi = new Hono()
 			.where(eq(transactionVersions.transactionId, transaction.id))
 			.orderBy(transactionVersions.id);
 
+		const mapEntryIds = versions.flatMap(({ version }) =>
+			Object.values(version.fieldSources).flatMap((source) => mapEntryIdOfSource(source) ?? []),
+		);
+		const mapEntries = mapEntryIds.length
+			? await db
+					.select()
+					.from(tables.merchantMapEntries)
+					.where(inArray(tables.merchantMapEntries.id, mapEntryIds))
+			: [];
+
+		/** The name of a rule or a map entry that set a field, `null` for a rule the revision lacks */
+		const sourceName = (source: string, revisionRules: Rule[] | null) => {
+			const mapEntryId = mapEntryIdOfSource(source);
+			if (mapEntryId === undefined) {
+				return revisionRules?.find((rule) => rule.id === source)?.name ?? null;
+			}
+
+			const entry = mapEntries.find((candidate) => candidate.id === mapEntryId);
+			return entry ? mapEntryLabel(entry) : "Map entry (deleted)";
+		};
+
 		return c.json(
 			{
 				transaction: transactionJson(transaction),
@@ -348,13 +377,16 @@ export const adminApi = new Hono()
 					ruleRevisionId: version.ruleRevisionId,
 					appCommit: version.appCommit,
 					data: version.data,
-					/** Fields a rule set, with the name the rule had in that revision */
+					/**
+					 * Fields a rule or a merchant map entry set, with the name the rule had in that revision,
+					 * or the entry's text and merchant
+					 */
 					fieldRules: Object.entries(version.fieldSources)
 						.filter(([, source]) => source !== defaultFieldSource)
 						.map(([field, ruleId]) => ({
 							field,
 							ruleId,
-							ruleName: revisionRules?.find((rule) => rule.id === ruleId)?.name ?? null,
+							ruleName: sourceName(ruleId, revisionRules),
 						})),
 					createdAt: version.createdAt.toString(),
 				})),

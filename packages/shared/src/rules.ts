@@ -6,6 +6,15 @@ import { transactionFieldsSchema, type TransactionField } from "./transaction.ts
 /** What a field was set by when no rule set it, in place of a rule id */
 export const defaultFieldSource = "default";
 
+const mapSourcePrefix = "map:";
+
+/** What a merchant was set by when a merchant map entry set it, in place of a rule id */
+export const mapFieldSource = (entryId: string) => `${mapSourcePrefix}${entryId}`;
+
+/** The entry id of a field source that `mapFieldSource` made, `undefined` for any other source */
+export const mapEntryIdOfSource = (source: string) =>
+	source.startsWith(mapSourcePrefix) ? source.slice(mapSourcePrefix.length) : undefined;
+
 export type RuleOperator = (typeof ruleOperators)[number];
 export const ruleOperators = ["contains", "equals", "regex"] as const;
 

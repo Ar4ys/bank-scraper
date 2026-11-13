@@ -144,3 +144,24 @@ function toQuery<T extends Record<string, string | number | boolean | undefined>
 			.map(([key, value]) => [key, String(value)]),
 	) as { [K in keyof T]: T[K] extends string | undefined ? T[K] : string };
 }
+
+export type MerchantMapEntry = Awaited<ReturnType<typeof loadMerchantMap>>[number];
+export const loadMerchantMap = () => unwrap(api["merchant-map"].$get());
+
+/** What a merchant map entry says: payments whose field contains the text get the merchant */
+export type MerchantMapEntryInput = Pick<MerchantMapEntry, "field" | "text" | "merchant">;
+
+export const addMerchantMapEntry = (entry: MerchantMapEntryInput, dryRun: boolean) =>
+	unwrap(api["merchant-map"].$post({ query: dryRunQuery(dryRun), json: entry }));
+
+export const updateMerchantMapEntry = (
+	id: string,
+	changes: Partial<MerchantMapEntryInput>,
+	dryRun: boolean,
+) =>
+	unwrap(
+		api["merchant-map"][":id"].$patch({ param: { id }, query: dryRunQuery(dryRun), json: changes }),
+	);
+
+export const deleteMerchantMapEntry = (id: string, dryRun: boolean) =>
+	unwrap(api["merchant-map"][":id"].$delete({ param: { id }, query: dryRunQuery(dryRun) }));

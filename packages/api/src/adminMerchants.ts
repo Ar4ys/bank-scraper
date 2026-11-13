@@ -1,76 +1,29 @@
 import { zValidator } from "@hono/zod-validator";
-import { count, eq, isNotNull, TransactionRollbackError } from "drizzle-orm";
-import { Hono, type Context } from "hono";
+import { count, eq, isNotNull } from "drizzle-orm";
+import { Hono } from "hono";
 import { z } from "zod";
 
-import { reportJson } from "./adminRules.ts";
+import {
+	changeAndReprocess,
+	dryRunQuery,
+	idParam,
+	reject,
+	respond,
+	type Rejection,
+} from "./adminChanges.ts";
 import { db, tables } from "./db/db.ts";
 import { sqlDateTimeNow, TransactionVersionCause, type Merchant } from "./db/schema.ts";
 import { merchantKey } from "./processing/merchants.ts";
-import { listBankTransactionKeys, processBankTransactions } from "./processing/process.ts";
 
 const { merchants, merchantNames, transactions } = tables;
-
-const idParam = zValidator("param", z.object({ id: z.string() }));
-
-const dryRunQuery = zValidator(
-	"query",
-	z.object({
-		/** Report what would change without writing anything */
-		dryRun: z.stringbool().default(false),
-	}),
-);
-
-type Rejection = { rejected: { status: 400 | 404 | 409; message: string } };
-
-const reject = (status: Rejection["rejected"]["status"], message: string): Rejection => ({
-	rejected: { status, message },
-});
 
 const notFound = reject(404, "Merchant not found");
 
 const findMerchant = (id: string) => db.select().from(merchants).where(eq(merchants.id, id)).get();
 
-/**
- * Runs a change of merchants and derives every transaction again, so that they get their new
- * merchant and a version that records it. Returns what `change` returned together with the report
- * of that processing, or the rejection of `change`, which must not have written anything then.
- *
- * With `dryRun` all of it is rolled back, and the report says what would change.
- */
-function changeMerchants<T extends object>(dryRun: boolean, change: () => Rejection | T) {
-	const outcome: { value?: Rejection | (T & ReturnType<typeof reportJson>) } = {};
-
-	try {
-		db.transaction((tx) => {
-			const changed = change();
-
-			if ("rejected" in changed) {
-				outcome.value = changed;
-				return;
-			}
-
-			const report = processBankTransactions(listBankTransactionKeys(), {
-				cause: TransactionVersionCause.Merchants,
-			});
-			outcome.value = { ...changed, ...reportJson(report) };
-
-			// A dry run that only pretended could report something else than the real run does
-			if (dryRun) tx.rollback();
-		});
-	} catch (error) {
-		if (!(error instanceof TransactionRollbackError)) throw error;
-	}
-
-	if (!outcome.value) throw new Error("The change of merchants has no outcome");
-
-	return outcome.value;
-}
-
-const respond = <T extends object>(c: Context, result: Rejection | T) =>
-	"rejected" in result
-		? c.json({ message: result.rejected.message }, result.rejected.status)
-		: c.json(result, 200);
+/** `changeAndReprocess` of a change of merchants */
+const changeMerchants = <T extends object>(dryRun: boolean, change: () => Rejection | T) =>
+	changeAndReprocess(dryRun, TransactionVersionCause.Merchants, change);
 
 const describeMerchant = (merchant: Merchant) =>
 	`"${merchant.name}"${merchant.deletedAt ? " (deleted)" : ""}`;

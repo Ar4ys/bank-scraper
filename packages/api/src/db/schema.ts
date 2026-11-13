@@ -200,6 +200,8 @@ export const TransactionVersionCause = Object.freeze({
 	Reprocess: "reprocess",
 	/** A merchant was renamed, merged, detached, deleted or restored */
 	Merchants: "merchants",
+	/** A merchant map entry was added, changed or removed */
+	MerchantMap: "merchant-map",
 });
 
 /** Which rule set a field, or `"default"` when the code did */
@@ -244,6 +246,37 @@ export const rules = s.snakeCase.table("rules", {
 	createdAt: instant().notNull().default(sqlDateTimeNow),
 	updatedAt: instant().notNull().default(sqlDateTimeNow),
 });
+
+export type MerchantMapField = DefineEnum<typeof MerchantMapField>;
+/** The field of a card or mobile payment's `details` that a merchant map entry is looked for in */
+export const MerchantMapField = Object.freeze({
+	Address: "address",
+	City: "city",
+});
+
+export type MerchantMapEntry = typeof merchantMapEntries.$inferSelect;
+/**
+ * The merchant of card and mobile payments for which the bank names none: a payment whose field
+ * contains the text gets the merchant. When several entries match, the longest text wins.
+ */
+export const merchantMapEntries = s.snakeCase.table(
+	"merchant_map_entries",
+	{
+		id: s.text().primaryKey().$defaultFn(randomUUIDv7),
+		field: s.text().$type<MerchantMapField>().notNull(),
+		/** As entered, trimmed */
+		text: s.text().notNull(),
+		/** `text` as it is matched, see `matchText` */
+		matchKey: s.text().notNull(),
+		/** A merchant name, looked up like the merchant text of a rule */
+		merchant: s.text().notNull(),
+		createdAt: instant().notNull().default(sqlDateTimeNow),
+		updatedAt: instant().notNull().default(sqlDateTimeNow),
+	},
+	(table) => [
+		s.uniqueIndex("merchant_map_entries_field_match_key_unique").on(table.field, table.matchKey),
+	],
+);
 
 export type RuleRevision = typeof ruleRevisions.$inferSelect;
 /** Snapshots of the whole rule list, one per "apply" */

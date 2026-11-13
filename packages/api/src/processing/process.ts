@@ -1,6 +1,8 @@
 import { isDeepStrictEqual } from "node:util";
 
 import {
+	mapEntryIdOfSource,
+	mapFieldSource,
 	transactionFieldsSchema,
 	type Rule,
 	type TransactionFieldsJson,
@@ -18,6 +20,7 @@ import {
 	type ProcessingError,
 } from "../db/schema.ts";
 import { deriveTransaction } from "./derive.ts";
+import { type MerchantMap } from "./merchantMap.ts";
 import { loadMerchantDirectory, resolveMerchant, type MerchantDirectory } from "./merchants.ts";
 
 /** Identifies one bank transaction; its raw rows are the versions of it */
@@ -38,7 +41,7 @@ export type TransactionChange = BankTransactionKey & {
 	txType: string;
 	before: TransactionFieldsJson | null;
 	after: TransactionFieldsJson;
-	/** Rule ids, or `defaultFieldSource`, that set the fields of `before` */
+	/** Rule ids, map sources or `defaultFieldSource`, that set the fields of `before` */
 	fieldSourcesBefore: FieldSources | null;
 	fieldSources: FieldSources;
 };
@@ -58,10 +61,11 @@ export type ProcessingReport = {
 	unchanged: number;
 	holds: number;
 	/**
-	 * Names of the rules in the field sources of the changes, by rule id. A rule that is not in the
-	 * rules processed with has the name it had in the revision that set the field.
+	 * Names of the rules and merchant map entries in the field sources of the changes, by source. A
+	 * rule that is not in the rules processed with has the name it had in the revision that set the
+	 * field; a map entry that no longer exists has none.
 	 */
-	ruleNames: Record<string, string>;
+	sourceNames: Record<string, string>;
 };
 
 export type ProcessOptions = {
@@ -73,11 +77,12 @@ export type ProcessOptions = {
 	 * What the caller changed before processing. A transaction of which only the merchant changes is
 	 * recorded with this cause; any other change gets the cause it would get without it.
 	 */
-	cause?: typeof TransactionVersionCause.Merchants;
+	cause?: typeof TransactionVersionCause.Merchants | typeof TransactionVersionCause.MerchantMap;
 };
 
 type ProcessContext = {
 	ruleRevision: RuleRevisionRef;
+	merchantMap: MerchantMap;
 	merchantDirectory: MerchantDirectory;
 	dryRun: boolean;
 	cause: ProcessOptions["cause"];
@@ -103,6 +108,7 @@ function processOne(
 	key: BankTransactionKey,
 	{
 		ruleRevision,
+		merchantMap,
 		merchantDirectory,
 		dryRun,
 		cause: causeOfCaller,
@@ -130,7 +136,7 @@ function processOne(
 		db.update(rawTransactions).set({ status, error }).where(eq(rawTransactions.id, raw.id)).run();
 	};
 
-	const derived = deriveTransaction(raw.data, ruleRevision.rules);
+	const derived = deriveTransaction(raw.data, ruleRevision.rules, merchantMap);
 
 	if (derived.status === RawTransactionStatus.Hold) {
 		report.holds++;
@@ -272,12 +278,13 @@ export function processBankTransactions(
 		errors: [],
 		unchanged: 0,
 		holds: 0,
-		ruleNames: {},
+		sourceNames: {},
 	};
 
 	inTransaction(() => {
 		const context = {
 			ruleRevision,
+			merchantMap: loadMerchantMap(),
 			merchantDirectory: loadMerchantDirectory(),
 			dryRun,
 			cause,
@@ -287,7 +294,10 @@ export function processBankTransactions(
 
 		for (const key of keys) processOne(key, context);
 
-		report.ruleNames = getRuleNames(ruleRevision.rules, [...context.revisionIdsBefore]);
+		report.sourceNames = {
+			...getRuleNames(ruleRevision.rules, [...context.revisionIdsBefore]),
+			...getMapSourceNames(report.changes),
+		};
 	});
 
 	return report;
@@ -311,6 +321,37 @@ function getRuleNames(rules: readonly Rule[], revisionIds: string[]): Record<str
 			rule.id,
 			rule.name,
 		]),
+	);
+}
+
+/** Every merchant map entry, oldest first, see `MerchantMap` */
+export const loadMerchantMap = (): MerchantMap =>
+	db.select().from(tables.merchantMapEntries).orderBy(tables.merchantMapEntries.id).all();
+
+/** `Map: "<text>" → <merchant>` of a map entry */
+export const mapEntryLabel = (entry: { text: string; merchant: string }) =>
+	`Map: "${entry.text}" → ${entry.merchant}`;
+
+/** Labels of the map entries that set a field of the changes, by source; deleted entries have none */
+function getMapSourceNames(changes: readonly TransactionChange[]): Record<string, string> {
+	const entryIds = new Set(
+		changes
+			.flatMap((change) => [
+				...Object.values(change.fieldSources),
+				...Object.values(change.fieldSourcesBefore ?? {}),
+			])
+			.flatMap((source) => mapEntryIdOfSource(source) ?? []),
+	);
+	if (!entryIds.size) return {};
+
+	const { merchantMapEntries } = tables;
+	return Object.fromEntries(
+		db
+			.select()
+			.from(merchantMapEntries)
+			.where(inArray(merchantMapEntries.id, [...entryIds]))
+			.all()
+			.map((entry) => [mapFieldSource(entry.id), mapEntryLabel(entry)]),
 	);
 }
 

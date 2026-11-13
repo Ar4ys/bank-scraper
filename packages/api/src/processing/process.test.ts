@@ -267,7 +267,7 @@ describe("processing", () => {
 			[change.txType, change.fieldSourcesBefore?.merchant, change.fieldSources.merchant],
 			["cardTransaction", "lidl", "market"],
 		);
-		assert.deepEqual(report.ruleNames, { lidl: "Lidl, deleted later", market: "Market" });
+		assert.deepEqual(report.sourceNames, { lidl: "Lidl, deleted later", market: "Market" });
 	});
 
 	it("reports the type and the fields without rules of a transaction the rules fail on", async () => {

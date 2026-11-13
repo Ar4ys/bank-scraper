@@ -119,7 +119,7 @@
 
 				{#if version.fieldRules.length}
 					<p class="text-xs text-muted-foreground">
-						Set by rules:
+						Set by:
 						{#each version.fieldRules as fieldRule (fieldRule.field)}
 							<span class="mr-3">
 								<span class="font-mono">{fieldRule.field}</span>

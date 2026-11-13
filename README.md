@@ -16,7 +16,9 @@ Collects my PKO Bank Polski (iPKO) transactions from the web UI into a local SQL
    version of the raw transaction, a new rule revision, or a change of the code. A raw transaction
    that cannot be parsed keeps the error on its row and leaves its transaction untouched. Holds are
    stored but never become transactions.
-4. The merchant that defaults and rules derive is only a name. It is looked up, ignoring case, among
+4. For a card or mobile payment the bank names no merchant for, the merchant map (see "Merchant
+   map" below) can name one from the payment's address or city. The merchant that defaults, the
+   map and rules derive is only a name. It is looked up, ignoring case, among
    the merchants of the admin app's Merchants page, and the transaction gets that merchant. A name
    that is not known yet becomes a new merchant. Merchants can be renamed, merged, deleted and
    restored there: merging one into another makes its names stand for the merchant that is left,
@@ -126,6 +128,20 @@ the transaction's last version recorded. The changes can be filtered by field an
 
 - `mise run dev-admin` starts the Vite dev server, which proxies `/api` to the API on port 8585.
 - `mise run build-admin` builds it into `packages/admin/dist`, which the API serves at `/`.
+
+### Merchant map
+
+The merchant of card and mobile payments for which the bank names none, edited on the Merchant map
+page: each entry says "a payment whose address (or city) contains this text gets this merchant".
+
+- Matching ignores case and treats every run of whitespace as one space. When several entries
+  match, the longest text wins, and of equally long ones the oldest entry.
+- A merchant name from the bank is never replaced by the map, and a rule that sets the merchant
+  overrides it.
+- The merchant of an entry is a name, looked up among the merchants like the merchant a rule
+  derives, so renames and merges keep working and a new name becomes a new merchant.
+- Every change shows which transactions would change, applies at once and reprocesses every
+  transaction, recording "merchant map" as the cause in its history. There are no drafts.
 
 ### Rules
 

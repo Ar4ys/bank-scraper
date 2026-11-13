@@ -1,4 +1,5 @@
 import {
+	mapFieldSource,
 	transactionFieldsSchema,
 	type Rule,
 	type TransactionFieldsJson,
@@ -9,6 +10,7 @@ import { RawTransactionStatus, type FieldSources, type ProcessingError } from ".
 import { baseTxSchema, ipkoTransactionSchema, ipkoTransactionToJson } from "../ipkoSchemas.ts";
 import { zodPrettifyError } from "../zod.ts";
 import { deriveDefaults } from "./defaults.ts";
+import { findMapEntry, type MerchantMap } from "./merchantMap.ts";
 import { applyRules } from "./rules.ts";
 
 export type DeriveResult =
@@ -41,10 +43,15 @@ export function parseForRules(rawData: unknown): Record<string, unknown> | undef
 }
 
 /**
- * Derives the fields of a transaction from the bank's JSON: strict parsing, code defaults, then
- * rules. Rules see the parsed transaction in its JSON form, see `ipkoTransactionToJson`.
+ * Derives the fields of a transaction from the bank's JSON: strict parsing, code defaults, the
+ * merchant map for a payment the bank names no merchant for, then rules. Rules see the parsed
+ * transaction in its JSON form, see `ipkoTransactionToJson`.
  */
-export function deriveTransaction(rawData: unknown, rules: readonly Rule[]): DeriveResult {
+export function deriveTransaction(
+	rawData: unknown,
+	rules: readonly Rule[],
+	merchantMap: MerchantMap = [],
+): DeriveResult {
 	const base = baseTxSchema.safeParse(rawData);
 	if (!base.success) return schemaError(base.error);
 	if (base.data.is_hold) return { status: RawTransactionStatus.Hold };
@@ -53,7 +60,15 @@ export function deriveTransaction(rawData: unknown, rules: readonly Rule[]): Der
 	if (!parsed.success) return schemaError(parsed.error);
 
 	const defaults = deriveDefaults(parsed.data);
-	const result = applyRules(defaults, ipkoTransactionToJson(parsed.data), rules);
+	const sources: Partial<FieldSources> = {};
+
+	const mapEntry = defaults.merchant === null ? findMapEntry(parsed.data, merchantMap) : undefined;
+	if (mapEntry) {
+		defaults.merchant = mapEntry.merchant;
+		sources.merchant = mapFieldSource(mapEntry.id);
+	}
+
+	const result = applyRules(defaults, ipkoTransactionToJson(parsed.data), rules, sources);
 
 	if (!result.success) {
 		return {

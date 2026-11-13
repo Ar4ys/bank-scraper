@@ -38,17 +38,21 @@ export type ApplyRulesResult =
  * Lets rules override the default fields. For every field the first enabled rule, by priority, that
  * matches the bank transaction and sets that field wins. Fails when a rule produced a value its
  * field cannot hold, e.g. a date that is not a date.
+ *
+ * `sources` names what set a default field when it was not the code, e.g. a merchant map entry.
  */
 export function applyRules(
 	defaults: TransactionFields,
 	bankTransaction: unknown,
 	rules: readonly Rule[],
+	sources: Partial<FieldSources> = {},
 ): ApplyRulesResult {
 	const fields: Record<string, unknown> = z.encode(transactionFieldsSchema, defaults);
 	// oxlint-disable-next-line typescript/no-unsafe-type-assertion
 	const fieldSources = Object.fromEntries(
 		Object.keys(fields).map((field) => [field, defaultFieldSource]),
 	) as FieldSources;
+	Object.assign(fieldSources, sources);
 
 	const matchingRules = rules
 		.filter((rule) => rule.enabled)

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { defaultFieldSource, diffJson } from "@bank-scraper/shared";
+	import { defaultFieldSource, diffJson, mapEntryIdOfSource } from "@bank-scraper/shared";
 
 	import { loadAccounts, type Account, type ProcessingReport } from "$lib/api";
 	import JsonDiff from "$lib/components/JsonDiff.svelte";
@@ -80,11 +80,23 @@
 
 	const accountName = (id: number) => accounts.find((account) => account.id === id)?.name ?? id;
 
-	const ruleName = (source: string) =>
-		source === defaultFieldSource ? "code" : (report.ruleNames[source] ?? source);
+	const ruleName = (source: string) => {
+		if (source === defaultFieldSource) return "code";
+		if (mapEntryIdOfSource(source) !== undefined) {
+			return report.sourceNames[source] ?? "Map entry (deleted)";
+		}
 
-	const sourceNote = (source: string | undefined) =>
-		source === undefined ? undefined : source === defaultFieldSource ? "code" : `rule: ${ruleName(source)}`;
+		return report.sourceNames[source] ?? source;
+	};
+
+	const sourceNote = (source: string | undefined) => {
+		if (source === undefined) return undefined;
+		if (source === defaultFieldSource || mapEntryIdOfSource(source) !== undefined) {
+			return ruleName(source);
+		}
+
+		return `rule: ${ruleName(source)}`;
+	};
 
 	/** What set each changed field, and what set it before when that was something else */
 	const notesOf = (change: Change) =>
