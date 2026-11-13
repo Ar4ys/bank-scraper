@@ -366,6 +366,9 @@
 						<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
 							View transactions
 						</Button>
+						<Button variant="outline" size="sm" disabled={busy} onclick={() => startMerge(merchant)}>
+							Merge into…
+						</Button>
 						<Button size="sm" disabled={busy} onclick={() => markReviewed(merchant)}>
 							Looks fine
 						</Button>
