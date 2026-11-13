@@ -20,6 +20,7 @@
 	const search = queryText("search");
 	const withoutMerchant = queryFlag("withoutMerchant");
 	const merchantId = queryText("merchantId");
+	const merchantMapEntryId = queryText("merchantMapEntryId");
 	const offset = queryCount("offset");
 
 	const page = latest(() =>
@@ -29,6 +30,7 @@
 			accountId: accountId.value,
 			search: search.value,
 			merchantId: merchantId.value,
+			merchantMapEntryId: merchantMapEntryId.value,
 			withoutMerchant: withoutMerchant.value || undefined,
 		}),
 	);
@@ -66,6 +68,18 @@
 			}}
 		>
 			Of one merchant ✕
+		</Button>
+	{/if}
+	{#if merchantMapEntryId.value}
+		<Button
+			variant="outline"
+			size="sm"
+			onclick={() => {
+				merchantMapEntryId.value = "";
+				offset.value = 0;
+			}}
+		>
+			Of one map entry ✕
 		</Button>
 	{/if}
 </div>

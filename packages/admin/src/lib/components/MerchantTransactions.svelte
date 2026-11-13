@@ -7,12 +7,12 @@
 	import { latest } from "$lib/latest.svelte";
 	import { p } from "$lib/router";
 
-	let { merchantId }: { merchantId: string } = $props();
+	let { filter }: { filter: { merchantId: string } | { merchantMapEntryId: string } } = $props();
 
 	const limit = 50;
 	let offset = $state(0);
 
-	const page = latest(() => loadTransactions({ limit, offset, merchantId }));
+	const page = latest(() => loadTransactions({ limit, offset, ...filter }));
 </script>
 
 {#if page.error}

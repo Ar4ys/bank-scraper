@@ -1,6 +1,7 @@
 import {
 	defaultFieldSource,
 	mapEntryIdOfSource,
+	mapFieldSource,
 	transactionFieldsSchema,
 	zTransactionAmount,
 	type Rule,
@@ -293,12 +294,14 @@ export const adminApi = new Hono()
 				/** `true` lists only transactions that have no merchant */
 				withoutMerchant: z.stringbool().optional(),
 				merchantId: z.string().optional(),
+				/** Lists only transactions whose merchant this merchant map entry sets now */
+				merchantMapEntryId: z.string().optional(),
 				/** Text to find in merchant, description or the bank's id */
 				search: z.string().optional(),
 			}),
 		),
 		async (c) => {
-			const { limit, offset, accountId, withoutMerchant, merchantId, search } =
+			const { limit, offset, accountId, withoutMerchant, merchantId, merchantMapEntryId, search } =
 				c.req.valid("query");
 			const pattern = search && `%${escapeLikePattern(search)}%`;
 
@@ -306,6 +309,9 @@ export const adminApi = new Hono()
 				accountId === undefined ? undefined : eq(transactions.accountId, accountId),
 				withoutMerchant ? isNull(transactions.merchant) : undefined,
 				merchantId ? eq(transactions.merchantId, merchantId) : undefined,
+				merchantMapEntryId
+					? sql`json_extract(${transactions.fieldSources}, '$.merchant') = ${mapFieldSource(merchantMapEntryId)}`
+					: undefined,
 				pattern
 					? or(
 							like(transactions.merchant, pattern),

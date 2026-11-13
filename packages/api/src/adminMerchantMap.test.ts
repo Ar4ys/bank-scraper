@@ -126,6 +126,17 @@ describe("admin merchant map API", () => {
 		]);
 	});
 
+	it("lists the transactions whose merchant an entry sets", async () => {
+		const bankIdsOf = async (text: string) => {
+			const entry = (await listEntries()).find((candidate: any) => candidate.text === text);
+			const { body } = await request(`/transactions?merchantMapEntryId=${entry.id}`);
+			return body.items.map((item: any) => item.bankId);
+		};
+
+		assert.deepEqual(await bankIdsOf("MART"), ["mart-1"]);
+		assert.deepEqual(await bankIdsOf("SUPERMART"), ["mart-2"]);
+	});
+
 	it("refuses an entry that matches the same text as another one", async () => {
 		const { status, body } = await request("/merchant-map", "POST", {
 			field: "address",

@@ -51,6 +51,7 @@ export const loadTransactions = (query: {
 	accountId?: string;
 	withoutMerchant?: boolean;
 	merchantId?: string;
+	merchantMapEntryId?: string;
 	search?: string;
 }) => unwrap(api.transactions.$get({ query: toQuery(query) }));
 

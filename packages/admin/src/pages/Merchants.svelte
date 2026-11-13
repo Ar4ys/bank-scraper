@@ -653,7 +653,7 @@
 		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto">
 			{#if transactionsOf}
 				{#key transactionsOf.id}
-					<MerchantTransactions merchantId={transactionsOf.id} />
+					<MerchantTransactions filter={{ merchantId: transactionsOf.id }} />
 				{/key}
 			{/if}
 		</div>

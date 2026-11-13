@@ -19,6 +19,7 @@
 	import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
 
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
+	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -63,6 +64,14 @@
 	function viewTransactions(place: RecurringPlace) {
 		transactionsOf = place;
 		transactionsOpen = true;
+	}
+
+	let entryTransactionsOpen = $state(false);
+	let entryTransactionsOf = $state<MerchantMapEntry>();
+
+	function viewEntryTransactions(entry: MerchantMapEntry) {
+		entryTransactionsOf = entry;
+		entryTransactionsOpen = true;
 	}
 	const filter = queryText("search");
 	let busy = $state(false);
@@ -391,8 +400,19 @@
 				<Table.Cell>{fieldLabels[entry.field]}</Table.Cell>
 				<Table.Cell class="min-w-48 font-mono text-xs whitespace-pre-wrap wrap-anywhere">{entry.text}</Table.Cell>
 				<Table.Cell class="min-w-48 font-medium whitespace-normal wrap-anywhere">{entry.merchant}</Table.Cell>
-				<Table.Cell class="text-right tabular-nums">{entry.transactionCount}</Table.Cell>
+				<Table.Cell class="text-right tabular-nums">
+					<button
+						class="cursor-pointer hover:underline hover:underline-offset-4"
+						title="View transactions"
+						onclick={() => viewEntryTransactions(entry)}
+					>
+						{entry.transactionCount}
+					</button>
+				</Table.Cell>
 				<Table.Cell class="whitespace-nowrap text-right">
+					<Button variant="outline" size="sm" onclick={() => viewEntryTransactions(entry)}>
+						View transactions
+					</Button>
 					<Button variant="outline" size="sm" disabled={busy} onclick={() => startEdit(entry)}>
 						Edit
 					</Button>
@@ -542,6 +562,37 @@
 					{/each}
 				</Table.Body>
 			</Table.Root>
+		</div>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={entryTransactionsOpen}>
+	<Dialog.Content
+		class="flex max-h-[85vh] flex-col sm:max-w-3xl"
+		onOpenAutoFocus={(event) => event.preventDefault()}
+	>
+		<Dialog.Header>
+			<Dialog.Title>
+				Transactions of "{entryTransactionsOf?.text}" → {entryTransactionsOf?.merchant}
+			</Dialog.Title>
+			<Dialog.Description>
+				{#if entryTransactionsOf}
+					<a
+						class="underline underline-offset-4"
+						href={p("/transactions", { search: { merchantMapEntryId: entryTransactionsOf.id } })}
+					>
+						Open in Transactions
+					</a>
+				{/if}
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto">
+			{#if entryTransactionsOf}
+				{#key entryTransactionsOf.id}
+					<MerchantTransactions filter={{ merchantMapEntryId: entryTransactionsOf.id }} />
+				{/key}
+			{/if}
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
