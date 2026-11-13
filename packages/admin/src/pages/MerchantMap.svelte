@@ -225,9 +225,9 @@
 					<Table.Cell class="whitespace-nowrap text-xs">
 						{place.firstDate}<br />{place.lastDate}
 					</Table.Cell>
-					<Table.Cell class="font-mono text-xs">
+					<Table.Cell class="min-w-56 font-mono text-xs">
 						{#each shownAddresses as { address, payments } (address)}
-							<div class="whitespace-pre">
+							<div class="whitespace-pre-wrap wrap-anywhere">
 								{address} <span class="text-muted-foreground">×{payments}</span>
 							</div>
 						{/each}
@@ -299,8 +299,8 @@
 		{#each shown as entry (entry.id)}
 			<Table.Row>
 				<Table.Cell>{fieldLabels[entry.field]}</Table.Cell>
-				<Table.Cell class="font-mono text-xs whitespace-pre">{entry.text}</Table.Cell>
-				<Table.Cell class="font-medium">{entry.merchant}</Table.Cell>
+				<Table.Cell class="min-w-48 font-mono text-xs whitespace-pre-wrap wrap-anywhere">{entry.text}</Table.Cell>
+				<Table.Cell class="min-w-48 font-medium whitespace-normal wrap-anywhere">{entry.merchant}</Table.Cell>
 				<Table.Cell class="text-right tabular-nums">{entry.transactionCount}</Table.Cell>
 				<Table.Cell class="whitespace-nowrap text-right">
 					<Button variant="outline" size="sm" disabled={busy} onclick={() => startEdit(entry)}>

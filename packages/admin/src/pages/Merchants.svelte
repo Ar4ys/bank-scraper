@@ -306,9 +306,13 @@
 		<span class="flex flex-wrap items-center gap-1.5 text-xs">
 			<span class="text-muted-foreground">Possible duplicates:</span>
 			{#each others as other (other.id)}
-				<span class="inline-flex items-center gap-1 rounded-md border py-0.5 pr-0.5 pl-2">
+				<span
+					class="inline-flex max-w-full items-center gap-1 rounded-md border py-0.5 pr-0.5 pl-2 whitespace-normal wrap-anywhere"
+				>
 					{other.name}
-					<span class="tabular-nums text-muted-foreground">({other.transactionCount})</span>
+					<span class="shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">
+						({other.transactionCount})
+					</span>
 					<Button
 						variant="outline"
 						size="xs"
@@ -346,13 +350,13 @@
 		<Table.Body>
 			{#each toReview as merchant (merchant.id)}
 				<Table.Row>
-					<Table.Cell class="font-medium">{merchant.name}</Table.Cell>
+					<Table.Cell class="min-w-48 font-medium whitespace-normal wrap-anywhere">{merchant.name}</Table.Cell>
 					<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
-					<Table.Cell class="space-y-1">
+					<Table.Cell class="min-w-72 space-y-1 whitespace-normal">
 						{#if merchant.otherNames.length}
 							<span class="flex flex-wrap gap-1">
 								{#each merchant.otherNames as other (other.key)}
-									<Badge variant="secondary">{other.name}</Badge>
+									<Badge variant="secondary" class="h-auto whitespace-normal wrap-anywhere">{other.name}</Badge>
 								{/each}
 							</span>
 						{/if}
@@ -401,7 +405,8 @@
 	</Table.Header>
 	<Table.Body>
 		{#each active as merchant (merchant.id)}
-			<Table.Row>
+			{@const hasDuplicates = suggestionsOf(merchant).length > 0}
+			<Table.Row class={hasDuplicates ? "border-b-0" : ""}>
 				<Table.Cell><Input class="min-w-56" bind:value={names[merchant.id]} /></Table.Cell>
 				<Table.Cell>
 					<Button
@@ -413,10 +418,12 @@
 					</Button>
 				</Table.Cell>
 				<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
-				<Table.Cell class="space-y-1">
+				<Table.Cell class="whitespace-normal">
 					<span class="flex flex-wrap gap-1.5">
 						{#each merchant.otherNames as other (other.key)}
-							<span class="inline-flex items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-0.5 pl-2 text-xs font-medium">
+							<span
+								class="inline-flex max-w-full items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-0.5 pl-2 text-xs font-medium whitespace-normal wrap-anywhere"
+							>
 								{other.name}
 								<Button
 									variant="outline"
@@ -431,7 +438,6 @@
 							</span>
 						{/each}
 					</span>
-					{@render duplicates(merchant)}
 				</Table.Cell>
 				<Table.Cell class="whitespace-nowrap text-right">
 					<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
@@ -445,6 +451,14 @@
 					</Button>
 				</Table.Cell>
 			</Table.Row>
+			{#if hasDuplicates}
+				<!-- Its own row: next to the rename field and the buttons the chips get squeezed -->
+				<Table.Row>
+					<Table.Cell colspan={5} class="pt-0 whitespace-normal">
+						{@render duplicates(merchant)}
+					</Table.Cell>
+				</Table.Row>
+			{/if}
 		{:else}
 			<Table.Row>
 				<Table.Cell colspan={5} class="text-muted-foreground">No merchants</Table.Cell>
@@ -468,11 +482,11 @@
 		<Table.Body>
 			{#each deleted as merchant (merchant.id)}
 				<Table.Row>
-					<Table.Cell class="font-medium">{merchant.name}</Table.Cell>
+					<Table.Cell class="min-w-48 font-medium whitespace-normal wrap-anywhere">{merchant.name}</Table.Cell>
 					<Table.Cell>
 						<span class="flex flex-wrap gap-1">
 							{#each merchant.otherNames as other (other.key)}
-								<Badge variant="secondary">{other.name}</Badge>
+								<Badge variant="secondary" class="h-auto whitespace-normal wrap-anywhere">{other.name}</Badge>
 							{/each}
 						</span>
 					</Table.Cell>
