@@ -350,7 +350,18 @@
 		<Table.Body>
 			{#each toReview as merchant (merchant.id)}
 				<Table.Row>
-					<Table.Cell class="min-w-48 font-medium whitespace-normal wrap-anywhere">{merchant.name}</Table.Cell>
+					<Table.Cell>
+						<span class="flex items-center gap-2">
+							<Input class="min-w-56" bind:value={names[merchant.id]} />
+							<Button
+								size="sm"
+								disabled={busy || !names[merchant.id]?.trim() || names[merchant.id] === merchant.name}
+								onclick={() => rename(merchant)}
+							>
+								Rename
+							</Button>
+						</span>
+					</Table.Cell>
 					<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
 					<Table.Cell class="min-w-72 space-y-1 whitespace-normal">
 						{#if merchant.otherNames.length}

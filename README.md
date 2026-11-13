@@ -155,7 +155,8 @@ shop under several spellings or store numbers) pile up. The Merchants page helps
   name, any of their names counting. Names are compared without case, diacritics, punctuation,
   words with digits and legal forms such as `sp. z o.o.`, by the trigrams they share.
 - "Not a duplicate" stops suggesting a pair, until one of the two is merged away or removed.
-- "Merge into…" is on the merchants in "To review" too, for a duplicate that is not suggested.
+- "Rename" and "Merge into…" are on the merchants in "To review" too, so a merchant can be
+  reviewed without looking for it in the list of all merchants.
 
 ### Merchant map
 
