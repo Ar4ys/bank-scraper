@@ -130,9 +130,34 @@ export const merchants = s.snakeCase.table("merchants", {
 	name: s.text().notNull(),
 	/** Set while the merchant is deleted: its transactions are derived without a merchant */
 	deletedAt: instant(),
+	/** When it was confirmed in the review; `null` while it waits to be reviewed */
+	reviewedAt: instant(),
 	createdAt: instant().notNull().default(sqlDateTimeNow),
 	updatedAt: instant().notNull().default(sqlDateTimeNow),
 });
+
+/**
+ * Pairs of merchants that are not duplicates, so they are not suggested for merging. The smaller id
+ * is always `merchantId`. A pair goes away with either merchant.
+ */
+export const merchantDismissals = s.snakeCase.table(
+	"merchant_dismissals",
+	{
+		merchantId: s
+			.text()
+			.notNull()
+			.references(() => merchants.id, { onDelete: "cascade" }),
+		otherMerchantId: s
+			.text()
+			.notNull()
+			.references(() => merchants.id, { onDelete: "cascade" }),
+		createdAt: instant().notNull().default(sqlDateTimeNow),
+	},
+	(table) => [
+		s.primaryKey({ columns: [table.merchantId, table.otherMerchantId] }),
+		s.check("merchant_dismissals_ordered", sql`${table.merchantId} < ${table.otherMerchantId}`),
+	],
+);
 
 export type MerchantName = typeof merchantNames.$inferSelect;
 /**
@@ -180,6 +205,12 @@ export const transactions = s.snakeCase.table(
 		 */
 		rawTransactionId: s.text().references(() => rawTransactions.id),
 		ruleRevisionId: s.text().references(() => ruleRevisions.id),
+		/**
+		 * What set each field in the last processing. Unlike the latest version's, it is current also
+		 * when only the source changed, e.g. a rule replaced by a merchant map entry that names the
+		 * same merchant. `null` until the transaction is processed again.
+		 */
+		fieldSources: s.blob({ mode: "json" }).$type<FieldSources>(),
 		createdAt: instant().notNull().default(sqlDateTimeNow),
 		updatedAt: instant().notNull().default(sqlDateTimeNow),
 	},

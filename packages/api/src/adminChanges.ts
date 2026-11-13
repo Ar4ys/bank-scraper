@@ -3,10 +3,13 @@ import { TransactionRollbackError } from "drizzle-orm";
 import { type Context } from "hono";
 import { z } from "zod";
 
-import { reportJson } from "./adminRules.ts";
 import { db } from "./db/db.ts";
 import { type TransactionVersionCause } from "./db/schema.ts";
-import { listBankTransactionKeys, processBankTransactions } from "./processing/process.ts";
+import {
+	listBankTransactionKeys,
+	processBankTransactions,
+	type ProcessingReport,
+} from "./processing/process.ts";
 
 export const idParam = zValidator("param", z.object({ id: z.string() }));
 
@@ -17,6 +20,15 @@ export const dryRunQuery = zValidator(
 		dryRun: z.stringbool().default(false),
 	}),
 );
+
+/** A processing report as JSON, with errors cut to their stage and message */
+export const reportJson = (report: ProcessingReport) => ({
+	...report,
+	errors: report.errors.map(({ error, ...rest }) => ({
+		...rest,
+		error: { stage: error.stage, message: error.message },
+	})),
+});
 
 export type Rejection = { rejected: { status: 400 | 404 | 409; message: string } };
 

@@ -71,6 +71,18 @@ export const updateAccount = (
 export type Merchant = Awaited<ReturnType<typeof loadMerchants>>[number];
 export const loadMerchants = () => unwrap(api.merchants.$get());
 
+/** By merchant id: the merchants that are probably the same one, best first */
+export type MerchantSuggestions = Awaited<ReturnType<typeof loadMerchantSuggestions>>;
+export const loadMerchantSuggestions = () => unwrap(api.merchants.suggestions.$get());
+
+/** Confirms a merchant in the review; nothing is reprocessed */
+export const reviewMerchant = (id: string) =>
+	unwrap(api.merchants[":id"].review.$post({ param: { id } }));
+
+/** Marks two merchants as no duplicates, so they are not suggested together again */
+export const dismissMerchantPair = (id: string, otherId: string) =>
+	unwrap(api.merchants[":id"].dismiss.$post({ param: { id }, json: { otherId } }));
+
 /**
  * Changes of merchants derive every transaction again and report what changed. With `dryRun`
  * nothing is written, and the report says what would change.
@@ -129,6 +141,14 @@ export const previewRules = (rules: RuleDraft[], only?: { accountId: number; ban
 	unwrap(api.rules.preview.$post({ json: { rules: toRulesInput(rules), only } }));
 
 export const applyRules = () => unwrap(api.rules.apply.$post());
+
+/**
+ * Replaces the rules that only map an address or city text to a merchant with merchant map entries.
+ * With `dryRun` nothing is written, and the report says what would change.
+ */
+export type RuleMoveReport = Awaited<ReturnType<typeof moveRulesToMerchantMap>>;
+export const moveRulesToMerchantMap = (dryRun: boolean) =>
+	unwrap(api.rules["move-to-merchant-map"].$post({ query: dryRunQuery(dryRun) }));
 
 export type RuleRevisionSummary = Awaited<ReturnType<typeof loadRuleRevisions>>[number];
 export const loadRuleRevisions = () => unwrap(api.rules.revisions.$get());

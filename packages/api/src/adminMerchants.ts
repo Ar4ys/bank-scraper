@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { count, eq, isNotNull } from "drizzle-orm";
+import { count, eq, isNotNull, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -14,8 +14,12 @@ import {
 import { db, tables } from "./db/db.ts";
 import { sqlDateTimeNow, TransactionVersionCause, type Merchant } from "./db/schema.ts";
 import { merchantKey } from "./processing/merchants.ts";
+import { findSuggestions } from "./processing/merchantSimilarity.ts";
 
-const { merchants, merchantNames, transactions } = tables;
+const { merchants, merchantNames, merchantDismissals, transactions } = tables;
+
+/** One key per unordered pair of merchant ids */
+const dismissalKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 const notFound = reject(404, "Merchant not found");
 
@@ -48,6 +52,8 @@ export const adminMerchantsApi = new Hono()
 				id: merchant.id,
 				name: merchant.name,
 				deletedAt: merchant.deletedAt?.toString() ?? null,
+				/** `null` while the merchant waits to be reviewed */
+				reviewedAt: merchant.reviewedAt?.toString() ?? null,
 				/** Always 0 for a deleted merchant: its transactions have no merchant */
 				transactionCount: counts.find((row) => row.merchantId === merchant.id)?.total ?? 0,
 				/** The names that stand for the merchant besides the one it is shown with */
@@ -60,6 +66,81 @@ export const adminMerchantsApi = new Hono()
 			200,
 		);
 	})
+
+	/** GET /api/admin/merchants/suggestions */
+	.get("/suggestions", (c) => {
+		const active = db.select().from(merchants).where(isNull(merchants.deletedAt)).all();
+		const activeIds = new Set(active.map((merchant) => merchant.id));
+
+		const names = new Map<string, string[]>(
+			active.map((merchant) => [merchant.id, [merchant.name]]),
+		);
+		for (const name of db.select().from(merchantNames).all()) {
+			if (activeIds.has(name.merchantId)) names.get(name.merchantId)?.push(name.name);
+		}
+
+		const dismissed = new Set(
+			db
+				.select()
+				.from(merchantDismissals)
+				.all()
+				.map((pair) => dismissalKey(pair.merchantId, pair.otherMerchantId)),
+		);
+
+		const suggestions = findSuggestions(names, (a, b) => dismissed.has(dismissalKey(a, b)));
+
+		return c.json(
+			/** By merchant id: the merchants that are probably the same one, best first */
+			Object.fromEntries(suggestions),
+			200,
+		);
+	})
+
+	/** POST /api/admin/merchants/:id/review */
+	.post("/:id/review", idParam, (c) => {
+		const merchant = findMerchant(c.req.valid("param").id);
+		if (!merchant) return c.json({ message: notFound.rejected.message }, 404);
+		if (merchant.deletedAt) return c.json({ message: "A deleted merchant is not reviewed" }, 409);
+
+		if (!merchant.reviewedAt) {
+			db.update(merchants)
+				.set({ reviewedAt: Temporal.Now.instant(), updatedAt: sqlDateTimeNow })
+				.where(eq(merchants.id, merchant.id))
+				.run();
+		}
+
+		return c.json({}, 200);
+	})
+
+	/** POST /api/admin/merchants/:id/dismiss */
+	.post(
+		"/:id/dismiss",
+		idParam,
+		zValidator(
+			"json",
+			z.object({
+				/** The merchant that is not a duplicate of this one */
+				otherId: z.string(),
+			}),
+		),
+		(c) => {
+			const { id } = c.req.valid("param");
+			const { otherId } = c.req.valid("json");
+
+			if (id === otherId) return c.json({ message: "A merchant is no duplicate of itself" }, 400);
+			if (!findMerchant(id) || !findMerchant(otherId)) {
+				return c.json({ message: notFound.rejected.message }, 404);
+			}
+
+			const [merchantId, otherMerchantId] = id < otherId ? [id, otherId] : [otherId, id];
+			db.insert(merchantDismissals)
+				.values({ merchantId, otherMerchantId })
+				.onConflictDoNothing()
+				.run();
+
+			return c.json({}, 200);
+		},
+	)
 
 	/** PATCH /api/admin/merchants/:id */
 	.patch(
@@ -91,7 +172,7 @@ export const adminMerchantsApi = new Hono()
 				if (!known) db.insert(merchantNames).values({ key, name, merchantId: id }).run();
 
 				db.update(merchants)
-					.set({ name, updatedAt: sqlDateTimeNow })
+					.set({ name, reviewedAt: Temporal.Now.instant(), updatedAt: sqlDateTimeNow })
 					.where(eq(merchants.id, id))
 					.run();
 
@@ -139,6 +220,10 @@ export const adminMerchantsApi = new Hono()
 					.where(eq(transactions.merchantId, id))
 					.run();
 				db.delete(merchants).where(eq(merchants.id, id)).run();
+				db.update(merchants)
+					.set({ reviewedAt: Temporal.Now.instant(), updatedAt: sqlDateTimeNow })
+					.where(eq(merchants.id, intoId))
+					.run();
 
 				return {};
 			});

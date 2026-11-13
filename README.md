@@ -129,6 +129,19 @@ the transaction's last version recorded. The changes can be filtered by field an
 - `mise run dev-admin` starts the Vite dev server, which proxies `/api` to the API on port 8585.
 - `mise run build-admin` builds it into `packages/admin/dist`, which the API serves at `/`.
 
+### Merchant review
+
+New merchants appear whenever processing derives a name that is not known yet, so duplicates (one
+shop under several spellings or store numbers) pile up. The Merchants page helps to clean them up.
+
+- Every merchant starts in "To review", existing ones included. It leaves the list once it is
+  confirmed ("Looks fine"), renamed, or another merchant is merged into it. Deleting and restoring
+  keep the state.
+- Every merchant that is not deleted shows "Possible duplicates": other merchants with an alike
+  name, any of their names counting. Names are compared without case, diacritics, punctuation,
+  words with digits and legal forms such as `sp. z o.o.`, by the trigrams they share.
+- "Not a duplicate" stops suggesting a pair, until one of the two is merged away or removed.
+
 ### Merchant map
 
 The merchant of card and mobile payments for which the bank names none, edited on the Merchant map
@@ -142,6 +155,9 @@ page: each entry says "a payment whose address (or city) contains this text gets
   derives, so renames and merges keep working and a new name becomes a new merchant.
 - Every change shows which transactions would change, applies at once and reprocesses every
   transaction, recording "merchant map" as the cause in its history. There are no drafts.
+- "Move simple rules to the merchant map" on the Rules page turns rules that only give payments with
+  a text in their address or city a merchant into entries, a regex of literal alternatives into one
+  entry per text, and applies the remaining rules. It is meant to run once.
 
 ### Rules
 

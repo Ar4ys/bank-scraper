@@ -12,11 +12,13 @@
 		loadRuleRevision,
 		loadRuleRevisions,
 		loadRules,
+		moveRulesToMerchantMap,
 		previewRules,
 		saveRules,
 		type Account,
 		type ProcessingReport,
 		type RuleDraft,
+		type RuleMoveReport,
 		type RuleRevisionSummary,
 		type RulesState,
 	} from "$lib/api";
@@ -75,6 +77,9 @@
 	let report = $state<ProcessingReport>();
 	let reportTitle = $state("");
 	let reportOpen = $state(false);
+
+	let moveReport = $state<RuleMoveReport>();
+	let moveOpen = $state(false);
 
 	// The sample transaction: rules can be tried on it, and its values are shown next to the fields
 	let sampleAccountId = $state(String(searchParams.get("accountId") ?? ""));
@@ -146,6 +151,20 @@
 			reportOpen = false;
 			await load();
 			notice = `Rules applied: ${applied.changes.length} transaction(s) changed.`;
+		});
+
+	const previewMove = () =>
+		run(async () => {
+			moveReport = await moveRulesToMerchantMap(true);
+			moveOpen = true;
+		});
+
+	const applyMove = () =>
+		run(async () => {
+			const moved = await moveRulesToMerchantMap(false);
+			moveOpen = false;
+			await load();
+			notice = `${moved.convertedRules.length} rule(s) moved to ${moved.entryCount} merchant map entries: ${moved.changes.length} transaction(s) changed.`;
 		});
 
 	const loadRevision = (id: string) =>
@@ -335,6 +354,15 @@
 		<input id="import-rules" type="file" accept="application/json" class="hidden" onchange={importRules} />
 		<Button variant="outline" size="sm" disabled={busy || !hasUnsavedEdits} onclick={save}>Save draft</Button>
 		<Button size="sm" disabled={busy} onclick={() => preview()}>Preview changes</Button>
+		<Button
+			variant="outline"
+			size="sm"
+			disabled={busy || hasUnsavedEdits || hasUnappliedChanges}
+			title="Apply or discard your edits first"
+			onclick={previewMove}
+		>
+			Move simple rules to the merchant map
+		</Button>
 	</span>
 </div>
 
@@ -649,6 +677,57 @@
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (reportOpen = false)}>Close</Button>
 			<Button disabled={busy || reportBlocksApply} onclick={apply}>Apply rules</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={moveOpen}>
+	<Dialog.Content
+		class="flex max-h-[85vh] flex-col sm:max-w-3xl"
+		onOpenAutoFocus={(event) => event.preventDefault()}
+	>
+		<Dialog.Header>
+			<Dialog.Title>Move simple rules to the merchant map</Dialog.Title>
+			<Dialog.Description>
+				Rules that only give payments with a text in their address or city a merchant become merchant
+				map entries. The other rules stay. This is a preview. Applying writes the entries, deletes the
+				moved rules, makes the rest a new revision and reprocesses every transaction.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto">
+			{#if moveReport}
+				<p class="text-sm">
+					<span class="font-medium">{moveReport.convertedRules.length} rule(s)</span> become
+					<span class="font-medium">{moveReport.entryCount} entries</span>,
+					{moveReport.keptRules.length} stay.
+				</p>
+
+				<details class="text-sm">
+					<summary class="cursor-pointer">Rules that move</summary>
+					<ul class="list-disc pl-6">
+						{#each moveReport.convertedRules as name, index (index)}
+							<li>{name}</li>
+						{/each}
+					</ul>
+				</details>
+
+				<details class="text-sm">
+					<summary class="cursor-pointer">Rules that stay</summary>
+					<ul class="list-disc pl-6">
+						{#each moveReport.keptRules as kept, index (index)}
+							<li>{kept.name} <span class="text-muted-foreground">({kept.reason})</span></li>
+						{/each}
+					</ul>
+				</details>
+
+				<ReportView report={moveReport} />
+			{/if}
+		</div>
+
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (moveOpen = false)}>Close</Button>
+			<Button disabled={busy} onclick={applyMove}>Move the rules</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

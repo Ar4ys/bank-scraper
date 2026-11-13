@@ -2,13 +2,17 @@
 	import {
 		deleteMerchant,
 		detachMerchantName,
+		dismissMerchantPair,
 		loadMerchants,
+		loadMerchantSuggestions,
 		mergeMerchant,
 		removeMerchantPermanently,
 		renameMerchant,
 		restoreMerchant,
+		reviewMerchant,
 		type Merchant,
 		type MerchantChangeReport,
+		type MerchantSuggestions,
 	} from "$lib/api";
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
@@ -33,6 +37,7 @@
 	};
 
 	let merchants = $state<Merchant[]>([]);
+	let suggestions = $state<MerchantSuggestions>({});
 	let names = $state<Record<string, string>>({});
 	const filter = queryText("search");
 	const showDeleted = queryFlag("showDeleted");
@@ -48,6 +53,10 @@
 	let mergeOpen = $state(false);
 	let mergeSource = $state<Merchant>();
 	let mergeFilter = $state("");
+
+	/** The two merchants of a suggestion being merged, and which of them stays */
+	let pairMerge = $state<{ stays: Merchant; goes: Merchant }>();
+	let pairMergeOpen = $state(false);
 
 	let transactionsOpen = $state(false);
 	let transactionsOf = $state<Merchant>();
@@ -86,6 +95,21 @@
 				return (sortDescending.value ? -order : order) || byName;
 			}),
 	);
+	const merchantById = $derived(new Map(merchants.map((merchant) => [merchant.id, merchant])));
+
+	/** Merchants waiting to be reviewed, those with the most transactions first */
+	const toReview = $derived(
+		merchants
+			.filter((merchant) => !merchant.deletedAt && !merchant.reviewedAt)
+			.toSorted((a, b) => b.transactionCount - a.transactionCount || a.name.localeCompare(b.name)),
+	);
+
+	const suggestionsOf = (merchant: Merchant) =>
+		(suggestions[merchant.id] ?? []).flatMap((suggestion) => {
+			const other = merchantById.get(suggestion.merchantId);
+			return other ? [other] : [];
+		});
+
 	const deleted = $derived(
 		merchants.filter((merchant) => merchant.deletedAt && matches(merchant, filter.value)),
 	);
@@ -98,7 +122,7 @@
 
 	async function load() {
 		try {
-			merchants = await loadMerchants();
+			[merchants, suggestions] = await Promise.all([loadMerchants(), loadMerchantSuggestions()]);
 			names = Object.fromEntries(merchants.map((merchant) => [merchant.id, merchant.name]));
 		} catch (e) {
 			error = String(e);
@@ -200,6 +224,44 @@
 		});
 	}
 
+	/** Opens the merge of a suggested pair, keeping the merchant with more transactions */
+	function startPairMerge(merchant: Merchant, other: Merchant) {
+		pairMerge =
+			other.transactionCount > merchant.transactionCount
+				? { stays: other, goes: merchant }
+				: { stays: merchant, goes: other };
+		pairMergeOpen = true;
+	}
+
+	async function previewPairMerge() {
+		const pair = pairMerge;
+		if (!pair) return;
+
+		pairMergeOpen = false;
+		mergeSource = pair.goes;
+		await mergeInto(pair.stays);
+	}
+
+	async function act(action: () => Promise<unknown>) {
+		busy = true;
+		error = undefined;
+		notice = undefined;
+
+		try {
+			await action();
+			await load();
+		} catch (e) {
+			error = String(e);
+		} finally {
+			busy = false;
+		}
+	}
+
+	const markReviewed = (merchant: Merchant) => act(() => reviewMerchant(merchant.id));
+
+	const dismiss = (merchant: Merchant, other: Merchant) =>
+		act(() => dismissMerchantPair(merchant.id, other.id));
+
 	function viewTransactions(merchant: Merchant) {
 		transactionsOf = merchant;
 		transactionsOpen = true;
@@ -213,7 +275,9 @@
 	The merchant that rules and defaults derive for a transaction is looked up here by name, ignoring
 	case. Merging a merchant into another one makes its names stand for that merchant, for existing
 	and future transactions. A deleted merchant leaves its transactions without a merchant until it is
-	restored. Every change shows the transactions it affects before it is applied.
+	restored. Every change shows the transactions it affects before it is applied. New merchants wait
+	in "To review" until they are confirmed, renamed or have another merchant merged into them, and
+	merchants with alike names are suggested as possible duplicates.
 </p>
 
 <div class="flex flex-wrap items-center gap-4">
@@ -231,6 +295,80 @@
 {/if}
 {#if notice}
 	<p class="text-sm text-muted-foreground">{notice}</p>
+{/if}
+
+{#snippet duplicates(merchant: Merchant)}
+	{@const others = suggestionsOf(merchant)}
+	{#if others.length}
+		<span class="flex flex-wrap items-center gap-1.5 text-xs">
+			<span class="text-muted-foreground">Possible duplicates:</span>
+			{#each others as other (other.id)}
+				<span class="inline-flex items-center gap-1 rounded-md border py-0.5 pr-0.5 pl-2">
+					{other.name}
+					<span class="tabular-nums text-muted-foreground">({other.transactionCount})</span>
+					<Button
+						variant="outline"
+						size="xs"
+						disabled={busy}
+						onclick={() => startPairMerge(merchant, other)}
+					>
+						Merge
+					</Button>
+					<Button
+						variant="ghost"
+						size="xs"
+						disabled={busy}
+						onclick={() => dismiss(merchant, other)}
+					>
+						Not a duplicate
+					</Button>
+				</span>
+			{/each}
+		</span>
+	{/if}
+{/snippet}
+
+{#if toReview.length}
+	<h2 class="pt-2 text-lg font-semibold">To review ({toReview.length})</h2>
+
+	<Table.Root>
+		<Table.Header>
+			<Table.Row>
+				<Table.Head>Name</Table.Head>
+				<Table.Head class="text-right">Transactions</Table.Head>
+				<Table.Head>Merged names and possible duplicates</Table.Head>
+				<Table.Head></Table.Head>
+			</Table.Row>
+		</Table.Header>
+		<Table.Body>
+			{#each toReview as merchant (merchant.id)}
+				<Table.Row>
+					<Table.Cell class="font-medium">{merchant.name}</Table.Cell>
+					<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
+					<Table.Cell class="space-y-1">
+						{#if merchant.otherNames.length}
+							<span class="flex flex-wrap gap-1">
+								{#each merchant.otherNames as other (other.key)}
+									<Badge variant="secondary">{other.name}</Badge>
+								{/each}
+							</span>
+						{/if}
+						{@render duplicates(merchant)}
+					</Table.Cell>
+					<Table.Cell class="whitespace-nowrap text-right">
+						<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
+							View transactions
+						</Button>
+						<Button size="sm" disabled={busy} onclick={() => markReviewed(merchant)}>
+							Looks fine
+						</Button>
+					</Table.Cell>
+				</Table.Row>
+			{/each}
+		</Table.Body>
+	</Table.Root>
+
+	<h2 class="pt-4 text-lg font-semibold">All merchants</h2>
 {/if}
 
 {#snippet sortButton(key: SortKey, label: string)}
@@ -272,7 +410,7 @@
 					</Button>
 				</Table.Cell>
 				<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
-				<Table.Cell>
+				<Table.Cell class="space-y-1">
 					<span class="flex flex-wrap gap-1.5">
 						{#each merchant.otherNames as other (other.key)}
 							<span class="inline-flex items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-0.5 pl-2 text-xs font-medium">
@@ -290,6 +428,7 @@
 							</span>
 						{/each}
 					</span>
+					{@render duplicates(merchant)}
 				</Table.Cell>
 				<Table.Cell class="whitespace-nowrap text-right">
 					<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
@@ -421,6 +560,42 @@
 
 		<Dialog.Footer>
 			<Button variant="outline" onclick={() => (mergeOpen = false)}>Cancel</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={pairMergeOpen}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Merge "{pairMerge?.goes.name}" and "{pairMerge?.stays.name}"</Dialog.Title>
+			<Dialog.Description>
+				Pick the merchant that is left. You see the affected transactions before anything is written.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		{#if pairMerge}
+			{@const pair = pairMerge}
+			<div class="space-y-1">
+				{#each [pair.stays, pair.goes] as merchant (merchant.id)}
+					<label class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+						<input
+							type="radio"
+							name="stays"
+							checked={merchant.id === pair.stays.id}
+							onchange={() =>
+								(pairMerge =
+									merchant.id === pair.stays.id ? pair : { stays: pair.goes, goes: pair.stays })}
+						/>
+						<span class="font-medium">{merchant.name}</span>
+						<span class="ml-auto tabular-nums text-muted-foreground">{merchant.transactionCount}</span>
+					</label>
+				{/each}
+			</div>
+		{/if}
+
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (pairMergeOpen = false)}>Cancel</Button>
+			<Button disabled={busy} onclick={previewPairMerge}>Preview merge</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

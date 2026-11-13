@@ -1,6 +1,6 @@
 import { mapFieldSource } from "@bank-scraper/shared";
 import { zValidator } from "@hono/zod-validator";
-import { and, eq, inArray, max, ne } from "drizzle-orm";
+import { and, eq, isNotNull, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -21,7 +21,7 @@ import {
 } from "./db/schema.ts";
 import { matchText } from "./processing/merchantMap.ts";
 
-const { merchantMapEntries, transactionVersions } = tables;
+const { merchantMapEntries, transactions } = tables;
 
 const entryInputSchema = z.object({
 	field: z.enum(MerchantMapField),
@@ -58,23 +58,19 @@ function rejectDuplicate(field: MerchantMapField, matchKey: string, exceptId?: s
 const changeMap = <T extends object>(dryRun: boolean, change: () => Rejection | T) =>
 	changeAndReprocess(dryRun, TransactionVersionCause.MerchantMap, change);
 
-/** How many transactions each entry sets the merchant of, by entry id */
+/** How many transactions each entry sets the merchant of now */
 function countTransactionsByEntry(entries: readonly MerchantMapEntry[]) {
-	const latest = db
-		.select({ id: max(transactionVersions.id).as("latest_id") })
-		.from(transactionVersions)
-		.groupBy(transactionVersions.transactionId);
-
 	const sources = db
-		.select({ fieldSources: transactionVersions.fieldSources })
-		.from(transactionVersions)
-		.where(inArray(transactionVersions.id, latest))
+		.select({ fieldSources: transactions.fieldSources })
+		.from(transactions)
+		.where(isNotNull(transactions.fieldSources))
 		.all();
 
 	const counts = new Map(entries.map((entry) => [mapFieldSource(entry.id), 0]));
 	for (const { fieldSources } of sources) {
-		const current = counts.get(fieldSources.merchant);
-		if (current !== undefined) counts.set(fieldSources.merchant, current + 1);
+		const source = fieldSources?.merchant;
+		const current = source === undefined ? undefined : counts.get(source);
+		if (source !== undefined && current !== undefined) counts.set(source, current + 1);
 	}
 
 	return (entry: MerchantMapEntry) => counts.get(mapFieldSource(entry.id)) ?? 0;

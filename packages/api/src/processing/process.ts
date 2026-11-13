@@ -178,7 +178,12 @@ function processOne(
 	/** Remembers what the transaction was processed with, so that the next change gets the right cause */
 	const markProcessed = (transactionId: string) => {
 		db.update(transactions)
-			.set({ rawTransactionId: raw.id, ruleRevisionId: ruleRevision.id, merchantId: merchant.id })
+			.set({
+				rawTransactionId: raw.id,
+				ruleRevisionId: ruleRevision.id,
+				merchantId: merchant.id,
+				fieldSources: derived.fieldSources,
+			})
 			.where(eq(transactions.id, transactionId))
 			.run();
 		setRawStatus(RawTransactionStatus.Processed);
