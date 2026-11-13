@@ -18,6 +18,9 @@ import {
 	TransactionVersionCause,
 	type FieldSources,
 	type ProcessingError,
+	type RawTransaction,
+	type Transaction,
+	type TransactionVersion,
 } from "../db/schema.ts";
 import { deriveTransaction } from "./derive.ts";
 import { type MerchantMap } from "./merchantMap.ts";
@@ -104,8 +107,85 @@ export function getLatestRuleRevision(): RuleRevisionRef {
 	return revision ? { id: revision.id, rules: revision.rules } : { id: null, rules: [] };
 }
 
+/** Keys of a bank transaction as one string, for maps */
+const keyId = (key: BankTransactionKey) => `${key.accountId}\n${key.bankId}`;
+
+/** Bank transactions read from the database at a time, see `loadRows` */
+const BATCH_SIZE = 500;
+
+/** What processing reads about one bank transaction */
+type KeyRows = {
+	/** The latest raw row: only the latest version of the bank's data counts, older rows are history */
+	raw: RawTransaction | undefined;
+	transaction: Transaction | undefined;
+	latestVersion: TransactionVersion | undefined;
+};
+
+/**
+ * Reads what processing needs for a batch of bank transactions, in three queries per account. One
+ * query per bank transaction was most of the time a full reprocess took, as drizzle builds every
+ * query anew.
+ */
+function loadRows(keys: readonly BankTransactionKey[]): Map<string, KeyRows> {
+	const { rawTransactions, transactions, transactionVersions } = tables;
+	const rows = new Map<string, KeyRows>(
+		keys.map((key) => [
+			keyId(key),
+			{ raw: undefined, transaction: undefined, latestVersion: undefined },
+		]),
+	);
+
+	for (const [accountId, accountKeys] of Map.groupBy(keys, (key) => key.accountId)) {
+		const bankIds = accountKeys.map((key) => key.bankId);
+
+		const raws = db
+			.select()
+			.from(rawTransactions)
+			.where(
+				and(eq(rawTransactions.accountId, accountId), inArray(rawTransactions.bankId, bankIds)),
+			)
+			.all();
+		for (const raw of raws) {
+			const entry = rows.get(keyId(raw));
+			if (entry && (!entry.raw || raw.id > entry.raw.id)) entry.raw = raw;
+		}
+
+		const found = db
+			.select()
+			.from(transactions)
+			.where(and(eq(transactions.accountId, accountId), inArray(transactions.bankId, bankIds)))
+			.all();
+		for (const transaction of found) {
+			const entry = rows.get(keyId(transaction));
+			if (entry) entry.transaction = transaction;
+		}
+	}
+
+	const byTransactionId = new Map(
+		[...rows.values()].flatMap((entry) =>
+			entry.transaction ? [[entry.transaction.id, entry] as const] : [],
+		),
+	);
+	if (byTransactionId.size) {
+		const versions = db
+			.select()
+			.from(transactionVersions)
+			.where(inArray(transactionVersions.transactionId, [...byTransactionId.keys()]))
+			.all();
+		for (const version of versions) {
+			const entry = byTransactionId.get(version.transactionId);
+			if (entry && (!entry.latestVersion || version.id > entry.latestVersion.id)) {
+				entry.latestVersion = version;
+			}
+		}
+	}
+
+	return rows;
+}
+
 function processOne(
 	key: BankTransactionKey,
+	{ raw, transaction, latestVersion }: KeyRows,
 	{
 		ruleRevision,
 		merchantMap,
@@ -118,21 +198,11 @@ function processOne(
 ) {
 	const { rawTransactions, transactions, transactionVersions, accounts } = tables;
 
-	// Only the latest version of the bank's data counts, older rows are history
-	const raw = db
-		.select()
-		.from(rawTransactions)
-		.where(
-			and(eq(rawTransactions.accountId, key.accountId), eq(rawTransactions.bankId, key.bankId)),
-		)
-		.orderBy(desc(rawTransactions.id))
-		.limit(1)
-		.get();
-
 	if (!raw) return;
 
 	const setRawStatus = (status: RawTransactionStatus, error: ProcessingError | null = null) => {
-		if (dryRun) return;
+		// Writing what is there already would still cost a query for every transaction of every run
+		if (dryRun || (raw.status === status && isDeepStrictEqual(raw.error, error))) return;
 		db.update(rawTransactions).set({ status, error }).where(eq(rawTransactions.id, raw.id)).run();
 	};
 
@@ -159,33 +229,24 @@ function processOne(
 	const merchant = resolveMerchant(derived.fields.merchant, merchantDirectory, dryRun);
 	const derivedFields: TransactionFieldsJson = { ...derived.fields, merchant: merchant.name };
 
-	const transaction = db
-		.select()
-		.from(transactions)
-		.where(and(eq(transactions.accountId, key.accountId), eq(transactions.bankId, key.bankId)))
-		.get();
-
-	const latestVersion =
-		transaction &&
-		db
-			.select()
-			.from(transactionVersions)
-			.where(eq(transactionVersions.transactionId, transaction.id))
-			.orderBy(desc(transactionVersions.id))
-			.limit(1)
-			.get();
-
 	/** Remembers what the transaction was processed with, so that the next change gets the right cause */
 	const markProcessed = (transactionId: string) => {
-		db.update(transactions)
-			.set({
-				rawTransactionId: raw.id,
-				ruleRevisionId: ruleRevision.id,
-				merchantId: merchant.id,
-				fieldSources: derived.fieldSources,
-			})
-			.where(eq(transactions.id, transactionId))
-			.run();
+		const processedWith = {
+			rawTransactionId: raw.id,
+			ruleRevisionId: ruleRevision.id,
+			merchantId: merchant.id,
+			fieldSources: derived.fieldSources,
+		};
+		const unchanged =
+			transaction?.id === transactionId &&
+			transaction.rawTransactionId === processedWith.rawTransactionId &&
+			transaction.ruleRevisionId === processedWith.ruleRevisionId &&
+			transaction.merchantId === processedWith.merchantId &&
+			isDeepStrictEqual(transaction.fieldSources, processedWith.fieldSources);
+
+		if (!unchanged) {
+			db.update(transactions).set(processedWith).where(eq(transactions.id, transactionId)).run();
+		}
 		setRawStatus(RawTransactionStatus.Processed);
 	};
 
@@ -297,7 +358,19 @@ export function processBankTransactions(
 			revisionIdsBefore: new Set<string>(),
 		};
 
-		for (const key of keys) processOne(key, context);
+		// A key is processed once: its latest raw row is all that counts, and the rows of a batch are
+		// read before any of its keys is processed
+		const uniqueKeys = [...new Map(keys.map((key) => [keyId(key), key])).values()];
+
+		for (let start = 0; start < uniqueKeys.length; start += BATCH_SIZE) {
+			const batch = uniqueKeys.slice(start, start + BATCH_SIZE);
+			const rows = loadRows(batch);
+
+			for (const key of batch) {
+				const keyRows = rows.get(keyId(key));
+				if (keyRows) processOne(key, keyRows, context);
+			}
+		}
 
 		report.sourceNames = {
 			...getRuleNames(ruleRevision.rules, [...context.revisionIdsBefore]),
