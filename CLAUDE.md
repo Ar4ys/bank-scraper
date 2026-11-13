@@ -53,6 +53,7 @@ Tools and tasks are managed with mise (`mise install && pnpm install`). `mise.to
 | `mise run test`                          | All tests (`node --test`)                                 |
 | `node --test packages/api/src/x.test.ts` | One test file                                             |
 | `mise run typecheck`                     | `tsc -b`, then `svelte-check` for the admin app           |
+| `mise run benchmark`                     | Times reprocessing on synthetic data, see `README.md`     |
 | `oxlint`                                 | Lint, type aware, fails on any warning                    |
 | `oxfmt`                                  | Format in place (`oxfmt --check` to only check)           |
 | `mise run db-generate`                   | Generate a migration from `packages/api/src/db/schema.ts` |

@@ -45,6 +45,7 @@ The server applies pending migrations when it starts.
 | `mise run watch-server`     | Same, restarting on file changes                                   |
 | `mise run test`             | Runs the tests, each test file against its own temp SQLite file    |
 | `mise run typecheck`        | Typechecks all packages                                            |
+| `mise run benchmark`        | Times reprocessing every transaction, see "Performance" below      |
 | `mise run db-generate`      | Generates a migration from `packages/api/src/db/schema.ts`         |
 | `mise run db-migrate`       | Applies migrations without starting the server                     |
 | `mise run db-push`          | `db-generate` followed by `db-migrate`                             |
@@ -116,6 +117,19 @@ docker compose exec bank-scraper node tools/backup.ts /data/backup.db
 After a restore, "Auto-Sync" in iPKO brings back the transactions scraped after the backup: the
 date it starts from is restored with the backup, so it starts early enough. Scraping the same
 transaction twice is harmless.
+
+### Performance
+
+Every merchant map, merchant and rule change reprocesses every transaction, so its speed is what
+the admin app feels like. Two things guard it:
+
+- `src/processing/processQueries.test.ts`, part of `mise run test`, counts the queries of a
+  reprocess: reads in batches rather than per transaction, and no writes for transactions that do
+  not change.
+- `mise run benchmark` times a merchant map preview and the phases of processing on 3400 synthetic
+  payments in a temp database. With a file argument it uses a copy of that backup instead, made
+  with `tools/backup.ts`. It prints timings and counts only. In the container:
+  `docker compose exec bank-scraper node tools/benchmark.ts`.
 
 ## Admin app
 

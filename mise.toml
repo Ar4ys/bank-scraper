@@ -33,6 +33,11 @@ run = "node --watch src/server.ts"
 dir = "packages/api"
 run = "node --env-file=local/dev.env --watch src/server.ts"
 
+[tasks.benchmark]
+description = "Times reprocessing on synthetic data, or on a copy of a backup given as argument"
+dir = "packages/api"
+run = "node tools/benchmark.ts"
+
 [tasks.db-generate]
 dir = "packages/api"
 run = "pnpm exec drizzle-kit generate && node ./tools/patchMigrations.ts"
