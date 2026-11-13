@@ -142,14 +142,6 @@ export const previewRules = (rules: RuleDraft[], only?: { accountId: number; ban
 
 export const applyRules = () => unwrap(api.rules.apply.$post());
 
-/**
- * Replaces the rules that only map an address or city text to a merchant with merchant map entries.
- * With `dryRun` nothing is written, and the report says what would change.
- */
-export type RuleMoveReport = Awaited<ReturnType<typeof moveRulesToMerchantMap>>;
-export const moveRulesToMerchantMap = (dryRun: boolean) =>
-	unwrap(api.rules["move-to-merchant-map"].$post({ query: dryRunQuery(dryRun) }));
-
 export type RuleRevisionSummary = Awaited<ReturnType<typeof loadRuleRevisions>>[number];
 export const loadRuleRevisions = () => unwrap(api.rules.revisions.$get());
 export const loadRuleRevision = (id: string) =>

@@ -2,25 +2,20 @@ import { isDeepStrictEqual } from "node:util";
 
 import { ruleSchema, type Rule } from "@bank-scraper/shared";
 import { zValidator } from "@hono/zod-validator";
-import { desc, eq, TransactionRollbackError } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { dryRunQuery, reportJson } from "./adminChanges.ts";
+import { reportJson } from "./adminChanges.ts";
 import { db, tables } from "./db/db.ts";
 import { ipkoFieldsByType, IpkoTxType } from "./ipkoSchemas.ts";
-import { matchText } from "./processing/merchantMap.ts";
-import { loadMerchantDirectory } from "./processing/merchants.ts";
 import {
 	getLatestRuleRevision,
 	listBankTransactionKeys,
-	loadMerchantMap,
 	processBankTransactions,
-	type ProcessingReport,
 } from "./processing/process.ts";
-import { planRuleMigration } from "./processing/ruleMigration.ts";
 
-const { rules, ruleRevisions, merchantMapEntries } = tables;
+const { rules, ruleRevisions } = tables;
 
 const ipkoTxTypes = Object.values(IpkoTxType);
 
@@ -156,85 +151,6 @@ export const adminRulesApi = new Hono()
 		});
 
 		return c.json({ revisionId: revision.id, ...reportJson(report) }, 200);
-	})
-
-	/**
-	 * POST /api/admin/rules/move-to-merchant-map
-	 *
-	 * Replaces the rules that only map an address or city text to a merchant with merchant map
-	 * entries, applies the remaining rules as a new revision and reprocesses everything. A one-off
-	 * for moving existing rules to the map.
-	 */
-	.post("/move-to-merchant-map", dryRunQuery, (c) => {
-		const working = getWorkingRules();
-
-		if (!isDeepStrictEqual(working, getLatestRuleRevision().rules)) {
-			return c.json({ message: "Apply or discard your rule edits first" }, 409);
-		}
-
-		const plan = planRuleMigration(working, loadMerchantDirectory(), loadMerchantMap());
-
-		if (plan.conflicts.length) {
-			const lines = plan.conflicts.map(
-				(conflict) =>
-					`- ${conflict.field} "${conflict.text}": ${conflict.merchants.map((name) => `"${name}"`).join(", ")}`,
-			);
-			return c.json(
-				{
-					message: `These texts would name different merchants. Merge the merchants or change the rules first:\n${lines.join("\n")}`,
-				},
-				409,
-			);
-		}
-
-		const converted = new Set(plan.convertedRuleIds);
-		const remaining = working
-			.filter((rule) => !converted.has(rule.id))
-			.map((rule, index) => ({ ...rule, priority: index }));
-
-		const outcome: { report?: ProcessingReport } = {};
-
-		try {
-			db.transaction((tx) => {
-				for (const entry of plan.entries) {
-					db.insert(merchantMapEntries)
-						.values({
-							field: entry.field,
-							text: entry.text,
-							matchKey: matchText(entry.text),
-							merchant: entry.merchant,
-						})
-						.run();
-				}
-
-				db.delete(rules).run();
-				if (remaining.length) db.insert(rules).values(remaining).run();
-
-				const revision = db.insert(ruleRevisions).values({ rules: remaining }).returning().get();
-				outcome.report = processBankTransactions(listBankTransactionKeys(), {
-					ruleRevision: { id: revision.id, rules: remaining },
-				});
-
-				if (c.req.valid("query").dryRun) tx.rollback();
-			});
-		} catch (error) {
-			if (!(error instanceof TransactionRollbackError)) throw error;
-		}
-
-		if (!outcome.report) throw new Error("Moving the rules to the merchant map has no outcome");
-
-		return c.json(
-			{
-				...reportJson(outcome.report),
-				/** How many entries the map gets */
-				entryCount: plan.entries.length,
-				/** Names of the rules the entries replace */
-				convertedRules: working.filter((rule) => converted.has(rule.id)).map((rule) => rule.name),
-				/** Rules that stay, and why */
-				keptRules: plan.keptRules.map(({ name, reason }) => ({ name, reason })),
-			},
-			200,
-		);
 	})
 
 	/** GET /api/admin/rules/revisions */

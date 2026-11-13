@@ -177,9 +177,6 @@ page: each entry says "a payment whose address (or city) contains this text gets
 - A place that is not worth a merchant can be ignored: "Ignore for now" until it gets a payment
   dated after the day it was ignored, "Ignore forever" whatever comes. Ignored places are listed
   under "Ignored", where "Restore" puts them back. Ignoring changes no transaction.
-- "Move simple rules to the merchant map" on the Rules page turns rules that only give payments with
-  a text in their address or city a merchant into entries, a regex of literal alternatives into one
-  entry per text, and applies the remaining rules. It is meant to run once.
 
 ### Rules
 
