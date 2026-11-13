@@ -56,33 +56,58 @@ const places = async () => (await request("/merchant-map/places")).body;
 // The tests build on each other: listed, a merchant deleted, a place named
 describe("places without a merchant", () => {
 	it("lists recurring places of payments without a merchant, the most payments first", async () => {
-		assert.deepEqual(await places(), [
-			{
-				key: "lidl",
-				payments: 4,
-				firstDate: "2026-01-05",
-				lastDate: "2026-04-05",
-				addresses: [
-					{ address: "LIDL 3011", payments: 1 },
-					{ address: "LIDL 3012", payments: 1 },
-					{ address: "LIDL 3024", payments: 1 },
-					{ address: "LIDL3012", payments: 1 },
-				],
-				proposedText: "LIDL",
-			},
-			{
-				key: "corner cafe",
-				payments: 3,
-				firstDate: "2026-01-10",
-				lastDate: "2026-01-12",
-				addresses: [
-					{ address: "CORNER  CAFE", payments: 1 },
-					{ address: "corner cafe", payments: 1 },
-					{ address: "CORNER CAFE", payments: 1 },
-				],
-				proposedText: "CORNER CAFE",
-			},
-		]);
+		assert.deepEqual(
+			(await places()).map(({ transactions: _transactions, ...place }: any) => place),
+			[
+				{
+					key: "lidl",
+					payments: 4,
+					firstDate: "2026-01-05",
+					lastDate: "2026-04-05",
+					addresses: [
+						{ address: "LIDL 3011", payments: 1 },
+						{ address: "LIDL 3012", payments: 1 },
+						{ address: "LIDL 3024", payments: 1 },
+						{ address: "LIDL3012", payments: 1 },
+					],
+					proposedText: "LIDL",
+				},
+				{
+					key: "corner cafe",
+					payments: 3,
+					firstDate: "2026-01-10",
+					lastDate: "2026-01-12",
+					addresses: [
+						{ address: "CORNER  CAFE", payments: 1 },
+						{ address: "corner cafe", payments: 1 },
+						{ address: "CORNER CAFE", payments: 1 },
+					],
+					proposedText: "CORNER CAFE",
+				},
+			],
+		);
+	});
+
+	it("lists every payment of a place, the newest first", async () => {
+		const [lidl] = await places();
+		const { items } = (await request("/transactions")).body;
+		const idOf = (bankId: string) => items.find((item: any) => item.bankId === bankId).id;
+
+		assert.deepEqual(
+			lidl.transactions.map((payment: any) => [
+				payment.transactionId,
+				payment.date,
+				payment.amount,
+				payment.currency,
+				payment.description,
+			]),
+			[
+				[idOf("lidl-4"), "2026-04-05", "-57.33", "PLN", "LIDL 3024, Wroclaw, POLSKA"],
+				[idOf("lidl-3"), "2026-03-05", "-57.33", "PLN", "LIDL3012, Wroclaw, POLSKA"],
+				[idOf("lidl-2"), "2026-02-05", "-57.33", "PLN", "LIDL 3012, Wroclaw, POLSKA"],
+				[idOf("lidl-1"), "2026-01-05", "-57.33", "PLN", "LIDL 3011, Wroclaw, POLSKA"],
+			],
+		);
 	});
 
 	it("leaves out payments the bank names a merchant for, even when that merchant is deleted", async () => {

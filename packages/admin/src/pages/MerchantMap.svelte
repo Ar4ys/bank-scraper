@@ -2,10 +2,12 @@
 	import {
 		addMerchantMapEntry,
 		deleteMerchantMapEntry,
+		loadAccounts,
 		loadMerchantMap,
 		loadMerchants,
 		loadRecurringPlaces,
 		updateMerchantMapEntry,
+		type Account,
 		type Merchant,
 		type MerchantChangeReport,
 		type MerchantMapEntry,
@@ -18,7 +20,9 @@
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import * as Table from "$lib/components/ui/table";
+	import { amountClass } from "$lib/format";
 	import { queryText } from "$lib/queryState";
+	import { p } from "$lib/router";
 
 	/** A change of the map that is shown as a preview first and written only when applied */
 	type Proposal = {
@@ -39,6 +43,17 @@
 	let drafts = $state<Record<string, { text: string; merchant: string }>>({});
 	/** Places whose addresses are all shown */
 	let expanded = $state<Record<string, boolean>>({});
+	let accounts = $state<Account[]>([]);
+
+	let transactionsOpen = $state(false);
+	let transactionsOf = $state<RecurringPlace>();
+
+	const accountName = (id: number) => accounts.find((account) => account.id === id)?.name ?? id;
+
+	function viewTransactions(place: RecurringPlace) {
+		transactionsOf = place;
+		transactionsOpen = true;
+	}
 	const filter = queryText("search");
 	let busy = $state(false);
 	let error = $state<string>();
@@ -69,10 +84,11 @@
 
 	async function load() {
 		try {
-			[entries, merchants, places] = await Promise.all([
+			[entries, merchants, places, accounts] = await Promise.all([
 				loadMerchantMap(),
 				loadMerchants(),
 				loadRecurringPlaces(),
+				loadAccounts(),
 			]);
 			drafts = Object.fromEntries(
 				places.map((place) => [
@@ -236,7 +252,10 @@
 								bind:value={draft.merchant}
 							/>
 						</Table.Cell>
-						<Table.Cell>
+						<Table.Cell class="whitespace-nowrap">
+							<Button variant="outline" size="sm" onclick={() => viewTransactions(place)}>
+								View transactions
+							</Button>
 							<Button
 								size="sm"
 								disabled={busy || !draft.text.trim() || !draft.merchant.trim()}
@@ -380,5 +399,59 @@
 				Apply
 			</Button>
 		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={transactionsOpen}>
+	<Dialog.Content
+		class="flex max-h-[85vh] flex-col sm:max-w-3xl"
+		onOpenAutoFocus={(event) => event.preventDefault()}
+	>
+		<Dialog.Header>
+			<Dialog.Title>Payments of "{transactionsOf?.proposedText}"</Dialog.Title>
+			<Dialog.Description>
+				{transactionsOf?.payments} payment(s) without a merchant. A row opens its transaction in a new
+				tab.
+			</Dialog.Description>
+		</Dialog.Header>
+
+		<div class="min-h-0 flex-1 overflow-y-auto">
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Date</Table.Head>
+						<Table.Head>Account</Table.Head>
+						<Table.Head>Description</Table.Head>
+						<Table.Head class="text-right">Amount</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each transactionsOf?.transactions ?? [] as payment (payment.transactionId)}
+						<Table.Row class="relative">
+							<Table.Cell class="whitespace-nowrap tabular-nums">{payment.date}</Table.Cell>
+							<Table.Cell class="whitespace-nowrap">{accountName(payment.accountId)}</Table.Cell>
+							<Table.Cell class="max-w-md truncate">
+								<!-- The list stays open while a transaction is looked at -->
+								<a
+									class="stretched-link"
+									href={p("/transactions/:id", { params: { id: payment.transactionId } })}
+									target="_blank"
+									rel="noopener"
+									title="Open the transaction in a new tab"
+								>
+									{payment.description}
+								</a>
+							</Table.Cell>
+							<Table.Cell
+								class="whitespace-nowrap text-right tabular-nums {amountClass(payment.amount)}"
+							>
+								{payment.amount}
+								{payment.currency}
+							</Table.Cell>
+						</Table.Row>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</div>
 	</Dialog.Content>
 </Dialog.Root>
