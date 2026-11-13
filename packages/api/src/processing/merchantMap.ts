@@ -20,11 +20,15 @@ export function findMapEntry(tx: IpkoTransaction, map: MerchantMap): MerchantMap
 		return undefined;
 	}
 
+	const texts: Record<MerchantMapEntry["field"], string | undefined> = {
+		address: matchText(tx.details.address),
+		city: tx.details.city === undefined ? undefined : matchText(tx.details.city),
+	};
 	let winner: MerchantMapEntry | undefined;
 
 	for (const entry of map) {
-		const value = tx.details[entry.field];
-		if (value === undefined || !matchText(value).includes(entry.matchKey)) continue;
+		const text = texts[entry.field];
+		if (text === undefined || !text.includes(entry.matchKey)) continue;
 
 		if (!winner || entry.matchKey.length > winner.matchKey.length) winner = entry;
 	}
