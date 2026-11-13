@@ -169,6 +169,14 @@ function toQuery<T extends Record<string, string | number | boolean | undefined>
 export type RecurringPlace = Awaited<ReturnType<typeof loadRecurringPlaces>>[number];
 export const loadRecurringPlaces = () => unwrap(api["merchant-map"].places.$get());
 
+/** Leaves a place out of the list: for good, or until it gets a payment dated after today */
+export const ignorePlace = (key: string, forever: boolean) =>
+	unwrap(api["merchant-map"].places.ignore.$post({ json: { key, forever } }));
+
+/** Puts an ignored place back into the list */
+export const restorePlace = (key: string) =>
+	unwrap(api["merchant-map"].places.restore.$post({ json: { key } }));
+
 export type MerchantMapEntry = Awaited<ReturnType<typeof loadMerchantMap>>[number];
 export const loadMerchantMap = () => unwrap(api["merchant-map"].$get());
 

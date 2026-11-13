@@ -309,6 +309,17 @@ export const merchantMapEntries = s.snakeCase.table(
 	],
 );
 
+export type IgnoredPlace = typeof ignoredPlaces.$inferSelect;
+/** Places without a merchant that are left out of the list of places to name */
+export const ignoredPlaces = s.snakeCase.table("ignored_places", {
+	/** The place's `placeKey` */
+	key: s.text().primaryKey(),
+	/** Ignored even when it gets new payments; otherwise until a payment dated after `ignoredOn` */
+	forever: s.integer({ mode: "boolean" }).notNull(),
+	ignoredOn: plainDate().notNull(),
+	createdAt: instant().notNull().default(sqlDateTimeNow),
+});
+
 export type RuleRevision = typeof ruleRevisions.$inferSelect;
 /** Snapshots of the whole rule list, one per "apply" */
 export const ruleRevisions = s.snakeCase.table("rule_revisions", {

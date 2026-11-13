@@ -22,7 +22,7 @@ import {
 import { matchText } from "./processing/merchantMap.ts";
 import { listRecurringPlaces } from "./processing/places.ts";
 
-const { merchantMapEntries, transactions } = tables;
+const { merchantMapEntries, transactions, ignoredPlaces } = tables;
 
 const entryInputSchema = z.object({
 	field: z.enum(MerchantMapField),
@@ -103,6 +103,47 @@ export const adminMerchantMapApi = new Hono()
 
 	/** GET /api/admin/merchant-map/places */
 	.get("/places", (c) => c.json(listRecurringPlaces(), 200))
+
+	/** POST /api/admin/merchant-map/places/ignore */
+	.post(
+		"/places/ignore",
+		zValidator(
+			"json",
+			z.object({
+				key: z.string().nonempty(),
+				/** Also when it gets new payments; otherwise until a payment dated after today */
+				forever: z.boolean(),
+			}),
+		),
+		(c) => {
+			const { key, forever } = c.req.valid("json");
+
+			// The server's today can be before the date of the place's newest payment (its clock runs on
+			// another time zone than the bank's dates), which would bring the place back at once
+			const today = Temporal.Now.plainDateISO();
+			const lastDate = listRecurringPlaces().find((place) => place.key === key)?.lastDate;
+			const ignoredOn =
+				lastDate && Temporal.PlainDate.compare(Temporal.PlainDate.from(lastDate), today) > 0
+					? Temporal.PlainDate.from(lastDate)
+					: today;
+
+			db.insert(ignoredPlaces)
+				.values({ key, forever, ignoredOn })
+				.onConflictDoUpdate({ target: ignoredPlaces.key, set: { forever, ignoredOn } })
+				.run();
+
+			return c.json({}, 200);
+		},
+	)
+
+	/** POST /api/admin/merchant-map/places/restore */
+	.post("/places/restore", zValidator("json", z.object({ key: z.string().nonempty() })), (c) => {
+		db.delete(ignoredPlaces)
+			.where(eq(ignoredPlaces.key, c.req.valid("json").key))
+			.run();
+
+		return c.json({}, 200);
+	})
 
 	/** POST /api/admin/merchant-map */
 	.post("/", dryRunQuery, zValidator("json", entryInputSchema), (c) => {

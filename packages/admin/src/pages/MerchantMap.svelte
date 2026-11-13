@@ -2,10 +2,12 @@
 	import {
 		addMerchantMapEntry,
 		deleteMerchantMapEntry,
+		ignorePlace,
 		loadAccounts,
 		loadMerchantMap,
 		loadMerchants,
 		loadRecurringPlaces,
+		restorePlace,
 		updateMerchantMapEntry,
 		type Account,
 		type Merchant,
@@ -19,9 +21,10 @@
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
+	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
 	import { amountClass } from "$lib/format";
-	import { queryText } from "$lib/queryState";
+	import { queryFlag, queryText } from "$lib/queryState";
 	import { p } from "$lib/router";
 
 	/** A change of the map that is shown as a preview first and written only when applied */
@@ -44,6 +47,10 @@
 	/** Places whose addresses are all shown */
 	let expanded = $state<Record<string, boolean>>({});
 	let accounts = $state<Account[]>([]);
+	const showIgnored = queryFlag("showIgnored");
+
+	const openPlaces = $derived(places.filter((place) => !place.ignored));
+	const ignoredList = $derived(places.filter((place) => place.ignored));
 
 	let transactionsOpen = $state(false);
 	let transactionsOf = $state<RecurringPlace>();
@@ -178,6 +185,26 @@
 		});
 	}
 
+	async function act(action: () => Promise<unknown>) {
+		busy = true;
+		error = undefined;
+		notice = undefined;
+
+		try {
+			await action();
+			await load();
+		} catch (e) {
+			error = String(e);
+		} finally {
+			busy = false;
+		}
+	}
+
+	const ignore = (place: RecurringPlace, forever: boolean) =>
+		act(() => ignorePlace(place.key, forever));
+
+	const restore = (place: RecurringPlace) => act(() => restorePlace(place.key));
+
 	const remove = (entry: MerchantMapEntry) =>
 		propose({
 			title: `Delete "${entry.text}" → ${entry.merchant}`,
@@ -197,14 +224,84 @@
 	before it is applied.
 </p>
 
-{#if places.length}
-	<h2 class="pt-2 text-lg font-semibold">Places without a merchant ({places.length})</h2>
-	<p class="text-sm text-muted-foreground">
-		Card and mobile payments that have no merchant, grouped by their address without digits and
-		punctuation, from three payments on. Naming a place adds an entry for the text. The preview shows
-		every payment it catches, also outside the place.
-	</p>
+{#snippet placeRow(place: RecurringPlace)}
+	{@const draft = drafts[place.key]}
+	{@const shownAddresses = expanded[place.key] ? place.addresses : place.addresses.slice(0, 3)}
+	<Table.Row>
+		<Table.Cell class="text-right tabular-nums">{place.payments}</Table.Cell>
+		<Table.Cell class="whitespace-nowrap text-xs">
+			{place.firstDate}<br />{place.lastDate}
+		</Table.Cell>
+		<Table.Cell class="min-w-56 font-mono text-xs">
+			{#each shownAddresses as { address, payments } (address)}
+				<div class="whitespace-pre-wrap wrap-anywhere">
+					{address} <span class="text-muted-foreground">×{payments}</span>
+				</div>
+			{/each}
+			{#if place.addresses.length > 3}
+				<button
+					class="cursor-pointer text-muted-foreground underline underline-offset-4"
+					onclick={() => (expanded[place.key] = !expanded[place.key])}
+				>
+					{expanded[place.key] ? "Show fewer" : `Show all ${place.addresses.length}`}
+				</button>
+			{/if}
+		</Table.Cell>
+		{#if draft}
+			<Table.Cell>
+				<Input class="min-w-40 font-mono" bind:value={draft.text} />
+			</Table.Cell>
+			<Table.Cell>
+				<Input class="min-w-40" list="merchant-names" placeholder="Merchant" bind:value={draft.merchant} />
+			</Table.Cell>
+			<Table.Cell>
+				<div class="flex flex-wrap justify-end gap-1">
+					{#if place.ignored}
+						<span class="w-full text-right text-xs text-muted-foreground">
+							{place.ignored.forever ? "Ignored forever" : "Until a new payment"}
+						</span>
+					{/if}
+					<Button variant="outline" size="sm" onclick={() => viewTransactions(place)}>
+						View transactions
+					</Button>
+					<Button
+						size="sm"
+						disabled={busy || !draft.text.trim() || !draft.merchant.trim()}
+						onclick={() => name(place)}
+					>
+						Name it
+					</Button>
+					{#if place.ignored}
+						<Button variant="outline" size="sm" disabled={busy} onclick={() => restore(place)}>
+							Restore
+						</Button>
+					{:else}
+						<Button
+							variant="ghost"
+							size="sm"
+							disabled={busy}
+							title="Hidden until a payment dated after today arrives"
+							onclick={() => ignore(place, false)}
+						>
+							Ignore for now
+						</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							disabled={busy}
+							title="Hidden even when new payments arrive"
+							onclick={() => ignore(place, true)}
+						>
+							Ignore forever
+						</Button>
+					{/if}
+				</div>
+			</Table.Cell>
+		{/if}
+	</Table.Row>
+{/snippet}
 
+{#snippet placesTable(list: RecurringPlace[])}
 	<Table.Root>
 		<Table.Header>
 			<Table.Row>
@@ -217,58 +314,37 @@
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
-			{#each places as place (place.key)}
-				{@const draft = drafts[place.key]}
-				{@const shownAddresses = expanded[place.key] ? place.addresses : place.addresses.slice(0, 3)}
-				<Table.Row>
-					<Table.Cell class="text-right tabular-nums">{place.payments}</Table.Cell>
-					<Table.Cell class="whitespace-nowrap text-xs">
-						{place.firstDate}<br />{place.lastDate}
-					</Table.Cell>
-					<Table.Cell class="min-w-56 font-mono text-xs">
-						{#each shownAddresses as { address, payments } (address)}
-							<div class="whitespace-pre-wrap wrap-anywhere">
-								{address} <span class="text-muted-foreground">×{payments}</span>
-							</div>
-						{/each}
-						{#if place.addresses.length > 3}
-							<button
-								class="cursor-pointer text-muted-foreground underline underline-offset-4"
-								onclick={() => (expanded[place.key] = !expanded[place.key])}
-							>
-								{expanded[place.key] ? "Show fewer" : `Show all ${place.addresses.length}`}
-							</button>
-						{/if}
-					</Table.Cell>
-					{#if draft}
-						<Table.Cell>
-							<Input class="min-w-40 font-mono" bind:value={draft.text} />
-						</Table.Cell>
-						<Table.Cell>
-							<Input
-								class="min-w-40"
-								list="merchant-names"
-								placeholder="Merchant"
-								bind:value={draft.merchant}
-							/>
-						</Table.Cell>
-						<Table.Cell class="whitespace-nowrap">
-							<Button variant="outline" size="sm" onclick={() => viewTransactions(place)}>
-								View transactions
-							</Button>
-							<Button
-								size="sm"
-								disabled={busy || !draft.text.trim() || !draft.merchant.trim()}
-								onclick={() => name(place)}
-							>
-								Name it
-							</Button>
-						</Table.Cell>
-					{/if}
-				</Table.Row>
+			{#each list as place (place.key)}
+				{@render placeRow(place)}
 			{/each}
 		</Table.Body>
 	</Table.Root>
+{/snippet}
+
+{#if places.length}
+	<h2 class="pt-2 text-lg font-semibold">Places without a merchant ({openPlaces.length})</h2>
+	<p class="text-sm text-muted-foreground">
+		Card and mobile payments that have no merchant, grouped by their address without digits and
+		punctuation, from three payments on. Naming a place adds an entry for the text. The preview shows
+		every payment it catches, also outside the place. An ignored place leaves the list, for now (until
+		it gets a payment dated after the day it was ignored) or forever.
+	</p>
+
+	{#if openPlaces.length}
+		{@render placesTable(openPlaces)}
+	{:else}
+		<p class="text-sm text-muted-foreground">No places left to name.</p>
+	{/if}
+
+	{#if ignoredList.length}
+		<span class="flex items-center gap-2 pt-2">
+			<Switch id="show-ignored" bind:checked={showIgnored.value} />
+			<Label for="show-ignored">Ignored ({ignoredList.length})</Label>
+		</span>
+		{#if showIgnored.value}
+			{@render placesTable(ignoredList)}
+		{/if}
+	{/if}
 
 	<h2 class="pt-4 text-lg font-semibold">Entries ({entries.length})</h2>
 {/if}

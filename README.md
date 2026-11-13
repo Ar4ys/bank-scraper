@@ -174,6 +174,9 @@ page: each entry says "a payment whose address (or city) contains this text gets
   are one place), from three payments on. "Name it" adds an entry for a proposed text, the longest
   one all the addresses of the place share, after the usual preview. Payments of a deleted merchant
   are listed too.
+- A place that is not worth a merchant can be ignored: "Ignore for now" until it gets a payment
+  dated after the day it was ignored, "Ignore forever" whatever comes. Ignored places are listed
+  under "Ignored", where "Restore" puts them back. Ignoring changes no transaction.
 - "Move simple rules to the merchant map" on the Rules page turns rules that only give payments with
   a text in their address or city a merchant into entries, a regex of literal alternatives into one
   entry per text, and applies the remaining rules. It is meant to run once.

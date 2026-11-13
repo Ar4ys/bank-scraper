@@ -3,6 +3,7 @@ import { eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, tables } from "../db/db.ts";
+import { type IgnoredPlace } from "../db/schema.ts";
 import { IpkoTxType, ipkoTransactionSchema } from "../ipkoSchemas.ts";
 import { placeKey, proposeEntryText } from "./placeKey.ts";
 
@@ -32,15 +33,39 @@ export type RecurringPlace = {
 	proposedText: string;
 	/** Every payment of the place, the newest first */
 	transactions: PlacePayment[];
+	/**
+	 * Set while the place is ignored: for good, or until it gets a payment dated after the day it was
+	 * ignored. `null` once such a payment arrives.
+	 */
+	ignored: { forever: boolean; ignoredOn: string } | null;
 };
+
+/** Whether an ignore still holds for a place whose newest payment is dated `lastDate` */
+function ignoredState(
+	ignore: IgnoredPlace | undefined,
+	lastDate: string,
+): RecurringPlace["ignored"] {
+	if (!ignore) return null;
+
+	const ignoredOn = ignore.ignoredOn.toString();
+	return ignore.forever || lastDate <= ignoredOn ? { forever: ignore.forever, ignoredOn } : null;
+}
 
 /**
  * Card and mobile payments without a merchant, neither from the bank nor from the map or a rule,
  * grouped by `placeKey` of their address. Places with fewer than `MIN_PLACE_PAYMENTS` payments are
- * left out. The places with the most payments come first.
+ * left out, ignored ones are not: they come with their `ignored` state. The places with the most
+ * payments come first.
  */
 export function listRecurringPlaces(): RecurringPlace[] {
-	const { transactions, rawTransactions } = tables;
+	const { transactions, rawTransactions, ignoredPlaces } = tables;
+	const ignores = new Map(
+		db
+			.select()
+			.from(ignoredPlaces)
+			.all()
+			.map((row) => [row.key, row]),
+	);
 
 	const rows = db
 		.select({
@@ -103,6 +128,7 @@ export function listRecurringPlaces(): RecurringPlace[] {
 				addresses: addresses.slice(0, MAX_PLACE_ADDRESSES),
 				proposedText: proposeEntryText(addresses.map(({ address }) => address)),
 				transactions: payments,
+				ignored: ignoredState(ignores.get(key), payments[0]?.date ?? ""),
 			};
 		})
 		.toSorted((a, b) => b.payments - a.payments || a.key.localeCompare(b.key));

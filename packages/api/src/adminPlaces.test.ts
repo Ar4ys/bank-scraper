@@ -71,6 +71,7 @@ describe("places without a merchant", () => {
 						{ address: "LIDL3012", payments: 1 },
 					],
 					proposedText: "LIDL",
+					ignored: null,
 				},
 				{
 					key: "corner cafe",
@@ -83,6 +84,7 @@ describe("places without a merchant", () => {
 						{ address: "CORNER CAFE", payments: 1 },
 					],
 					proposedText: "CORNER CAFE",
+					ignored: null,
 				},
 			],
 		);
