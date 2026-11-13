@@ -44,6 +44,39 @@ function deepMaskToPaths(deepMask: DeepMask<Record<string, any>>): string[][] {
 	return paths;
 }
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * A check equivalent to `discriminator.safeParse(value).success` that needs no parse, when every
+ * leaf of the discriminator is a `z.literal` or a `z.enum`; `undefined` otherwise.
+ */
+function discriminatorMatcher(
+	discriminator: z.ZodObject,
+	paths: readonly string[][],
+): ((value: unknown) => boolean) | undefined {
+	const leaves: Array<{ path: readonly string[]; allowed: ReadonlySet<unknown> }> = [];
+
+	for (const path of paths) {
+		let schema: unknown = discriminator;
+		for (const key of path) schema = schema instanceof z.ZodObject ? schema.shape[key] : undefined;
+
+		if (schema instanceof z.ZodLiteral) leaves.push({ path, allowed: schema.values });
+		else if (schema instanceof z.ZodEnum) leaves.push({ path, allowed: new Set(schema.options) });
+		else return undefined;
+	}
+
+	return (value) =>
+		leaves.every(({ path, allowed }) => {
+			let current = value;
+			for (const key of path) {
+				if (!isPlainObject(current)) return false;
+				current = current[key];
+			}
+			return allowed.has(current);
+		});
+}
+
 type ZodMdu<T extends readonly z.ZodObject[]> = z.ZodCodec<
 	z.ZodCustom<z.input<T[number]>>,
 	z.ZodCustom<z.output<T[number]>>
@@ -78,7 +111,14 @@ export function zMdu<
 	const discriminatorPathsDotSeparated = discriminatorPaths.map((path) => path.join("."));
 	const configs = schemas.map((schema, i) => {
 		try {
-			return { schema, discriminator: zodDeepPick(discriminators, schema) };
+			const discriminator = zodDeepPick(discriminators, schema);
+			// A failed `safeParse` builds a whole ZodError, and every value is tried against every
+			// schema, which made this union many times slower than parsing the schema it picks
+			const matches =
+				discriminatorMatcher(discriminator, discriminatorPaths) ??
+				((value: unknown) => discriminator.safeParse(value).success);
+
+			return { schema, matches };
 		} catch (e) {
 			let errorMessage = `Unable to get discriminators for schema at index ${i}`;
 			if (schema.description) errorMessage += ` (${schema.description})`;
@@ -90,7 +130,7 @@ export function zMdu<
 		decode: (value, ctx) => {
 			const processedConfigs = configs
 				.entries()
-				.filter(([, config]) => config.discriminator.safeParse(value).success)
+				.filter(([, config]) => config.matches(value))
 				.map(([i, config]) => ({
 					i,
 					description: config.schema.description,
