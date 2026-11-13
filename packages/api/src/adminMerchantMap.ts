@@ -20,6 +20,7 @@ import {
 	type MerchantMapEntry,
 } from "./db/schema.ts";
 import { matchText } from "./processing/merchantMap.ts";
+import { listRecurringPlaces } from "./processing/places.ts";
 
 const { merchantMapEntries, transactions } = tables;
 
@@ -99,6 +100,9 @@ export const adminMerchantMapApi = new Hono()
 			200,
 		);
 	})
+
+	/** GET /api/admin/merchant-map/places */
+	.get("/places", (c) => c.json(listRecurringPlaces(), 200))
 
 	/** POST /api/admin/merchant-map */
 	.post("/", dryRunQuery, zValidator("json", entryInputSchema), (c) => {

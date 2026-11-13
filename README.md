@@ -155,6 +155,11 @@ page: each entry says "a payment whose address (or city) contains this text gets
   derives, so renames and merges keep working and a new name becomes a new merchant.
 - Every change shows which transactions would change, applies at once and reprocesses every
   transaction, recording "merchant map" as the cause in its history. There are no drafts.
+- "Places without a merchant", above the entries, lists card and mobile payments that have no
+  merchant, grouped by their address without digits and punctuation (`LIDL 3011` and `LIDL3012`
+  are one place), from three payments on. "Name it" adds an entry for a proposed text, the longest
+  one all the addresses of the place share, after the usual preview. Payments of a deleted merchant
+  are listed too.
 - "Move simple rules to the merchant map" on the Rules page turns rules that only give payments with
   a text in their address or city a merchant into entries, a regex of literal alternatives into one
   entry per text, and applies the remaining rules. It is meant to run once.

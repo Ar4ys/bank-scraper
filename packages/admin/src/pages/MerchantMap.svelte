@@ -4,11 +4,13 @@
 		deleteMerchantMapEntry,
 		loadMerchantMap,
 		loadMerchants,
+		loadRecurringPlaces,
 		updateMerchantMapEntry,
 		type Merchant,
 		type MerchantChangeReport,
 		type MerchantMapEntry,
 		type MerchantMapEntryInput,
+		type RecurringPlace,
 	} from "$lib/api";
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import { Button } from "$lib/components/ui/button";
@@ -32,6 +34,11 @@
 
 	let entries = $state<MerchantMapEntry[]>([]);
 	let merchants = $state<Merchant[]>([]);
+	let places = $state<RecurringPlace[]>([]);
+	/** The entry each place would get, editable before it is named */
+	let drafts = $state<Record<string, { text: string; merchant: string }>>({});
+	/** Places whose addresses are all shown */
+	let expanded = $state<Record<string, boolean>>({});
 	const filter = queryText("search");
 	let busy = $state(false);
 	let error = $state<string>();
@@ -62,7 +69,17 @@
 
 	async function load() {
 		try {
-			[entries, merchants] = await Promise.all([loadMerchantMap(), loadMerchants()]);
+			[entries, merchants, places] = await Promise.all([
+				loadMerchantMap(),
+				loadMerchants(),
+				loadRecurringPlaces(),
+			]);
+			drafts = Object.fromEntries(
+				places.map((place) => [
+					place.key,
+					drafts[place.key] ?? { text: place.proposedText, merchant: "" },
+				]),
+			);
 		} catch (e) {
 			error = String(e);
 		}
@@ -133,6 +150,18 @@
 		);
 	}
 
+	function name(place: RecurringPlace) {
+		const draft = drafts[place.key];
+		if (!draft) return;
+
+		const input = { field: "address" as const, text: draft.text.trim(), merchant: draft.merchant.trim() };
+
+		return propose({
+			title: `Add "${input.text}" → ${input.merchant}`,
+			run: (dryRun) => addMerchantMapEntry(input, dryRun),
+		});
+	}
+
 	const remove = (entry: MerchantMapEntry) =>
 		propose({
 			title: `Delete "${entry.text}" → ${entry.merchant}`,
@@ -151,6 +180,79 @@
 	a rule that sets the merchant overrides the map. Every change shows the transactions it affects
 	before it is applied.
 </p>
+
+{#if places.length}
+	<h2 class="pt-2 text-lg font-semibold">Places without a merchant ({places.length})</h2>
+	<p class="text-sm text-muted-foreground">
+		Card and mobile payments that have no merchant, grouped by their address without digits and
+		punctuation, from three payments on. Naming a place adds an entry for the text. The preview shows
+		every payment it catches, also outside the place.
+	</p>
+
+	<Table.Root>
+		<Table.Header>
+			<Table.Row>
+				<Table.Head class="text-right">Payments</Table.Head>
+				<Table.Head>Dates</Table.Head>
+				<Table.Head>Addresses</Table.Head>
+				<Table.Head>Text</Table.Head>
+				<Table.Head>Merchant</Table.Head>
+				<Table.Head></Table.Head>
+			</Table.Row>
+		</Table.Header>
+		<Table.Body>
+			{#each places as place (place.key)}
+				{@const draft = drafts[place.key]}
+				{@const shownAddresses = expanded[place.key] ? place.addresses : place.addresses.slice(0, 3)}
+				<Table.Row>
+					<Table.Cell class="text-right tabular-nums">{place.payments}</Table.Cell>
+					<Table.Cell class="whitespace-nowrap text-xs">
+						{place.firstDate}<br />{place.lastDate}
+					</Table.Cell>
+					<Table.Cell class="font-mono text-xs">
+						{#each shownAddresses as { address, payments } (address)}
+							<div class="whitespace-pre">
+								{address} <span class="text-muted-foreground">×{payments}</span>
+							</div>
+						{/each}
+						{#if place.addresses.length > 3}
+							<button
+								class="cursor-pointer text-muted-foreground underline underline-offset-4"
+								onclick={() => (expanded[place.key] = !expanded[place.key])}
+							>
+								{expanded[place.key] ? "Show fewer" : `Show all ${place.addresses.length}`}
+							</button>
+						{/if}
+					</Table.Cell>
+					{#if draft}
+						<Table.Cell>
+							<Input class="min-w-40 font-mono" bind:value={draft.text} />
+						</Table.Cell>
+						<Table.Cell>
+							<Input
+								class="min-w-40"
+								list="merchant-names"
+								placeholder="Merchant"
+								bind:value={draft.merchant}
+							/>
+						</Table.Cell>
+						<Table.Cell>
+							<Button
+								size="sm"
+								disabled={busy || !draft.text.trim() || !draft.merchant.trim()}
+								onclick={() => name(place)}
+							>
+								Name it
+							</Button>
+						</Table.Cell>
+					{/if}
+				</Table.Row>
+			{/each}
+		</Table.Body>
+	</Table.Root>
+
+	<h2 class="pt-4 text-lg font-semibold">Entries ({entries.length})</h2>
+{/if}
 
 <div class="flex flex-wrap items-center gap-4">
 	<Input class="max-w-xs" placeholder="Text or merchant" bind:value={filter.value} />

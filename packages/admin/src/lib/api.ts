@@ -165,6 +165,10 @@ function toQuery<T extends Record<string, string | number | boolean | undefined>
 	) as { [K in keyof T]: T[K] extends string | undefined ? T[K] : string };
 }
 
+/** Recurring card and mobile payments without a merchant, grouped by their address */
+export type RecurringPlace = Awaited<ReturnType<typeof loadRecurringPlaces>>[number];
+export const loadRecurringPlaces = () => unwrap(api["merchant-map"].places.$get());
+
 export type MerchantMapEntry = Awaited<ReturnType<typeof loadMerchantMap>>[number];
 export const loadMerchantMap = () => unwrap(api["merchant-map"].$get());
 
