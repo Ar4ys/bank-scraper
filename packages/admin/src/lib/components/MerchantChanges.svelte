@@ -5,6 +5,9 @@
 	import { p } from "$lib/router";
 
 	let { report }: { report: MerchantChangeReport } = $props();
+
+	/** Causes that processing gives a transaction when nothing but its merchant changed */
+	const onlyMerchantCauses: string[] = ["merchants", "merchant-map"];
 </script>
 
 {#snippet merchant(name: string | null | undefined)}
@@ -51,7 +54,7 @@
 						{:else}
 							{change.after.description}
 						{/if}
-						{#if change.cause !== "merchants"}
+						{#if !onlyMerchantCauses.includes(change.cause)}
 							<span class="block text-xs text-muted-foreground">Other fields change too</span>
 						{/if}
 					</Table.Cell>

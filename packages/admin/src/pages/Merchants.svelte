@@ -54,8 +54,8 @@
 	let mergeSource = $state<Merchant>();
 	let mergeFilter = $state("");
 
-	/** The two merchants of a suggestion being merged, and which of them stays */
-	let pairMerge = $state<{ stays: Merchant; goes: Merchant }>();
+	/** The two merchants of a suggestion being merged, in a fixed order, and which of them stays */
+	let pairMerge = $state<{ merchants: [Merchant, Merchant]; staysId: string }>();
 	let pairMergeOpen = $state(false);
 
 	let transactionsOpen = $state(false);
@@ -226,10 +226,10 @@
 
 	/** Opens the merge of a suggested pair, keeping the merchant with more transactions */
 	function startPairMerge(merchant: Merchant, other: Merchant) {
-		pairMerge =
-			other.transactionCount > merchant.transactionCount
-				? { stays: other, goes: merchant }
-				: { stays: merchant, goes: other };
+		pairMerge = {
+			merchants: [merchant, other],
+			staysId: other.transactionCount > merchant.transactionCount ? other.id : merchant.id,
+		};
 		pairMergeOpen = true;
 	}
 
@@ -237,9 +237,12 @@
 		const pair = pairMerge;
 		if (!pair) return;
 
+		const [first, second] = pair.merchants;
+		const [stays, goes] = first.id === pair.staysId ? [first, second] : [second, first];
+
 		pairMergeOpen = false;
-		mergeSource = pair.goes;
-		await mergeInto(pair.stays);
+		mergeSource = goes;
+		await mergeInto(stays);
 	}
 
 	async function act(action: () => Promise<unknown>) {
@@ -567,7 +570,9 @@
 <Dialog.Root bind:open={pairMergeOpen}>
 	<Dialog.Content class="sm:max-w-lg">
 		<Dialog.Header>
-			<Dialog.Title>Merge "{pairMerge?.goes.name}" and "{pairMerge?.stays.name}"</Dialog.Title>
+			<Dialog.Title>
+				Merge "{pairMerge?.merchants[0].name}" and "{pairMerge?.merchants[1].name}"
+			</Dialog.Title>
 			<Dialog.Description>
 				Pick the merchant that is left. You see the affected transactions before anything is written.
 			</Dialog.Description>
@@ -576,15 +581,13 @@
 		{#if pairMerge}
 			{@const pair = pairMerge}
 			<div class="space-y-1">
-				{#each [pair.stays, pair.goes] as merchant (merchant.id)}
+				{#each pair.merchants as merchant (merchant.id)}
 					<label class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
 						<input
 							type="radio"
 							name="stays"
-							checked={merchant.id === pair.stays.id}
-							onchange={() =>
-								(pairMerge =
-									merchant.id === pair.stays.id ? pair : { stays: pair.goes, goes: pair.stays })}
+							checked={merchant.id === pair.staysId}
+							onchange={() => (pairMerge = { ...pair, staysId: merchant.id })}
 						/>
 						<span class="font-medium">{merchant.name}</span>
 						<span class="ml-auto tabular-nums text-muted-foreground">{merchant.transactionCount}</span>
