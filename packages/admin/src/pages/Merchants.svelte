@@ -376,6 +376,35 @@
 	<p class="text-sm text-muted-foreground">{notice}</p>
 {/if}
 
+{#snippet mergedNames(merchant: Merchant, detachable: boolean)}
+	{#if merchant.otherNames.length}
+		<span class="flex flex-wrap items-center gap-1.5 text-xs">
+			<span class="text-muted-foreground">Merged names:</span>
+			{#each merchant.otherNames as other (other.key)}
+				<span
+					class="inline-flex max-w-full items-center gap-1.5 rounded-md bg-secondary py-0.5 pl-2 font-medium whitespace-normal wrap-anywhere {detachable
+						? 'pr-0.5'
+						: 'pr-2'}"
+				>
+					{other.name}
+					{#if detachable}
+						<Button
+							variant="outline"
+							size="xs"
+							class="cursor-pointer"
+							title="Make it a merchant of its own again"
+							disabled={busy}
+							onclick={() => detach(merchant, other)}
+						>
+							Detach
+						</Button>
+					{/if}
+				</span>
+			{/each}
+		</span>
+	{/if}
+{/snippet}
+
 {#snippet duplicates(merchant: Merchant)}
 	{@const others = suggestionsOf(merchant)}
 	{#if others.length}
@@ -419,13 +448,13 @@
 			<Table.Row>
 				<Table.Head>Name</Table.Head>
 				<Table.Head class="text-right">Transactions</Table.Head>
-				<Table.Head>Merged names and possible duplicates</Table.Head>
 				<Table.Head></Table.Head>
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
 			{#each toReview as merchant (merchant.id)}
-				<Table.Row>
+				{@const secondLine = merchant.otherNames.length > 0 || suggestionsOf(merchant).length > 0}
+				<Table.Row class={secondLine ? "border-b-0" : ""}>
 					<Table.Cell>
 						<span class="flex items-center gap-2">
 							<Input class="min-w-56" bind:value={names[merchant.id]} />
@@ -440,16 +469,6 @@
 						</span>
 					</Table.Cell>
 					<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
-					<Table.Cell class="min-w-72 space-y-1 whitespace-normal">
-						{#if merchant.otherNames.length}
-							<span class="flex flex-wrap gap-1">
-								{#each merchant.otherNames as other (other.key)}
-									<Badge variant="secondary" class="h-auto whitespace-normal wrap-anywhere">{other.name}</Badge>
-								{/each}
-							</span>
-						{/if}
-						{@render duplicates(merchant)}
-					</Table.Cell>
 					<Table.Cell class="whitespace-nowrap text-right">
 						<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
 							View transactions
@@ -462,6 +481,14 @@
 						</Button>
 					</Table.Cell>
 				</Table.Row>
+				{#if secondLine}
+					<Table.Row>
+						<Table.Cell colspan={3} class="space-y-1.5 pt-0 whitespace-normal">
+							{@render mergedNames(merchant, false)}
+							{@render duplicates(merchant)}
+						</Table.Cell>
+					</Table.Row>
+				{/if}
 			{/each}
 		</Table.Body>
 	</Table.Root>
@@ -490,14 +517,13 @@
 			<Table.Head class="text-right">
 				{@render sortButton("transactionCount", "Transactions")}
 			</Table.Head>
-			<Table.Head>Merged names</Table.Head>
 			<Table.Head></Table.Head>
 		</Table.Row>
 	</Table.Header>
 	<Table.Body>
 		{#each active as merchant (merchant.id)}
-			{@const hasDuplicates = suggestionsOf(merchant).length > 0}
-			<Table.Row class={hasDuplicates ? "border-b-0" : ""}>
+			{@const secondLine = merchant.otherNames.length > 0 || suggestionsOf(merchant).length > 0}
+			<Table.Row class={secondLine ? "border-b-0" : ""}>
 				<Table.Cell>
 					<span class="flex items-center gap-2">
 						<Input class="min-w-56" bind:value={names[merchant.id]} />
@@ -523,27 +549,6 @@
 					</Button>
 				</Table.Cell>
 				<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
-				<Table.Cell class="min-w-48 whitespace-normal">
-					<span class="flex flex-wrap gap-1.5">
-						{#each merchant.otherNames as other (other.key)}
-							<span
-								class="inline-flex max-w-full items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-0.5 pl-2 text-xs font-medium whitespace-normal wrap-anywhere"
-							>
-								{other.name}
-								<Button
-									variant="outline"
-									size="xs"
-									class="cursor-pointer"
-									title="Make it a merchant of its own again"
-									disabled={busy}
-									onclick={() => detach(merchant, other)}
-								>
-									Detach
-								</Button>
-							</span>
-						{/each}
-					</span>
-				</Table.Cell>
 				<Table.Cell class="whitespace-nowrap text-right">
 					<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
 						View transactions
@@ -556,17 +561,18 @@
 					</Button>
 				</Table.Cell>
 			</Table.Row>
-			{#if hasDuplicates}
-				<!-- Its own row: next to the rename field and the buttons the chips get squeezed -->
+			{#if secondLine}
+				<!-- Its own row: next to the name, pickers and buttons the chips get squeezed -->
 				<Table.Row>
-					<Table.Cell colspan={5} class="pt-0 whitespace-normal">
+					<Table.Cell colspan={4} class="space-y-1.5 pt-0 whitespace-normal">
+						{@render mergedNames(merchant, true)}
 						{@render duplicates(merchant)}
 					</Table.Cell>
 				</Table.Row>
 			{/if}
 		{:else}
 			<Table.Row>
-				<Table.Cell colspan={5} class="text-muted-foreground">No merchants</Table.Cell>
+				<Table.Cell colspan={4} class="text-muted-foreground">No merchants</Table.Cell>
 			</Table.Row>
 		{/each}
 	</Table.Body>
