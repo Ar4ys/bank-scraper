@@ -126,6 +126,10 @@
 	html {
 		@apply font-sans;
 	}
+	/* Tailwind 4 leaves buttons with the default arrow cursor; every clickable control gets the hand */
+	:is(button, select, summary, [role="button"]):not(:disabled, [aria-disabled="true"]) {
+		cursor: pointer;
+	}
 }
 
 /*

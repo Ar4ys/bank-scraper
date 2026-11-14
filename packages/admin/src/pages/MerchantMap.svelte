@@ -409,7 +409,7 @@
 	{#if ignoredList.length}
 		<span class="flex items-center gap-2 pt-2">
 			<Switch id="show-ignored" bind:checked={showIgnored.value} />
-			<Label for="show-ignored">Ignored ({ignoredList.length})</Label>
+			<Label for="show-ignored" class="cursor-pointer">Ignored ({ignoredList.length})</Label>
 		</span>
 		{#if showIgnored.value}
 			{@render placesTable(ignoredList)}
@@ -537,7 +537,7 @@
 			<div class="flex items-start gap-3">
 				<Switch id="entry-overrides" bind:checked={form.overridesBankMerchant} />
 				<div class="space-y-0.5">
-					<Label for="entry-overrides">Override the bank's merchant</Label>
+					<Label for="entry-overrides" class="cursor-pointer">Override the bank's merchant</Label>
 					<p class="text-sm text-muted-foreground">
 						Also applies to payments the bank names a merchant for, such as Bolt's rides, food
 						and scooters that the bank all calls "Bolt". Off, the entry only names payments

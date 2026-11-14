@@ -390,7 +390,7 @@
 	<Input class="max-w-xs" placeholder="Name" bind:value={filter.value} />
 	<span class="flex items-center gap-2">
 		<Switch id="show-deleted" bind:checked={showDeleted.value} />
-		<Label for="show-deleted">
+		<Label for="show-deleted" class="cursor-pointer">
 			Show deleted ({merchants.filter((merchant) => merchant.deletedAt).length})
 		</Label>
 	</span>

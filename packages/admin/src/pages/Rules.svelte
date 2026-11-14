@@ -420,7 +420,7 @@
 				{/if}
 				<span class="flex items-center gap-2 text-sm font-normal">
 					<Switch id="enabled-{index}" bind:checked={rule.enabled} />
-					<Label for="enabled-{index}">Enabled</Label>
+					<Label for="enabled-{index}" class="cursor-pointer">Enabled</Label>
 				</span>
 				<span class="ml-auto flex gap-2">
 					<Button variant="outline" size="sm" disabled={index === 0} onclick={() => move(index, -1)}>Up</Button>

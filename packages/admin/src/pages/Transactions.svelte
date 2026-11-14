@@ -56,7 +56,7 @@
 			bind:checked={withoutMerchant.value}
 			onCheckedChange={() => (offset.value = 0)}
 		/>
-		<Label for="without-merchant">Without merchant</Label>
+		<Label for="without-merchant" class="cursor-pointer">Without merchant</Label>
 	</span>
 	{#if merchantId.value}
 		<Button
