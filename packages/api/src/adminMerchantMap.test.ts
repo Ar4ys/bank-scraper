@@ -195,6 +195,32 @@ describe("admin merchant map API", () => {
 		);
 	});
 
+	it("overrides the bank's merchant with an entry that says so, until that is switched off", async () => {
+		const named = async () =>
+			(await merchants()).find(([bankId]: string[]) => bankId === "named-1")[1];
+		const created = await request("/merchant-map", "POST", {
+			field: "address",
+			text: "MART 0002",
+			merchant: "Mart Two",
+			overridesBankMerchant: true,
+		});
+		assert.equal(created.status, 200);
+		assert.equal(await named(), "Mart Two");
+
+		const entry = (await listEntries()).find((item: any) => item.text === "MART 0002");
+		assert.equal(entry.overridesBankMerchant, true);
+
+		await request(`/merchant-map/${entry.id}`, "PATCH", { merchant: "Mart Second" });
+		assert.equal(await named(), "Mart Second", "an edit that leaves the switch out keeps it");
+
+		await request(`/merchant-map/${entry.id}`, "PATCH", { overridesBankMerchant: false });
+		assert.equal(await named(), "Mart Polska");
+		assert.equal(
+			(await listEntries()).find((item: any) => item.id === entry.id).overridesBankMerchant,
+			false,
+		);
+	});
+
 	it("answers 404 for an unknown entry", async () => {
 		assert.equal((await request("/merchant-map/unknown", "DELETE")).status, 404);
 		assert.equal((await request("/merchant-map/unknown", "PATCH", { text: "x" })).status, 404);

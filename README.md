@@ -203,8 +203,10 @@ page: each entry says "a payment whose address (or city) contains this text gets
 
 - Matching ignores case and treats every run of whitespace as one space. When several entries
   match, the longest text wins, and of equally long ones the oldest entry.
-- A merchant name from the bank is never replaced by the map, and a rule that sets the merchant
-  overrides it.
+- A merchant name from the bank is replaced only by entries with "Override the bank's merchant" on,
+  for a bank name that covers several services (the bank calls Bolt's rides, food and scooters all
+  "Bolt"). For such a payment only those entries compete, longest first. A rule that sets the
+  merchant overrides the map.
 - The merchant of an entry is a name, looked up among the merchants like the merchant a rule
   derives, so renames and merges keep working and a new name becomes a new merchant.
 - Every change shows which transactions would change, applies at once and reprocesses every

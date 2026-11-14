@@ -189,7 +189,10 @@ export type MerchantMapEntry = Awaited<ReturnType<typeof loadMerchantMap>>[numbe
 export const loadMerchantMap = () => unwrap(api["merchant-map"].$get());
 
 /** What a merchant map entry says: payments whose field contains the text get the merchant */
-export type MerchantMapEntryInput = Pick<MerchantMapEntry, "field" | "text" | "merchant">;
+export type MerchantMapEntryInput = Pick<
+	MerchantMapEntry,
+	"field" | "text" | "merchant" | "overridesBankMerchant"
+>;
 
 export const addMerchantMapEntry = (entry: MerchantMapEntryInput, dryRun: boolean) =>
 	unwrap(api["merchant-map"].$post({ query: dryRunQuery(dryRun), json: entry }));

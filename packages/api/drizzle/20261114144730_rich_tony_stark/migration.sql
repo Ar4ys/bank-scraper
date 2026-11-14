@@ -1,0 +1,1 @@
+ALTER TABLE `merchant_map_entries` ADD `overrides_bank_merchant` integer DEFAULT false NOT NULL;

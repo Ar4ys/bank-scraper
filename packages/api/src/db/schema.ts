@@ -305,6 +305,8 @@ export const merchantMapEntries = s.snakeCase.table(
 		matchKey: s.text().notNull(),
 		/** A merchant name, looked up like the merchant text of a rule */
 		merchant: s.text().notNull(),
+		/** Applies also to payments the bank names a merchant for, replacing that merchant */
+		overridesBankMerchant: s.integer({ mode: "boolean" }).notNull().default(false),
 		createdAt: instant().notNull().default(sqlDateTimeNow),
 		updatedAt: instant().notNull().default(sqlDateTimeNow),
 	},

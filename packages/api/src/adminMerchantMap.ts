@@ -28,6 +28,8 @@ const entryInputSchema = z.object({
 	field: z.enum(MerchantMapField),
 	text: z.string().trim().nonempty(),
 	merchant: z.string().trim().nonempty(),
+	/** Left out: `false` for a new entry, unchanged for an edited one */
+	overridesBankMerchant: z.boolean().optional(),
 });
 
 const notFound = reject(404, "Merchant map entry not found");
@@ -94,6 +96,7 @@ export const adminMerchantMapApi = new Hono()
 				field: entry.field,
 				text: entry.text,
 				merchant: entry.merchant,
+				overridesBankMerchant: entry.overridesBankMerchant,
 				/** Transactions whose merchant this entry sets now */
 				transactionCount: transactionCount(entry),
 			})),
@@ -147,7 +150,7 @@ export const adminMerchantMapApi = new Hono()
 
 	/** POST /api/admin/merchant-map */
 	.post("/", dryRunQuery, zValidator("json", entryInputSchema), (c) => {
-		const { field, text, merchant } = c.req.valid("json");
+		const { field, text, merchant, overridesBankMerchant = false } = c.req.valid("json");
 
 		const result = changeMap(c.req.valid("query").dryRun, () => {
 			const matchKey = matchText(text);
@@ -156,7 +159,7 @@ export const adminMerchantMapApi = new Hono()
 
 			const entry = db
 				.insert(merchantMapEntries)
-				.values({ field, text, matchKey, merchant })
+				.values({ field, text, matchKey, merchant, overridesBankMerchant })
 				.returning({ id: merchantMapEntries.id })
 				.get();
 
@@ -188,6 +191,7 @@ export const adminMerchantMapApi = new Hono()
 					text,
 					matchKey,
 					merchant: input.merchant ?? entry.merchant,
+					overridesBankMerchant: input.overridesBankMerchant ?? entry.overridesBankMerchant,
 					updatedAt: sqlDateTimeNow,
 				})
 				.where(eq(merchantMapEntries.id, id))

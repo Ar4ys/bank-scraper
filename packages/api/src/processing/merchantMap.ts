@@ -12,10 +12,15 @@ export type MerchantMap = readonly MerchantMapEntry[];
 
 /**
  * The entry that names the merchant of a card or mobile payment: of the entries whose text its
- * field contains, the longest, and of equally long ones the oldest. `undefined` for other
- * transactions and when nothing matches.
+ * field contains, the longest, and of equally long ones the oldest. When the bank names a merchant
+ * for the payment, only entries that override it count. `undefined` for other transactions and when
+ * nothing matches.
  */
-export function findMapEntry(tx: IpkoTransaction, map: MerchantMap): MerchantMapEntry | undefined {
+export function findMapEntry(
+	tx: IpkoTransaction,
+	map: MerchantMap,
+	bankNamesMerchant: boolean,
+): MerchantMapEntry | undefined {
 	if (tx.$type !== IpkoTxType.CardTransaction && tx.$type !== IpkoTxType.MobileTransaction) {
 		return undefined;
 	}
@@ -27,6 +32,8 @@ export function findMapEntry(tx: IpkoTransaction, map: MerchantMap): MerchantMap
 	let winner: MerchantMapEntry | undefined;
 
 	for (const entry of map) {
+		if (bankNamesMerchant && !entry.overridesBankMerchant) continue;
+
 		const text = texts[entry.field];
 		if (text === undefined || !text.includes(entry.matchKey)) continue;
 

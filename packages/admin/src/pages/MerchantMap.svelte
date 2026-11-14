@@ -25,6 +25,7 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
+	import { Badge } from "$lib/components/ui/badge";
 	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
 	import { amountClass } from "$lib/format";
@@ -81,7 +82,12 @@
 	let editOpen = $state(false);
 	/** The entry being edited, `undefined` while adding one */
 	let editing = $state<MerchantMapEntry>();
-	let form = $state<MerchantMapEntryInput>({ field: "address", text: "", merchant: "" });
+	let form = $state<MerchantMapEntryInput>({
+		field: "address",
+		text: "",
+		merchant: "",
+		overridesBankMerchant: false,
+	});
 
 	let proposal = $state<Proposal>();
 	let preview = $state<MerchantChangeReport>();
@@ -122,13 +128,18 @@
 
 	function startAdd() {
 		editing = undefined;
-		form = { field: "address", text: "", merchant: "" };
+		form = { field: "address", text: "", merchant: "", overridesBankMerchant: false };
 		editOpen = true;
 	}
 
 	function startEdit(entry: MerchantMapEntry) {
 		editing = entry;
-		form = { field: entry.field, text: entry.text, merchant: entry.merchant };
+		form = {
+			field: entry.field,
+			text: entry.text,
+			merchant: entry.merchant,
+			overridesBankMerchant: entry.overridesBankMerchant,
+		};
 		editOpen = true;
 	}
 
@@ -169,7 +180,12 @@
 	}
 
 	function save() {
-		const input = { field: form.field, text: form.text.trim(), merchant: form.merchant.trim() };
+		const input = {
+			field: form.field,
+			text: form.text.trim(),
+			merchant: form.merchant.trim(),
+			overridesBankMerchant: form.overridesBankMerchant,
+		};
 		const entry = editing;
 
 		return propose(
@@ -189,7 +205,12 @@
 		const draft = drafts[place.key];
 		if (!draft) return;
 
-		const input = { field: "address" as const, text: draft.text.trim(), merchant: draft.merchant.trim() };
+		const input = {
+			field: "address" as const,
+			text: draft.text.trim(),
+			merchant: draft.merchant.trim(),
+			overridesBankMerchant: false,
+		};
 
 		return propose({
 			title: `Add "${input.text}" → ${input.merchant}`,
@@ -231,8 +252,8 @@
 <p class="text-sm text-muted-foreground">
 	The merchant of card and mobile payments for which the bank names none: a payment whose address
 	(or city) contains an entry's text gets its merchant. Case and repeated spaces do not count. When
-	several entries match, the longest text wins. A merchant name from the bank is never replaced, and
-	a rule that sets the merchant overrides the map. Every change shows the transactions it affects
+	several entries match, the longest text wins. A merchant name from the bank is replaced only by
+	entries that override it, and a rule that sets the merchant overrides the map. Every change shows the transactions it affects
 	before it is applied.
 </p>
 
@@ -399,7 +420,18 @@
 			<Table.Row>
 				<Table.Cell>{fieldLabels[entry.field]}</Table.Cell>
 				<Table.Cell class="min-w-48 font-mono text-xs whitespace-pre-wrap wrap-anywhere">{entry.text}</Table.Cell>
-				<Table.Cell class="min-w-48 font-medium whitespace-normal wrap-anywhere">{entry.merchant}</Table.Cell>
+				<Table.Cell class="min-w-48 font-medium whitespace-normal wrap-anywhere">
+					{entry.merchant}
+					{#if entry.overridesBankMerchant}
+						<Badge
+							variant="secondary"
+							class="ml-1"
+							title="Also replaces a merchant name from the bank"
+						>
+							overrides bank
+						</Badge>
+					{/if}
+				</Table.Cell>
 				<Table.Cell class="text-right tabular-nums">
 					<button
 						class="cursor-pointer hover:underline hover:underline-offset-4"
@@ -468,6 +500,17 @@
 					placeholder="An existing merchant or a new name"
 					bind:value={form.merchant}
 				/>
+			</div>
+			<div class="flex items-start gap-3">
+				<Switch id="entry-overrides" bind:checked={form.overridesBankMerchant} />
+				<div class="space-y-0.5">
+					<Label for="entry-overrides">Override the bank's merchant</Label>
+					<p class="text-sm text-muted-foreground">
+						Also applies to payments the bank names a merchant for, such as Bolt's rides, food
+						and scooters that the bank all calls "Bolt". Off, the entry only names payments
+						without one.
+					</p>
+				</div>
 			</div>
 		</div>
 

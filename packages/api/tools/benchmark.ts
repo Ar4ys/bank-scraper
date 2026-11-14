@@ -251,7 +251,7 @@ await time("  ipkoTransactionToJson × all", 3, () => {
 	for (const tx of parsed) ipkoTransactionToJson(tx);
 });
 await time(`  findMapEntry × all (${map.length} entries)`, 3, () => {
-	for (const tx of parsed) findMapEntry(tx, map);
+	for (const tx of parsed) findMapEntry(tx, map, false);
 });
 await time(`  deriveDefaults + applyRules × all (${rules.length} rules)`, 3, () => {
 	for (const [i, tx] of parsed.entries()) applyRules(deriveDefaults(tx), jsons[i], rules);

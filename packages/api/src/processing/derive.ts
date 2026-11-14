@@ -62,7 +62,7 @@ export function deriveTransaction(
 	const defaults = deriveDefaults(parsed.data);
 	const sources: Partial<FieldSources> = {};
 
-	const mapEntry = defaults.merchant === null ? findMapEntry(parsed.data, merchantMap) : undefined;
+	const mapEntry = findMapEntry(parsed.data, merchantMap, defaults.merchant !== null);
 	if (mapEntry) {
 		defaults.merchant = mapEntry.merchant;
 		sources.merchant = mapFieldSource(mapEntry.id);
