@@ -104,7 +104,7 @@
 					<p class="px-2 py-1.5 text-sm text-destructive">{searchError}</p>
 				{:else}
 					{#each results as result (result.brandId)}
-						<div class="flex items-center gap-1 rounded-md hover:bg-muted">
+						<div class="flex items-center gap-1 rounded-md pr-1 hover:bg-muted">
 							<button
 								class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2 py-1.5 text-left text-sm"
 								onclick={() => pick(normalizeDomain(result.domain) ?? result.domain)}
