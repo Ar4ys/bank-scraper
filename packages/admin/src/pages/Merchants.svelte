@@ -23,6 +23,7 @@
 	import DomainPicker from "$lib/components/DomainPicker.svelte";
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
+	import SortButton from "$lib/components/SortButton.svelte";
 	import { Badge } from "$lib/components/ui/badge";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
@@ -31,8 +32,9 @@
 	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
 	import { formatInstant } from "$lib/format";
-	import { queryFlag, queryOption, queryText } from "$lib/queryState";
+	import { queryFlag, queryText } from "$lib/queryState";
 	import { p } from "$lib/router";
+	import { compareOptional, querySort, type QuerySort } from "$lib/sorting";
 
 	/** A change of merchants that is shown as a preview first and written only when applied */
 	type Proposal = {
@@ -75,20 +77,44 @@
 	let transactionsOpen = $state(false);
 	let transactionsOf = $state<Merchant>();
 
-	const sortKeys = ["name", "transactionCount"] as const;
+	const sortKeys = ["name", "domain", "category", "transactionCount"] as const;
 	type SortKey = (typeof sortKeys)[number];
-	const sortKey = queryOption("sort", sortKeys, "name");
-	const sortDescending = queryFlag("descending");
+	// Counts are looked at from the largest, texts from A
+	const startsDescending = (key: SortKey) => key === "transactionCount";
+	const allSort = querySort(
+		{ key: "sort", descending: "descending" },
+		sortKeys,
+		{ key: "name", descending: false },
+		startsDescending,
+	);
+	const reviewSort = querySort(
+		{ key: "reviewSort", descending: "reviewDescending" },
+		sortKeys,
+		{ key: "transactionCount", descending: true },
+		startsDescending,
+	);
 
-	function sortBy(key: SortKey) {
-		if (sortKey.value === key) {
-			sortDescending.value = !sortDescending.value;
-		} else {
-			sortKey.value = key;
-			// Counts are looked at from the largest, names from A
-			sortDescending.value = key === "transactionCount";
-		}
-	}
+	const categoryLabel = (merchant: Merchant) => {
+		const category = sureCategories?.find((item) => item.id === merchant.sureCategoryId);
+		if (!category) return null;
+		return category.parentName ? `${category.parentName} › ${category.name}` : category.name;
+	};
+
+	/** By the saved values, so a row doesn't move while its drafts are edited */
+	const compareMerchants = (sort: QuerySort<SortKey>) => (a: Merchant, b: Merchant) => {
+		const byName = a.name.localeCompare(b.name);
+		const direction = sort.descending ? -1 : 1;
+		const order =
+			sort.key === "name"
+				? byName * direction
+				: sort.key === "transactionCount"
+					? (a.transactionCount - b.transactionCount) * direction
+					: sort.key === "domain"
+						? compareOptional(a.domain, b.domain, sort.descending)
+						: compareOptional(categoryLabel(a), categoryLabel(b), sort.descending);
+
+		return order || byName;
+	};
 
 	const matches = (merchant: Merchant, text: string) => {
 		const needle = text.trim().toLowerCase();
@@ -102,21 +128,19 @@
 	const active = $derived(
 		merchants
 			.filter((merchant) => !merchant.deletedAt && matches(merchant, filter.value))
-			.toSorted((a, b) => {
-				const byName = a.name.localeCompare(b.name);
-				const order = sortKey.value === "name" ? byName : a.transactionCount - b.transactionCount;
-
-				return (sortDescending.value ? -order : order) || byName;
-			}),
+			.toSorted(compareMerchants(allSort)),
 	);
 	const merchantById = $derived(new Map(merchants.map((merchant) => [merchant.id, merchant])));
 
-	/** Merchants waiting to be reviewed, those with the most transactions first */
+	/** Merchants waiting to be reviewed, by default those with the most transactions first */
 	const toReview = $derived(
 		merchants
 			.filter((merchant) => !merchant.deletedAt && !merchant.reviewedAt)
-			.toSorted((a, b) => b.transactionCount - a.transactionCount || a.name.localeCompare(b.name)),
+			.toSorted(compareMerchants(reviewSort)),
 	);
+	/** Columns of a merchant's first line; its second line spans them all */
+	const reviewColumns = $derived(sureCategories === null ? 4 : 5);
+	const allColumns = $derived(reviewColumns + 1);
 
 	const suggestionsOf = (merchant: Merchant) =>
 		(suggestions[merchant.id] ?? []).flatMap((suggestion) => {
@@ -446,8 +470,14 @@
 	<Table.Root>
 		<Table.Header>
 			<Table.Row>
-				<Table.Head>Name</Table.Head>
-				<Table.Head class="text-right">Transactions</Table.Head>
+				<Table.Head><SortButton sort={reviewSort} key="name" label="Name" /></Table.Head>
+				<Table.Head><SortButton sort={reviewSort} key="domain" label="Domain" /></Table.Head>
+				{#if sureCategories !== null}
+					<Table.Head><SortButton sort={reviewSort} key="category" label="Category" /></Table.Head>
+				{/if}
+				<Table.Head class="text-right">
+					<SortButton sort={reviewSort} key="transactionCount" label="Transactions" />
+				</Table.Head>
 				<Table.Head></Table.Head>
 			</Table.Row>
 		</Table.Header>
@@ -455,19 +485,19 @@
 			{#each toReview as merchant (merchant.id)}
 				{@const secondLine = merchant.otherNames.length > 0 || suggestionsOf(merchant).length > 0}
 				<Table.Row class={secondLine ? "border-b-0" : ""}>
+					<Table.Cell><Input class="min-w-56" bind:value={names[merchant.id]} /></Table.Cell>
 					<Table.Cell>
-						<span class="flex items-center gap-2">
-							<Input class="min-w-56" bind:value={names[merchant.id]} />
-							<DomainPicker
-								bind:value={domains[merchant.id]}
-								merchantName={merchant.name}
-								clientId={brandfetchClientId}
-							/>
-							{#if sureCategories !== null}
-								<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
-							{/if}
-						</span>
+						<DomainPicker
+							bind:value={domains[merchant.id]}
+							merchantName={merchant.name}
+							clientId={brandfetchClientId}
+						/>
 					</Table.Cell>
+					{#if sureCategories !== null}
+						<Table.Cell>
+							<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
+						</Table.Cell>
+					{/if}
 					<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
 					<Table.Cell class="whitespace-nowrap text-right">
 						<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
@@ -483,7 +513,7 @@
 				</Table.Row>
 				{#if secondLine}
 					<Table.Row>
-						<Table.Cell colspan={3} class="space-y-1.5 pt-0 whitespace-normal">
+						<Table.Cell colspan={reviewColumns} class="space-y-1.5 pt-0 whitespace-normal">
 							{@render mergedNames(merchant, false)}
 							{@render duplicates(merchant)}
 						</Table.Cell>
@@ -496,26 +526,17 @@
 	<h2 class="pt-4 text-lg font-semibold">All merchants</h2>
 {/if}
 
-{#snippet sortButton(key: SortKey, label: string)}
-	<button
-		class="inline-flex cursor-pointer items-center gap-1 hover:underline"
-		title="Sort by this column"
-		onclick={() => sortBy(key)}
-	>
-		{label}
-		<span class="w-3 text-muted-foreground">
-			{sortKey.value === key ? (sortDescending.value ? "↓" : "↑") : "↕"}
-		</span>
-	</button>
-{/snippet}
-
 <Table.Root>
 	<Table.Header>
 		<Table.Row>
-			<Table.Head>{@render sortButton("name", "Name")}</Table.Head>
+			<Table.Head><SortButton sort={allSort} key="name" label="Name" /></Table.Head>
+			<Table.Head><SortButton sort={allSort} key="domain" label="Domain" /></Table.Head>
+			{#if sureCategories !== null}
+				<Table.Head><SortButton sort={allSort} key="category" label="Category" /></Table.Head>
+			{/if}
 			<Table.Head></Table.Head>
 			<Table.Head class="text-right">
-				{@render sortButton("transactionCount", "Transactions")}
+				<SortButton sort={allSort} key="transactionCount" label="Transactions" />
 			</Table.Head>
 			<Table.Head></Table.Head>
 		</Table.Row>
@@ -524,19 +545,19 @@
 		{#each active as merchant (merchant.id)}
 			{@const secondLine = merchant.otherNames.length > 0 || suggestionsOf(merchant).length > 0}
 			<Table.Row class={secondLine ? "border-b-0" : ""}>
+				<Table.Cell><Input class="min-w-56" bind:value={names[merchant.id]} /></Table.Cell>
 				<Table.Cell>
-					<span class="flex items-center gap-2">
-						<Input class="min-w-56" bind:value={names[merchant.id]} />
-						<DomainPicker
-							bind:value={domains[merchant.id]}
-							merchantName={merchant.name}
-							clientId={brandfetchClientId}
-						/>
-						{#if sureCategories !== null}
-							<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
-						{/if}
-					</span>
+					<DomainPicker
+						bind:value={domains[merchant.id]}
+						merchantName={merchant.name}
+						clientId={brandfetchClientId}
+					/>
 				</Table.Cell>
+				{#if sureCategories !== null}
+					<Table.Cell>
+						<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
+					</Table.Cell>
+				{/if}
 				<Table.Cell>
 					<Button
 						size="sm"
@@ -564,7 +585,7 @@
 			{#if secondLine}
 				<!-- Its own row: next to the name, pickers and buttons the chips get squeezed -->
 				<Table.Row>
-					<Table.Cell colspan={4} class="space-y-1.5 pt-0 whitespace-normal">
+					<Table.Cell colspan={allColumns} class="space-y-1.5 pt-0 whitespace-normal">
 						{@render mergedNames(merchant, true)}
 						{@render duplicates(merchant)}
 					</Table.Cell>
@@ -572,7 +593,7 @@
 			{/if}
 		{:else}
 			<Table.Row>
-				<Table.Cell colspan={4} class="text-muted-foreground">No merchants</Table.Cell>
+				<Table.Cell colspan={allColumns} class="text-muted-foreground">No merchants</Table.Cell>
 			</Table.Row>
 		{/each}
 	</Table.Body>

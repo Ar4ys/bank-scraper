@@ -20,6 +20,7 @@
 
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
+	import SortButton from "$lib/components/SortButton.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -31,6 +32,7 @@
 	import { amountClass } from "$lib/format";
 	import { queryFlag, queryText } from "$lib/queryState";
 	import { p } from "$lib/router";
+	import { querySort } from "$lib/sorting";
 
 	/** A change of the map that is shown as a preview first and written only when applied */
 	type Proposal = {
@@ -94,13 +96,37 @@
 	let previewOpen = $state(false);
 	let previewError = $state<string>();
 
+	const sortKeys = ["text", "merchant", "transactionCount"] as const;
+	type SortKey = (typeof sortKeys)[number];
+	const sort = querySort(
+		{ key: "sort", descending: "descending" },
+		sortKeys,
+		{ key: "merchant", descending: false },
+		// Counts are looked at from the largest, texts from A
+		(key) => key === "transactionCount",
+	);
+
+	const compareEntries = (a: MerchantMapEntry, b: MerchantMapEntry) => {
+		const byMerchant = a.merchant.localeCompare(b.merchant) || a.text.localeCompare(b.text);
+		const order =
+			sort.key === "text"
+				? a.text.localeCompare(b.text)
+				: sort.key === "merchant"
+					? byMerchant
+					: a.transactionCount - b.transactionCount;
+
+		return (sort.descending ? -order : order) || byMerchant;
+	};
+
 	const shown = $derived.by(() => {
 		const needle = filter.value.trim().toLowerCase();
 
-		return entries.filter(
-			(entry) =>
-				entry.text.toLowerCase().includes(needle) || entry.merchant.toLowerCase().includes(needle),
-		);
+		return entries
+			.filter(
+				(entry) =>
+					entry.text.toLowerCase().includes(needle) || entry.merchant.toLowerCase().includes(needle),
+			)
+			.toSorted(compareEntries);
 	});
 
 	const merchantNames = $derived(
@@ -409,9 +435,11 @@
 	<Table.Header>
 		<Table.Row>
 			<Table.Head>Field</Table.Head>
-			<Table.Head>Text</Table.Head>
-			<Table.Head>Merchant</Table.Head>
-			<Table.Head class="text-right">Transactions</Table.Head>
+			<Table.Head><SortButton {sort} key="text" label="Text" /></Table.Head>
+			<Table.Head><SortButton {sort} key="merchant" label="Merchant" /></Table.Head>
+			<Table.Head class="text-right">
+				<SortButton {sort} key="transactionCount" label="Transactions" />
+			</Table.Head>
 			<Table.Head></Table.Head>
 		</Table.Row>
 	</Table.Header>
