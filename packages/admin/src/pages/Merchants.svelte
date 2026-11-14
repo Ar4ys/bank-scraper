@@ -5,13 +5,13 @@
 		dismissMerchantPair,
 		loadMerchants,
 		loadMerchantSuggestions,
+		loadSureCategories,
 		mergeMerchant,
 		removeMerchantPermanently,
 		renameMerchant,
 		restoreMerchant,
 		reviewMerchant,
 		setMerchantCategory,
-		loadSureCategories,
 		type Merchant,
 		type MerchantChangeReport,
 		type MerchantSuggestions,
@@ -322,7 +322,6 @@
 			busy = false;
 		}
 	}
-
 
 	const dismiss = (merchant: Merchant, other: Merchant) =>
 		act(() => dismissMerchantPair(merchant.id, other.id));
