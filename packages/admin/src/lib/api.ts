@@ -76,6 +76,14 @@ export const loadMerchants = () => unwrap(api.merchants.$get());
 export type MerchantSuggestions = Awaited<ReturnType<typeof loadMerchantSuggestions>>;
 export const loadMerchantSuggestions = () => unwrap(api.merchants.suggestions.$get());
 
+/** Sure's categories; `enabled` is false while Sure isn't configured */
+export type SureCategory = Awaited<ReturnType<typeof loadSureCategories>>["categories"][number];
+export const loadSureCategories = () => unwrap(api.sure.categories.$get());
+
+/** Reaches Sure on its next sync; nothing is reprocessed here */
+export const setMerchantCategory = (id: string, sureCategoryId: string | null) =>
+	unwrap(api.merchants[":id"].category.$put({ param: { id }, json: { sureCategoryId } }));
+
 /** Confirms a merchant in the review; nothing is reprocessed */
 export const reviewMerchant = (id: string) =>
 	unwrap(api.merchants[":id"].review.$post({ param: { id } }));

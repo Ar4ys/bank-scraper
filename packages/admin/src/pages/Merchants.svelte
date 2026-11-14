@@ -10,10 +10,14 @@
 		renameMerchant,
 		restoreMerchant,
 		reviewMerchant,
+		setMerchantCategory,
+		loadSureCategories,
 		type Merchant,
 		type MerchantChangeReport,
 		type MerchantSuggestions,
+		type SureCategory,
 	} from "$lib/api";
+	import CategoryPicker from "$lib/components/CategoryPicker.svelte";
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
 	import { Badge } from "$lib/components/ui/badge";
@@ -39,6 +43,10 @@
 	let merchants = $state<Merchant[]>([]);
 	let suggestions = $state<MerchantSuggestions>({});
 	let names = $state<Record<string, string>>({});
+	/** The category picked for each merchant, saved together with its name */
+	let categories = $state<Record<string, string | null>>({});
+	/** Sure's categories; `undefined` while they can't be read, `null` while Sure isn't configured */
+	let sureCategories = $state<SureCategory[] | null>();
 	const filter = queryText("search");
 	const showDeleted = queryFlag("showDeleted");
 	let busy = $state(false);
@@ -122,8 +130,37 @@
 
 	async function load() {
 		try {
-			[merchants, suggestions] = await Promise.all([loadMerchants(), loadMerchantSuggestions()]);
-			names = Object.fromEntries(merchants.map((merchant) => [merchant.id, merchant.name]));
+			const [loadedMerchants, loadedSuggestions, sure] = await Promise.all([
+				loadMerchants(),
+				loadMerchantSuggestions(),
+				loadSureCategories().catch((e: unknown) => {
+					error = `Sure's categories can't be loaded: ${String(e)}`;
+					return undefined;
+				}),
+			]);
+
+			// Saving one row reloads them all, so edits of the other rows that weren't saved are kept
+			const before = merchantById;
+			/** The draft while it differs from what was saved before the reload, else the saved value */
+			const keepUnsaved = <T,>(
+				merchant: Merchant,
+				drafts: Record<string, T | undefined>,
+				saved: (merchant: Merchant) => T,
+			) => {
+				const previous = before.get(merchant.id);
+				const draft = drafts[merchant.id];
+				const edited = previous !== undefined && draft !== undefined && draft !== saved(previous);
+				return [merchant.id, edited ? draft : saved(merchant)] as const;
+			};
+
+			[merchants, suggestions] = [loadedMerchants, loadedSuggestions];
+			sureCategories = sure && (sure.enabled ? sure.categories : null);
+			names = Object.fromEntries(
+				merchants.map((merchant) => keepUnsaved(merchant, names, (m) => m.name)),
+			);
+			categories = Object.fromEntries(
+				merchants.map((merchant) => keepUnsaved(merchant, categories, (m) => m.sureCategoryId)),
+			);
 		} catch (e) {
 			error = String(e);
 		}
@@ -164,15 +201,41 @@
 		}
 	}
 
-	const rename = (merchant: Merchant) => {
-		const name = (names[merchant.id] ?? "").trim();
+	const draftName = (merchant: Merchant) => (names[merchant.id] ?? "").trim();
+	const nameChanged = (merchant: Merchant) => draftName(merchant) !== merchant.name;
+	const categoryChanged = (merchant: Merchant) =>
+		(categories[merchant.id] ?? null) !== merchant.sureCategoryId;
 
+	async function saveCategory(merchant: Merchant) {
+		if (categoryChanged(merchant)) {
+			await setMerchantCategory(merchant.id, categories[merchant.id] ?? null);
+		}
+	}
+
+	/**
+	 * Saves the edited name and the picked category of a merchant. A new name goes through the
+	 * rename preview first, and the category is saved only once the rename is applied, so a rejected
+	 * rename saves nothing. A rename reviews the merchant; `review` reviews it otherwise too.
+	 */
+	function save(merchant: Merchant, review: boolean) {
+		if (!nameChanged(merchant)) {
+			return act(async () => {
+				await saveCategory(merchant);
+				if (review) await reviewMerchant(merchant.id);
+			});
+		}
+
+		const name = draftName(merchant);
 		return propose({
 			title: `Rename "${merchant.name}" to "${name}"`,
 			description: `Its transactions get the new name. "${merchant.name}" stays a name of the merchant, so whatever still derives it ends up here.`,
-			run: (dryRun) => renameMerchant(merchant.id, name, dryRun),
+			run: async (dryRun) => {
+				const report = await renameMerchant(merchant.id, name, dryRun);
+				if (!dryRun) await saveCategory(merchant);
+				return report;
+			},
 		});
-	};
+	}
 
 	const detach = (merchant: Merchant, other: Merchant["otherNames"][number]) =>
 		propose({
@@ -260,7 +323,6 @@
 		}
 	}
 
-	const markReviewed = (merchant: Merchant) => act(() => reviewMerchant(merchant.id));
 
 	const dismiss = (merchant: Merchant, other: Merchant) =>
 		act(() => dismissMerchantPair(merchant.id, other.id));
@@ -353,13 +415,9 @@
 					<Table.Cell>
 						<span class="flex items-center gap-2">
 							<Input class="min-w-56" bind:value={names[merchant.id]} />
-							<Button
-								size="sm"
-								disabled={busy || !names[merchant.id]?.trim() || names[merchant.id] === merchant.name}
-								onclick={() => rename(merchant)}
-							>
-								Rename
-							</Button>
+							{#if sureCategories !== null}
+								<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
+							{/if}
 						</span>
 					</Table.Cell>
 					<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
@@ -380,7 +438,7 @@
 						<Button variant="outline" size="sm" disabled={busy} onclick={() => startMerge(merchant)}>
 							Merge into…
 						</Button>
-						<Button size="sm" disabled={busy} onclick={() => markReviewed(merchant)}>
+						<Button size="sm" disabled={busy || !draftName(merchant)} onclick={() => save(merchant, true)}>
 							Looks fine
 						</Button>
 					</Table.Cell>
@@ -421,18 +479,27 @@
 		{#each active as merchant (merchant.id)}
 			{@const hasDuplicates = suggestionsOf(merchant).length > 0}
 			<Table.Row class={hasDuplicates ? "border-b-0" : ""}>
-				<Table.Cell><Input class="min-w-56" bind:value={names[merchant.id]} /></Table.Cell>
+				<Table.Cell>
+					<span class="flex items-center gap-2">
+						<Input class="min-w-56" bind:value={names[merchant.id]} />
+						{#if sureCategories !== null}
+							<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
+						{/if}
+					</span>
+				</Table.Cell>
 				<Table.Cell>
 					<Button
 						size="sm"
-						disabled={busy || !names[merchant.id]?.trim() || names[merchant.id] === merchant.name}
-						onclick={() => rename(merchant)}
+						disabled={busy ||
+							!draftName(merchant) ||
+							(!nameChanged(merchant) && !categoryChanged(merchant))}
+						onclick={() => save(merchant, false)}
 					>
-						Rename
+						Save
 					</Button>
 				</Table.Cell>
 				<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
-				<Table.Cell class="whitespace-normal">
+				<Table.Cell class="min-w-48 whitespace-normal">
 					<span class="flex flex-wrap gap-1.5">
 						{#each merchant.otherNames as other (other.key)}
 							<span

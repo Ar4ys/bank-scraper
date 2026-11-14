@@ -65,6 +65,8 @@ The server applies pending migrations when it starts.
 | `ADMIN_APP_DIR`     | `../admin/dist`                    | Directory of the built admin app, relative to `packages/api`             |
 | `APP_GIT_COMMIT`    | `unknown`                          | Git commit of the running build, recorded with every transaction version |
 | `USERSCRIPT_PATH`   | `../userscript/dist/userscript.js` | Built userscript to serve, relative to `packages/api`                    |
+| `SURE_API_URL`      | none                               | Sure's base URL, for its categories (see "Merchant categories")          |
+| `SURE_API_KEY`      | none                               | Sure API key with read scope; set it with `SURE_API_URL` or not at all   |
 
 ## Deployment
 
@@ -155,8 +157,26 @@ shop under several spellings or store numbers) pile up. The Merchants page helps
   name, any of their names counting. Names are compared without case, diacritics, punctuation,
   words with digits and legal forms such as `sp. z o.o.`, by the trigrams they share.
 - "Not a duplicate" stops suggesting a pair, until one of the two is merged away or removed.
-- "Rename" and "Merge into…" are on the merchants in "To review" too, so a merchant can be
-  reviewed without looking for it in the list of all merchants.
+- In "To review", "Looks fine" saves the row: an edited name goes through the rename preview, and
+  the picked category is saved with it. "Merge into…" is there too, so a merchant can be reviewed
+  without looking for it in the list of all merchants. In "All merchants", "Save" does the same
+  without reviewing.
+
+### Merchant categories
+
+A merchant can have a default category of Sure, picked next to its name on the Merchants page. The
+Lunch Flow API sends its id as `categoryId` with the merchant's transactions, and the Sure fork
+applies it on import, so a new category reaches all past transactions on Sure's next sync.
+
+- The picker lists Sure's categories, read through Sure's API (`SURE_API_URL`, `SURE_API_KEY`) on
+  every load of the page. Without both, there is no picker.
+- A picked category is saved with the name, by "Looks fine" or "Save". Edits of other rows that
+  weren't saved survive a save.
+- Clearing a category sends nothing, so the transactions keep the category they have in Sure.
+- Merging a merchant into one without a category moves its category over.
+- A category Sure no longer has shows as "Missing in Sure"; its id is still sent, and Sure ignores
+  it. While Sure can't be reached, the pickers are disabled.
+- In Sure, a category set by hand wins, and so do Sure's rules, which run after every sync.
 
 ### Merchant map
 

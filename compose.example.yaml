@@ -11,6 +11,9 @@ services:
     environment:
       INGEST_API_KEY: change-me
       LUNCHFLOW_API_KEY: change-me-too
+      # Optional, for the merchants' default categories: Sure's URL and an API key with read scope
+      # SURE_API_URL: http://sure:3000
+      # SURE_API_KEY: change-me-three
     volumes:
       # The only copy of the data: back it up, see "Backup" in the README
       - bank-scraper-data:/data
