@@ -55,18 +55,19 @@ The server applies pending migrations when it starts.
 
 ## Configuration
 
-| Env var             | Default                            | Meaning                                                                  |
-| ------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
-| `HTTP_HOST`         | `127.0.0.1`                        | Address the HTTP server listens on                                       |
-| `HTTP_PORT`         | `8585`                             | Port the HTTP server listens on                                          |
-| `SQLITE_DB_PATH`    | `./local/dev.db`                   | Path of the SQLite database file, relative to `packages/api`             |
-| `INGEST_API_KEY`    | required                           | Key the userscript has to send to store scraped transactions             |
-| `LUNCHFLOW_API_KEY` | required                           | Key Sure has to send to the Lunch Flow API                               |
-| `ADMIN_APP_DIR`     | `../admin/dist`                    | Directory of the built admin app, relative to `packages/api`             |
-| `APP_GIT_COMMIT`    | `unknown`                          | Git commit of the running build, recorded with every transaction version |
-| `USERSCRIPT_PATH`   | `../userscript/dist/userscript.js` | Built userscript to serve, relative to `packages/api`                    |
-| `SURE_API_URL`      | none                               | Sure's base URL, for its categories (see "Merchant categories")          |
-| `SURE_API_KEY`      | none                               | Sure API key with read scope; set it with `SURE_API_URL` or not at all   |
+| Env var                | Default                            | Meaning                                                                       |
+| ---------------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
+| `HTTP_HOST`            | `127.0.0.1`                        | Address the HTTP server listens on                                            |
+| `HTTP_PORT`            | `8585`                             | Port the HTTP server listens on                                               |
+| `SQLITE_DB_PATH`       | `./local/dev.db`                   | Path of the SQLite database file, relative to `packages/api`                  |
+| `INGEST_API_KEY`       | required                           | Key the userscript has to send to store scraped transactions                  |
+| `LUNCHFLOW_API_KEY`    | required                           | Key Sure has to send to the Lunch Flow API                                    |
+| `ADMIN_APP_DIR`        | `../admin/dist`                    | Directory of the built admin app, relative to `packages/api`                  |
+| `APP_GIT_COMMIT`       | `unknown`                          | Git commit of the running build, recorded with every transaction version      |
+| `USERSCRIPT_PATH`      | `../userscript/dist/userscript.js` | Built userscript to serve, relative to `packages/api`                         |
+| `SURE_API_URL`         | none                               | Sure's base URL, for its categories (see "Merchant categories")               |
+| `SURE_API_KEY`         | none                               | Sure API key with read scope; set it with `SURE_API_URL` or not at all        |
+| `BRANDFETCH_CLIENT_ID` | none                               | Brandfetch client id, for the brand search and logos (see "Merchant domains") |
 
 ## Deployment
 
@@ -177,6 +178,23 @@ applies it on import, so a new category reaches all past transactions on Sure's 
 - A category Sure no longer has shows as "Missing in Sure"; its id is still sent, and Sure ignores
   it. While Sure can't be reached, the pickers are disabled.
 - In Sure, a category set by hand wins, and so do Sure's rules, which run after every sync.
+
+### Merchant domains
+
+A merchant can have its website's domain (`lidl.pl`), from which Sure shows its logo. The Lunch Flow
+API sends it as `merchantDomain`, and the Sure fork sets the merchant's website to
+`https://<domain>` on the next sync, replacing whatever website it had there.
+
+- The button next to the name opens a search of Brandfetch's brands, started with the merchant's
+  name, plus a field for a domain or URL typed by hand. A URL is stored as its domain without
+  `www.`. The domain is saved with the row, like the category.
+- The search runs in the browser, as Brandfetch requires, with `BRANDFETCH_CLIENT_ID` (free, from
+  Brandfetch's developer portal). It sends the merchant's name to Brandfetch only when the dialog
+  is opened. Only the picked domain is kept.
+- The logo next to the name is Brandfetch's, loaded by the browser. Without `BRANDFETCH_CLIENT_ID`
+  there is no search and no logo, but a domain can still be typed and reaches Sure.
+- Clearing a domain sends nothing, so Sure keeps its website. Merging moves the domain to a
+  merchant that has none.
 
 ### Merchant map
 

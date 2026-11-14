@@ -14,6 +14,8 @@ services:
       # Optional, for the merchants' default categories: Sure's URL and an API key with read scope
       # SURE_API_URL: http://sure:3000
       # SURE_API_KEY: change-me-three
+      # Optional, for searching merchants' domains and showing their logos: a Brandfetch client id
+      # BRANDFETCH_CLIENT_ID: your-client-id
     volumes:
       # The only copy of the data: back it up, see "Backup" in the README
       - bank-scraper-data:/data

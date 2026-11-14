@@ -84,6 +84,13 @@ export const loadSureCategories = () => unwrap(api.sure.categories.$get());
 export const setMerchantCategory = (id: string, sureCategoryId: string | null) =>
 	unwrap(api.merchants[":id"].category.$put({ param: { id }, json: { sureCategoryId } }));
 
+/** Takes a domain or a URL and answers with the domain stored; reaches Sure on its next sync */
+export const setMerchantDomain = (id: string, domain: string | null) =>
+	unwrap(api.merchants[":id"].domain.$put({ param: { id }, json: { domain } }));
+
+/** `clientId` is `null` while Brandfetch isn't configured */
+export const loadBrandfetch = () => unwrap(api.brandfetch.$get());
+
 /** Confirms a merchant in the review; nothing is reprocessed */
 export const reviewMerchant = (id: string) =>
 	unwrap(api.merchants[":id"].review.$post({ param: { id } }));

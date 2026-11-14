@@ -3,6 +3,7 @@
 		deleteMerchant,
 		detachMerchantName,
 		dismissMerchantPair,
+		loadBrandfetch,
 		loadMerchants,
 		loadMerchantSuggestions,
 		loadSureCategories,
@@ -12,12 +13,14 @@
 		restoreMerchant,
 		reviewMerchant,
 		setMerchantCategory,
+		setMerchantDomain,
 		type Merchant,
 		type MerchantChangeReport,
 		type MerchantSuggestions,
 		type SureCategory,
 	} from "$lib/api";
 	import CategoryPicker from "$lib/components/CategoryPicker.svelte";
+	import DomainPicker from "$lib/components/DomainPicker.svelte";
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
 	import { Badge } from "$lib/components/ui/badge";
@@ -47,6 +50,9 @@
 	let categories = $state<Record<string, string | null>>({});
 	/** Sure's categories; `undefined` while they can't be read, `null` while Sure isn't configured */
 	let sureCategories = $state<SureCategory[] | null>();
+	/** The domain picked for each merchant, saved together with its name */
+	let domains = $state<Record<string, string | null>>({});
+	let brandfetchClientId = $state<string | null>(null);
 	const filter = queryText("search");
 	const showDeleted = queryFlag("showDeleted");
 	let busy = $state(false);
@@ -130,13 +136,14 @@
 
 	async function load() {
 		try {
-			const [loadedMerchants, loadedSuggestions, sure] = await Promise.all([
+			const [loadedMerchants, loadedSuggestions, sure, brandfetch] = await Promise.all([
 				loadMerchants(),
 				loadMerchantSuggestions(),
 				loadSureCategories().catch((e: unknown) => {
 					error = `Sure's categories can't be loaded: ${String(e)}`;
 					return undefined;
 				}),
+				loadBrandfetch(),
 			]);
 
 			// Saving one row reloads them all, so edits of the other rows that weren't saved are kept
@@ -155,11 +162,15 @@
 
 			[merchants, suggestions] = [loadedMerchants, loadedSuggestions];
 			sureCategories = sure && (sure.enabled ? sure.categories : null);
+			brandfetchClientId = brandfetch.clientId;
 			names = Object.fromEntries(
 				merchants.map((merchant) => keepUnsaved(merchant, names, (m) => m.name)),
 			);
 			categories = Object.fromEntries(
 				merchants.map((merchant) => keepUnsaved(merchant, categories, (m) => m.sureCategoryId)),
+			);
+			domains = Object.fromEntries(
+				merchants.map((merchant) => keepUnsaved(merchant, domains, (m) => m.domain)),
 			);
 		} catch (e) {
 			error = String(e);
@@ -205,22 +216,26 @@
 	const nameChanged = (merchant: Merchant) => draftName(merchant) !== merchant.name;
 	const categoryChanged = (merchant: Merchant) =>
 		(categories[merchant.id] ?? null) !== merchant.sureCategoryId;
+	const domainChanged = (merchant: Merchant) => (domains[merchant.id] ?? null) !== merchant.domain;
 
-	async function saveCategory(merchant: Merchant) {
+	async function saveDetails(merchant: Merchant) {
 		if (categoryChanged(merchant)) {
 			await setMerchantCategory(merchant.id, categories[merchant.id] ?? null);
+		}
+		if (domainChanged(merchant)) {
+			await setMerchantDomain(merchant.id, domains[merchant.id] ?? null);
 		}
 	}
 
 	/**
-	 * Saves the edited name and the picked category of a merchant. A new name goes through the
-	 * rename preview first, and the category is saved only once the rename is applied, so a rejected
-	 * rename saves nothing. A rename reviews the merchant; `review` reviews it otherwise too.
+	 * Saves the edited name, the picked category and the picked domain of a merchant. A new name goes
+	 * through the rename preview first, and the rest is saved only once the rename is applied, so a
+	 * rejected rename saves nothing. A rename reviews the merchant; `review` reviews it otherwise too.
 	 */
 	function save(merchant: Merchant, review: boolean) {
 		if (!nameChanged(merchant)) {
 			return act(async () => {
-				await saveCategory(merchant);
+				await saveDetails(merchant);
 				if (review) await reviewMerchant(merchant.id);
 			});
 		}
@@ -231,7 +246,7 @@
 			description: `Its transactions get the new name. "${merchant.name}" stays a name of the merchant, so whatever still derives it ends up here.`,
 			run: async (dryRun) => {
 				const report = await renameMerchant(merchant.id, name, dryRun);
-				if (!dryRun) await saveCategory(merchant);
+				if (!dryRun) await saveDetails(merchant);
 				return report;
 			},
 		});
@@ -414,6 +429,11 @@
 					<Table.Cell>
 						<span class="flex items-center gap-2">
 							<Input class="min-w-56" bind:value={names[merchant.id]} />
+							<DomainPicker
+								bind:value={domains[merchant.id]}
+								merchantName={merchant.name}
+								clientId={brandfetchClientId}
+							/>
 							{#if sureCategories !== null}
 								<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
 							{/if}
@@ -481,6 +501,11 @@
 				<Table.Cell>
 					<span class="flex items-center gap-2">
 						<Input class="min-w-56" bind:value={names[merchant.id]} />
+						<DomainPicker
+							bind:value={domains[merchant.id]}
+							merchantName={merchant.name}
+							clientId={brandfetchClientId}
+						/>
 						{#if sureCategories !== null}
 							<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
 						{/if}
@@ -491,7 +516,7 @@
 						size="sm"
 						disabled={busy ||
 							!draftName(merchant) ||
-							(!nameChanged(merchant) && !categoryChanged(merchant))}
+							(!nameChanged(merchant) && !categoryChanged(merchant) && !domainChanged(merchant))}
 						onclick={() => save(merchant, false)}
 					>
 						Save
