@@ -19,6 +19,7 @@ import {
 	TransactionVersionCause,
 	type MerchantMapEntry,
 } from "./db/schema.ts";
+import { explainMapEntry } from "./processing/entryCoverage.ts";
 import { matchText } from "./processing/merchantMap.ts";
 import { listRecurringPlaces } from "./processing/places.ts";
 
@@ -102,6 +103,18 @@ export const adminMerchantMapApi = new Hono()
 			})),
 			200,
 		);
+	})
+
+	/**
+	 * GET /api/admin/merchant-map/:id/coverage
+	 *
+	 * The payments the entry's text matches, and what sets the merchant of those it doesn't name
+	 */
+	.get("/:id/coverage", idParam, (c) => {
+		const entry = findEntry(c.req.valid("param").id);
+		if (!entry) return c.json({ message: notFound.rejected.message }, 404);
+
+		return c.json(explainMapEntry(entry), 200);
 	})
 
 	/** GET /api/admin/merchant-map/places */

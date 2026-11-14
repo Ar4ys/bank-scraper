@@ -213,6 +213,9 @@ page: each entry says "a payment whose address (or city) contains this text gets
   transaction, recording "merchant map" as the cause in its history. There are no drafts.
 - Each entry shows how many transactions it gives their merchant now; clicking that number lists
   them. The same count button lists the transactions of merchants and places.
+- An entry whose text matches payments it doesn't name says why in that list: the bank names their
+  merchant (and the entry doesn't override it), a longer entry wins, or a rule sets the merchant.
+  A transaction's page shows what sets each of its fields now, under "Set by".
 - "Places without a merchant", above the entries, lists card and mobile payments that have no
   merchant, grouped by their address without digits and punctuation (`LIDL 3011` and `LIDL3012`
   are one place), from three payments on. "Name it" adds an entry for a proposed text, the longest

@@ -194,6 +194,11 @@ export type MerchantMapEntryInput = Pick<
 	"field" | "text" | "merchant" | "overridesBankMerchant"
 >;
 
+/** Which payments an entry's text matches, and what sets the merchant of those it doesn't name */
+export type MerchantMapEntryCoverage = Awaited<ReturnType<typeof loadMerchantMapEntryCoverage>>;
+export const loadMerchantMapEntryCoverage = (id: string) =>
+	unwrap(api["merchant-map"][":id"].coverage.$get({ param: { id } }));
+
 export const addMerchantMapEntry = (entry: MerchantMapEntryInput, dryRun: boolean) =>
 	unwrap(api["merchant-map"].$post({ query: dryRunQuery(dryRun), json: entry }));
 

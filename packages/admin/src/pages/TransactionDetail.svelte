@@ -28,7 +28,7 @@
 
 {#await detail}
 	<p class="text-sm text-muted-foreground">Loading…</p>
-{:then { transaction, versions, parsed, rawVersions }}
+{:then { transaction, currentSources, versions, parsed, rawVersions }}
 	{@const bank = { accountId: String(transaction.accountId), bankId: transaction.bankId }}
 	{@const rawHref = p("/raw/:accountId/:bankId", { params: bank })}
 
@@ -64,6 +64,23 @@
 		<dd>{transaction.description}</dd>
 		<dt class="text-muted-foreground">Date</dt>
 		<dd class="tabular-nums">{transaction.date}</dd>
+		<dt class="text-muted-foreground">Set by</dt>
+		<dd>
+			{#if currentSources.length === 0}
+				<span class="text-muted-foreground">not known until it is processed again</span>
+			{:else}
+				{@const overridden = currentSources.filter((item) => item.source !== "default")}
+				{#each overridden as item (item.field)}
+					<span class="mr-3">
+						<span class="font-mono">{item.field}</span>
+						← {item.name ?? item.source}
+					</span>
+				{/each}
+				<span class="text-muted-foreground">
+					{overridden.length ? "everything else ←" : "every field ←"} the bank's data
+				</span>
+			{/if}
+		</dd>
 		<dt class="text-muted-foreground">Account</dt>
 		<dd>{accounts.find((account) => account.id === transaction.accountId)?.name ?? transaction.accountId}</dd>
 		<dt class="text-muted-foreground">Id</dt>

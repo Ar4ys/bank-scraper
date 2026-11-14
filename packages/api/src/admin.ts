@@ -355,9 +355,18 @@ export const adminApi = new Hono()
 			.where(eq(transactionVersions.transactionId, transaction.id))
 			.orderBy(transactionVersions.id);
 
-		const mapEntryIds = versions.flatMap(({ version }) =>
-			Object.values(version.fieldSources).flatMap((source) => mapEntryIdOfSource(source) ?? []),
-		);
+		const currentSources: Record<string, string> = transaction.fieldSources ?? {};
+		const mapEntryIds = [
+			...Object.values(currentSources),
+			...versions.flatMap(({ version }) => Object.values(version.fieldSources)),
+		].flatMap((source) => mapEntryIdOfSource(source) ?? []);
+		const currentRevision = transaction.ruleRevisionId
+			? db
+					.select()
+					.from(ruleRevisions)
+					.where(eq(ruleRevisions.id, transaction.ruleRevisionId))
+					.get()
+			: undefined;
 		const mapEntries = mapEntryIds.length
 			? await db
 					.select()
@@ -379,6 +388,19 @@ export const adminApi = new Hono()
 		return c.json(
 			{
 				transaction: transactionJson(transaction),
+				/**
+				 * What sets each field now: `default` for the code's value from the bank's data, a rule
+				 * with its name in the revision the transaction was processed with, or a map entry. Empty
+				 * for a transaction not processed since sources were recorded.
+				 */
+				currentSources: Object.entries(currentSources).map(([field, source]) => ({
+					field,
+					source,
+					name:
+						source === defaultFieldSource
+							? null
+							: sourceName(source, currentRevision?.rules ?? null),
+				})),
 				/** Oldest first */
 				versions: versions.map(({ version, revisionRules }) => ({
 					id: version.id,

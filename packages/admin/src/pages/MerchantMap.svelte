@@ -5,6 +5,7 @@
 		ignorePlace,
 		loadAccounts,
 		loadMerchantMap,
+		loadMerchantMapEntryCoverage,
 		loadMerchants,
 		loadRecurringPlaces,
 		restorePlace,
@@ -13,6 +14,7 @@
 		type Merchant,
 		type MerchantChangeReport,
 		type MerchantMapEntry,
+		type MerchantMapEntryCoverage,
 		type MerchantMapEntryInput,
 		type RecurringPlace,
 	} from "$lib/api";
@@ -72,10 +74,20 @@
 
 	let entryTransactionsOpen = $state(false);
 	let entryTransactionsOf = $state<MerchantMapEntry>();
+	let coverage = $state<MerchantMapEntryCoverage>();
+	let coverageError = $state<string>();
 
 	function viewEntryTransactions(entry: MerchantMapEntry) {
 		entryTransactionsOf = entry;
 		entryTransactionsOpen = true;
+		coverage = undefined;
+		coverageError = undefined;
+		loadMerchantMapEntryCoverage(entry.id).then(
+			(loaded) => {
+				if (entryTransactionsOf?.id === entry.id) coverage = loaded;
+			},
+			(e: unknown) => (coverageError = String(e)),
+		);
 	}
 	const filter = queryText("search");
 	let busy = $state(false);
@@ -664,6 +676,35 @@
 		</Dialog.Header>
 
 		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto">
+			{#if coverageError}
+				<p class="text-sm text-destructive">{coverageError}</p>
+			{:else if coverage && coverage.matching === 0}
+				<p class="rounded-md bg-muted px-3 py-2 text-sm">Its text matches no payment.</p>
+			{:else if coverage && coverage.others.length}
+				<div class="rounded-md bg-muted px-3 py-2 text-sm">
+					<p>
+						Its text matches {coverage.matching} payment(s), and sets the merchant of
+						{coverage.set}. For the rest something else does:
+					</p>
+					<ul class="list-disc pl-5">
+						{#each coverage.others as other, index (index)}
+							<li>
+								<span class="tabular-nums">{other.payments}</span>:
+								{#if other.kind === "bank"}
+									the bank names their merchant. "Override the bank's merchant" on this entry would
+									replace it.
+								{:else if other.kind === "entry"}
+									{other.label} sets it, as the longer (or older) text.
+								{:else if other.kind === "rule"}
+									the rule "{other.label}" sets it: rules override the map.
+								{:else}
+									not processed since this entry changed; reprocessing updates them.
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 			{#if entryTransactionsOf}
 				{#key entryTransactionsOf.id}
 					<MerchantTransactions filter={{ merchantMapEntryId: entryTransactionsOf.id }} />
