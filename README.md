@@ -145,6 +145,13 @@ the transaction's last version recorded. The changes can be filtered by field an
 
 - `mise run dev-admin` starts the Vite dev server, which proxies `/api` to the API on port 8585.
 - `mise run build-admin` builds it into `packages/admin/dist`, which the API serves at `/`.
+- Long lists show 50 rows per page (Transactions and Raw transactions 100), with page numbers. The
+  Merchants and Merchant map lists sort by their column headers. Search, sort and page are kept in
+  the URL; searching or sorting goes back to the first page.
+- A transaction count opens that list's transactions everywhere: the number with a receipt icon.
+  Rarer and destructive row actions (Delete, Merge into… in "All merchants") sit in the ⋮ menu.
+- The Merchants page shares one category popover, one row menu and one domain dialog between its
+  rows: one per row made a few hundred merchants take over a second to show.
 
 ### Merchant review
 
