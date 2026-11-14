@@ -6,6 +6,7 @@ export const logoUrl = (clientId: string, domain: string) =>
 
 const searchResultsSchema = z.array(
 	z.object({
+		brandId: z.string(),
 		name: z.string().nullable(),
 		domain: z.string(),
 		icon: z.string().nullable(),
@@ -28,5 +29,6 @@ export async function searchBrands(clientId: string, query: string, signal?: Abo
 
 	const parsed = searchResultsSchema.safeParse(await response.json());
 	if (!parsed.success) throw new Error("Brandfetch answered with unexpected results");
-	return parsed.data;
+	// The list is keyed by brand, and a key may appear only once
+	return [...new Map(parsed.data.map((result) => [result.brandId, result])).values()];
 }

@@ -98,11 +98,11 @@
 		{#if clientId}
 			<Input placeholder="Brand" bind:value={query} />
 
-			<div class="min-h-24 flex-1 overflow-y-auto">
+			<div class="min-h-24 flex-1 overflow-y-auto transition-opacity {searching ? 'opacity-50' : ''}">
 				{#if searchError}
 					<p class="px-2 py-1.5 text-sm text-destructive">{searchError}</p>
 				{:else}
-					{#each results as result, index (index)}
+					{#each results as result (result.brandId)}
 						<button
 							class="flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
 							onclick={() => pick(normalizeDomain(result.domain) ?? result.domain)}
