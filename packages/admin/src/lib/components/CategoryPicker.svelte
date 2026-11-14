@@ -17,6 +17,7 @@
 	} = $props();
 
 	let open = $state(false);
+	let search = $state<HTMLInputElement | null>(null);
 
 	const label = (category: SureCategory) =>
 		category.parentName ? `${category.parentName} › ${category.name}` : category.name;
@@ -65,9 +66,18 @@
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-64 p-0" align="start">
-		<Command.Root>
-			<Command.Input placeholder="Category" />
+	<!-- The popover focuses its search, and the list scrolls its first item into view, before the
+	     popover is positioned: either scrolled the page to the top -->
+	<Popover.Content
+		class="w-64 p-0"
+		align="start"
+		onOpenAutoFocus={(event) => {
+			event.preventDefault();
+			search?.focus({ preventScroll: true });
+		}}
+	>
+		<Command.Root disableInitialScroll>
+			<Command.Input bind:ref={search} placeholder="Category" />
 			<Command.List>
 				<Command.Empty>No category found</Command.Empty>
 				<Command.Group>
