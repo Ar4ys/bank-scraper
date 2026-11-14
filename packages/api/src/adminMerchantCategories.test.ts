@@ -103,8 +103,12 @@ describe("categories of merchants", () => {
 	});
 });
 
-describe("Sure's categories without Sure configured", () => {
-	it("reports the integration as off", async () => {
+describe("integrations that aren't configured", () => {
+	it("hands out no Brandfetch client id", async () => {
+		assert.deepEqual((await request("/brandfetch")).body, { clientId: null });
+	});
+
+	it("reports Sure's categories as off", async () => {
 		assert.deepEqual((await request("/sure/categories")).body, {
 			enabled: false,
 			categories: [],

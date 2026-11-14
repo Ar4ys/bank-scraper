@@ -73,7 +73,11 @@ export const lunchflowApi = new Hono()
 			if (!account) return c.json(accountNotFound, 404);
 
 			const rows = await db
-				.select({ transaction: transactions, sureCategoryId: merchants.sureCategoryId })
+				.select({
+					transaction: transactions,
+					sureCategoryId: merchants.sureCategoryId,
+					domain: merchants.domain,
+				})
 				.from(transactions)
 				.leftJoin(merchants, eq(merchants.id, transactions.merchantId))
 				.where(
@@ -86,7 +90,7 @@ export const lunchflowApi = new Hono()
 				.orderBy(transactions.date, transactions.id);
 
 			return c.json({
-				transactions: rows.map(({ transaction, sureCategoryId }) => ({
+				transactions: rows.map(({ transaction, sureCategoryId, domain }) => ({
 					id: transaction.id,
 					accountId: transaction.accountId,
 					amount: toMajorUnits(transaction.amount),
@@ -97,6 +101,7 @@ export const lunchflowApi = new Hono()
 					isPending: transaction.isPending,
 					// Read by the Sure fork, not part of Lunch Flow's API
 					...(sureCategoryId === null ? {} : { categoryId: sureCategoryId }),
+					...(domain === null ? {} : { merchantDomain: domain }),
 				})),
 				total: rows.length,
 			});

@@ -108,6 +108,24 @@ describe("Lunch Flow API", () => {
 		await db.update(tables.merchants).set({ sureCategoryId: null });
 	});
 
+	it("sends the domain of a transaction's merchant, and nothing without one", async () => {
+		const transactions = async () =>
+			(await get(`/accounts/${account.id}/transactions`)).body.transactions;
+
+		assert.ok((await transactions()).every((item: object) => !("merchantDomain" in item)));
+
+		await db
+			.update(tables.merchants)
+			.set({ domain: "example.com" })
+			.where(eq(tables.merchants.name, "SOMEONE WHO RECEIVED MONEY"));
+
+		const [card, transfer] = await transactions();
+		assert.equal(transfer.merchantDomain, "example.com");
+		assert.equal("merchantDomain" in card, false);
+
+		await db.update(tables.merchants).set({ domain: null });
+	});
+
 	it("filters by inclusive dates, named as Sure or as the docs name them", async () => {
 		const dates = async (query: string) =>
 			(await get(`/accounts/${account.id}/transactions?${query}`)).body.transactions.map(

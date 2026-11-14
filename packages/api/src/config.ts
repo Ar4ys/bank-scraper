@@ -30,6 +30,11 @@ const configSchema = z.object({
 		.optional(),
 	/** API key of Sure with read scope, sent as `X-Api-Key` */
 	SURE_API_KEY: z.string().nonempty().optional(),
+	/**
+	 * Brandfetch client id, for the brand search and the logos in the admin app. It is public: the
+	 * admin app calls Brandfetch with it from the browser.
+	 */
+	BRANDFETCH_CLIENT_ID: z.string().nonempty().optional(),
 });
 
 export const config = configSchema

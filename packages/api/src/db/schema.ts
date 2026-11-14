@@ -134,6 +134,8 @@ export const merchants = s.snakeCase.table("merchants", {
 	reviewedAt: instant(),
 	/** Id of the category in Sure its transactions get; Sure ignores an id it doesn't have */
 	sureCategoryId: s.text(),
+	/** Its website's domain (`lidl.pl`), from which Sure and the admin app show its logo */
+	domain: s.text(),
 	createdAt: instant().notNull().default(sqlDateTimeNow),
 	updatedAt: instant().notNull().default(sqlDateTimeNow),
 });

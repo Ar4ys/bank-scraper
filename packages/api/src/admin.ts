@@ -11,6 +11,7 @@ import { and, count, countDistinct, desc, eq, inArray, isNull, like, or, sql } f
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { adminBrandfetchApi } from "./adminBrandfetch.ts";
 import { adminMerchantMapApi } from "./adminMerchantMap.ts";
 import { adminMerchantsApi } from "./adminMerchants.ts";
 import { adminRulesApi } from "./adminRules.ts";
@@ -102,6 +103,7 @@ export const adminApi = new Hono()
 	.route("/merchants", adminMerchantsApi)
 	.route("/merchant-map", adminMerchantMapApi)
 	.route("/sure", adminSureApi)
+	.route("/brandfetch", adminBrandfetchApi)
 
 	/** GET /api/admin/dashboard */
 	.get("/dashboard", async (c) => {

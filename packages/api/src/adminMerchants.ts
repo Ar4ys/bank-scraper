@@ -1,3 +1,4 @@
+import { normalizeDomain } from "@bank-scraper/shared";
 import { zValidator } from "@hono/zod-validator";
 import { count, eq, isNotNull, isNull } from "drizzle-orm";
 import { Hono } from "hono";
@@ -56,6 +57,8 @@ export const adminMerchantsApi = new Hono()
 				reviewedAt: merchant.reviewedAt?.toString() ?? null,
 				/** Id of the category in Sure its transactions get, `null` for none */
 				sureCategoryId: merchant.sureCategoryId,
+				/** Its website's domain (`lidl.pl`), `null` for none */
+				domain: merchant.domain,
 				/** Always 0 for a deleted merchant: its transactions have no merchant */
 				transactionCount: counts.find((row) => row.merchantId === merchant.id)?.total ?? 0,
 				/** The names that stand for the merchant besides the one it is shown with */
@@ -134,6 +137,36 @@ export const adminMerchantsApi = new Hono()
 				.run();
 
 			return c.json({}, 200);
+		},
+	)
+
+	/**
+	 * PUT /api/admin/merchants/:id/domain
+	 *
+	 * Takes a domain or a URL, which is reduced to its domain, and answers with what was stored.
+	 * Takes effect in Sure on its next sync; Sure keeps the website it has when the domain is
+	 * cleared.
+	 */
+	.put(
+		"/:id/domain",
+		idParam,
+		zValidator("json", z.object({ domain: z.string().nullable() })),
+		(c) => {
+			const merchant = findMerchant(c.req.valid("param").id);
+			if (!merchant) return c.json({ message: notFound.rejected.message }, 404);
+
+			const input = c.req.valid("json").domain;
+			const domain = input === null || input.trim() === "" ? null : normalizeDomain(input);
+			if (domain === undefined) {
+				return c.json({ message: `"${input}" is not a domain such as lidl.pl` }, 400);
+			}
+
+			db.update(merchants)
+				.set({ domain, updatedAt: sqlDateTimeNow })
+				.where(eq(merchants.id, merchant.id))
+				.run();
+
+			return c.json({ domain }, 200);
 		},
 	)
 
@@ -249,6 +282,7 @@ export const adminMerchantsApi = new Hono()
 					.set({
 						reviewedAt: Temporal.Now.instant(),
 						sureCategoryId: into.sureCategoryId ?? merchant.sureCategoryId,
+						domain: into.domain ?? merchant.domain,
 						updatedAt: sqlDateTimeNow,
 					})
 					.where(eq(merchants.id, intoId))
