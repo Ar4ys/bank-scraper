@@ -3,25 +3,21 @@
 	import ExternalLink from "@lucide/svelte/icons/external-link";
 
 	import { searchBrands, type BrandSearchResult } from "$lib/brandfetch";
-	import MerchantLogo from "$lib/components/MerchantLogo.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { Input } from "$lib/components/ui/input";
 
 	let {
-		value = $bindable(),
-		merchantName,
 		clientId,
 	}: {
-		/** The picked domain, `null` for none */
-		value: string | null;
-		/** The first query of the search */
-		merchantName: string;
 		/** `null` while Brandfetch isn't configured: no search and no logos, only typing */
 		clientId: string | null;
 	} = $props();
 
 	let open = $state(false);
+	let merchantName = $state("");
+	let value = $state<string | null>(null);
+	let onpick: (domain: string | null) => void = () => {};
 	let query = $state("");
 	let typed = $state("");
 	let results = $state<BrandSearchResult[]>([]);
@@ -29,9 +25,17 @@
 	let searchError = $state<string>();
 	let typedError = $state<string>();
 
-	function start() {
-		query = merchantName;
-		typed = value ?? "";
+	/** Opens the dialog for a merchant, searching for its name, with the domain picked so far */
+	export function show(
+		name: string,
+		current: string | null,
+		onchoose: (domain: string | null) => void,
+	) {
+		merchantName = name;
+		value = current;
+		onpick = onchoose;
+		query = name;
+		typed = current ?? "";
 		results = [];
 		searchError = undefined;
 		typedError = undefined;
@@ -67,7 +71,7 @@
 	});
 
 	function pick(domain: string | null) {
-		value = domain;
+		onpick(domain);
 		open = false;
 	}
 
@@ -80,11 +84,6 @@
 		pick(domain);
 	}
 </script>
-
-<Button variant="outline" size="sm" class="w-44 justify-start gap-2 font-normal" onclick={start}>
-	<MerchantLogo {clientId} domain={value} />
-	<span class="truncate {value ? '' : 'text-muted-foreground'}">{value ?? "No domain"}</span>
-</Button>
 
 <Dialog.Root bind:open>
 	<Dialog.Content class="flex max-h-[85vh] flex-col sm:max-w-lg">

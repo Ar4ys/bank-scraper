@@ -1,6 +1,4 @@
 <script lang="ts">
-	import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
-
 	import {
 		deleteMerchant,
 		detachMerchantName,
@@ -21,16 +19,20 @@
 		type MerchantSuggestions,
 		type SureCategory,
 	} from "$lib/api";
-	import CategoryPicker from "$lib/components/CategoryPicker.svelte";
-	import DomainPicker from "$lib/components/DomainPicker.svelte";
+	import { categoryLabel } from "$lib/categories";
+	import CategoryButton from "$lib/components/CategoryButton.svelte";
+	import CategoryPopover from "$lib/components/CategoryPopover.svelte";
+	import DomainButton from "$lib/components/DomainButton.svelte";
+	import DomainDialog from "$lib/components/DomainDialog.svelte";
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
+	import MoreButton from "$lib/components/MoreButton.svelte";
+	import RowMenu from "$lib/components/RowMenu.svelte";
 	import SortButton from "$lib/components/SortButton.svelte";
 	import TransactionsButton from "$lib/components/TransactionsButton.svelte";
 	import { Badge } from "$lib/components/ui/badge";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { Switch } from "$lib/components/ui/switch";
@@ -98,11 +100,15 @@
 		startsDescending,
 	);
 
-	const categoryLabel = (merchant: Merchant) => {
+	const savedCategoryLabel = (merchant: Merchant) => {
 		const category = sureCategories?.find((item) => item.id === merchant.sureCategoryId);
-		if (!category) return null;
-		return category.parentName ? `${category.parentName} › ${category.name}` : category.name;
+		return category ? categoryLabel(category) : null;
 	};
+
+	// One popover, menu and dialog for all rows: one per row made the page slow to show
+	let categoryPopover = $state<CategoryPopover>();
+	let rowMenu = $state<RowMenu>();
+	let domainDialog = $state<DomainDialog>();
 
 	/** By the saved values, so a row doesn't move while its drafts are edited */
 	const compareMerchants = (sort: QuerySort<SortKey>) => (a: Merchant, b: Merchant) => {
@@ -115,7 +121,7 @@
 					? (a.transactionCount - b.transactionCount) * direction
 					: sort.key === "domain"
 						? compareOptional(a.domain, b.domain, sort.descending)
-						: compareOptional(categoryLabel(a), categoryLabel(b), sort.descending);
+						: compareOptional(savedCategoryLabel(a), savedCategoryLabel(b), sort.descending);
 
 		return order || byName;
 	};
@@ -490,15 +496,25 @@
 				<Table.Row class={secondLine ? "border-b-0" : ""}>
 					<Table.Cell><Input class="min-w-56" bind:value={names[merchant.id]} /></Table.Cell>
 					<Table.Cell>
-						<DomainPicker
-							bind:value={domains[merchant.id]}
-							merchantName={merchant.name}
+						<DomainButton
+							value={domains[merchant.id] ?? null}
 							clientId={brandfetchClientId}
+							onclick={() =>
+								domainDialog?.show(merchant.name, domains[merchant.id] ?? null, (domain) => {
+									domains[merchant.id] = domain;
+								})}
 						/>
 					</Table.Cell>
 					{#if sureCategories !== null}
 						<Table.Cell>
-							<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
+							<CategoryButton
+								value={categories[merchant.id] ?? null}
+								categories={sureCategories}
+								onclick={(anchor) =>
+									categoryPopover?.show(anchor, (id) => {
+										categories[merchant.id] = id;
+									})}
+							/>
 						</Table.Cell>
 					{/if}
 					<Table.Cell class="text-right">
@@ -551,15 +567,25 @@
 			<Table.Row class={secondLine ? "border-b-0" : ""}>
 				<Table.Cell><Input class="min-w-56" bind:value={names[merchant.id]} /></Table.Cell>
 				<Table.Cell>
-					<DomainPicker
-						bind:value={domains[merchant.id]}
-						merchantName={merchant.name}
+					<DomainButton
+						value={domains[merchant.id] ?? null}
 						clientId={brandfetchClientId}
+						onclick={() =>
+							domainDialog?.show(merchant.name, domains[merchant.id] ?? null, (domain) => {
+								domains[merchant.id] = domain;
+							})}
 					/>
 				</Table.Cell>
 				{#if sureCategories !== null}
 					<Table.Cell>
-						<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
+						<CategoryButton
+								value={categories[merchant.id] ?? null}
+								categories={sureCategories}
+								onclick={(anchor) =>
+									categoryPopover?.show(anchor, (id) => {
+										categories[merchant.id] = id;
+									})}
+							/>
 					</Table.Cell>
 				{/if}
 				<Table.Cell class="text-right">
@@ -578,21 +604,14 @@
 					>
 						Save
 					</Button>
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger disabled={busy}>
-							{#snippet child({ props })}
-								<Button {...props} variant="ghost" size="icon-sm" aria-label="More actions">
-									<EllipsisVertical />
-								</Button>
-							{/snippet}
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Content align="end" class="w-auto">
-							<DropdownMenu.Item onSelect={() => startMerge(merchant)}>Merge into…</DropdownMenu.Item>
-							<DropdownMenu.Item variant="destructive" onSelect={() => remove(merchant)}>
-								Delete
-							</DropdownMenu.Item>
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
+					<MoreButton
+						disabled={busy}
+						onclick={(anchor) =>
+							rowMenu?.show(anchor, [
+								{ label: "Merge into…", onselect: () => startMerge(merchant) },
+								{ label: "Delete", destructive: true, onselect: () => remove(merchant) },
+							])}
+					/>
 				</Table.Cell>
 			</Table.Row>
 			{#if secondLine}
@@ -642,20 +661,17 @@
 						<Button variant="outline" size="sm" disabled={busy} onclick={() => restore(merchant)}>
 							Restore
 						</Button>
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger disabled={busy}>
-								{#snippet child({ props })}
-									<Button {...props} variant="ghost" size="icon-sm" aria-label="More actions">
-										<EllipsisVertical />
-									</Button>
-								{/snippet}
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Content align="end" class="w-auto">
-								<DropdownMenu.Item variant="destructive" onSelect={() => removePermanently(merchant)}>
-									Permanently remove
-								</DropdownMenu.Item>
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
+						<MoreButton
+							disabled={busy}
+							onclick={(anchor) =>
+								rowMenu?.show(anchor, [
+									{
+										label: "Permanently remove",
+										destructive: true,
+										onselect: () => removePermanently(merchant),
+									},
+								])}
+						/>
 					</Table.Cell>
 				</Table.Row>
 			{:else}
@@ -796,3 +812,7 @@
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
+
+<CategoryPopover bind:this={categoryPopover} categories={sureCategories ?? undefined} />
+<RowMenu bind:this={rowMenu} />
+<DomainDialog bind:this={domainDialog} clientId={brandfetchClientId} />
