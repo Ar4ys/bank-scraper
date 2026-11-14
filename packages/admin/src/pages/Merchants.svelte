@@ -27,6 +27,7 @@
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
 	import MoreButton from "$lib/components/MoreButton.svelte";
+	import Pagination from "$lib/components/Pagination.svelte";
 	import RowMenu from "$lib/components/RowMenu.svelte";
 	import SortButton from "$lib/components/SortButton.svelte";
 	import TransactionsButton from "$lib/components/TransactionsButton.svelte";
@@ -38,7 +39,8 @@
 	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
 	import { formatInstant } from "$lib/format";
-	import { queryFlag, queryText } from "$lib/queryState";
+	import { clampOffset, PAGE_SIZE } from "$lib/pages";
+	import { queryCount, queryFlag, queryText } from "$lib/queryState";
 	import { p } from "$lib/router";
 	import { compareOptional, querySort, type QuerySort } from "$lib/sorting";
 
@@ -83,6 +85,9 @@
 	let transactionsOpen = $state(false);
 	let transactionsOf = $state<Merchant>();
 
+	const allOffset = queryCount("offset");
+	const reviewOffset = queryCount("reviewOffset");
+
 	const sortKeys = ["name", "domain", "category", "transactionCount"] as const;
 	type SortKey = (typeof sortKeys)[number];
 	// Counts are looked at from the largest, texts from A
@@ -92,12 +97,14 @@
 		sortKeys,
 		{ key: "name", descending: false },
 		startsDescending,
+		() => (allOffset.value = 0),
 	);
 	const reviewSort = querySort(
 		{ key: "reviewSort", descending: "reviewDescending" },
 		sortKeys,
 		{ key: "transactionCount", descending: true },
 		startsDescending,
+		() => (reviewOffset.value = 0),
 	);
 
 	const savedCategoryLabel = (merchant: Merchant) => {
@@ -148,6 +155,12 @@
 			.filter((merchant) => !merchant.deletedAt && !merchant.reviewedAt)
 			.toSorted(compareMerchants(reviewSort)),
 	);
+
+	// An offset past the end, e.g. after merges shortened the list, shows its last page
+	const reviewPage = $derived(clampOffset(reviewOffset.value, toReview.length));
+	const allPage = $derived(clampOffset(allOffset.value, active.length));
+	const shownReview = $derived(toReview.slice(reviewPage, reviewPage + PAGE_SIZE));
+	const shownActive = $derived(active.slice(allPage, allPage + PAGE_SIZE));
 	/** Columns of a merchant's first line; its second line spans them all */
 	const columns = $derived(sureCategories === null ? 4 : 5);
 
@@ -393,7 +406,12 @@
 </p>
 
 <div class="flex flex-wrap items-center gap-4">
-	<Input class="max-w-xs" placeholder="Name" bind:value={filter.value} />
+	<Input
+		class="max-w-xs"
+		placeholder="Name"
+		bind:value={filter.value}
+		oninput={() => (allOffset.value = 0)}
+	/>
 	<span class="flex items-center gap-2">
 		<Switch id="show-deleted" bind:checked={showDeleted.value} />
 		<Label for="show-deleted" class="cursor-pointer">
@@ -491,7 +509,7 @@
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
-			{#each toReview as merchant (merchant.id)}
+			{#each shownReview as merchant (merchant.id)}
 				{@const secondLine = merchant.otherNames.length > 0 || suggestionsOf(merchant).length > 0}
 				<Table.Row class={secondLine ? "border-b-0" : ""}>
 					<Table.Cell><Input class="min-w-56" bind:value={names[merchant.id]} /></Table.Cell>
@@ -543,6 +561,13 @@
 			{/each}
 		</Table.Body>
 	</Table.Root>
+	{#if toReview.length > PAGE_SIZE}
+		<Pagination
+			bind:offset={() => reviewPage, (offset) => (reviewOffset.value = offset)}
+			limit={PAGE_SIZE}
+			total={toReview.length}
+		/>
+	{/if}
 
 	<h2 class="pt-4 text-lg font-semibold">All merchants</h2>
 {/if}
@@ -562,7 +587,7 @@
 		</Table.Row>
 	</Table.Header>
 	<Table.Body>
-		{#each active as merchant (merchant.id)}
+		{#each shownActive as merchant (merchant.id)}
 			{@const secondLine = merchant.otherNames.length > 0 || suggestionsOf(merchant).length > 0}
 			<Table.Row class={secondLine ? "border-b-0" : ""}>
 				<Table.Cell><Input class="min-w-56" bind:value={names[merchant.id]} /></Table.Cell>
@@ -630,6 +655,13 @@
 		{/each}
 	</Table.Body>
 </Table.Root>
+{#if active.length > PAGE_SIZE}
+	<Pagination
+		bind:offset={() => allPage, (offset) => (allOffset.value = offset)}
+		limit={PAGE_SIZE}
+		total={active.length}
+	/>
+{/if}
 
 {#if showDeleted.value}
 	<h2 class="pt-4 text-lg font-semibold">Deleted</h2>

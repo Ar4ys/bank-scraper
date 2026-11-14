@@ -3,13 +3,14 @@ import { queryOption, queryState } from "$lib/queryState";
 /**
  * The column a table is sorted by and its direction, kept in the URL under `params`. Sorting by
  * another column starts in the direction `startsDescending` gives it; the same column again
- * reverses.
+ * reverses. `onsort` runs after every change, e.g. to go back to the first page.
  */
 export function querySort<const K extends string>(
 	params: { key: string; descending: string },
 	keys: readonly K[],
 	fallback: { key: NoInfer<K>; descending: boolean },
 	startsDescending: (key: K) => boolean,
+	onsort?: () => void,
 ) {
 	const key = queryOption(params.key, keys, fallback.key);
 	const descending = queryState(params.descending, fallback.descending, {
@@ -31,6 +32,7 @@ export function querySort<const K extends string>(
 				key.value = next;
 				descending.value = startsDescending(next);
 			}
+			onsort?.();
 		},
 	};
 }

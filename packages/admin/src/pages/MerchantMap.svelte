@@ -22,6 +22,7 @@
 
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
+	import Pagination from "$lib/components/Pagination.svelte";
 	import SortButton from "$lib/components/SortButton.svelte";
 	import TransactionsButton from "$lib/components/TransactionsButton.svelte";
 	import { Button } from "$lib/components/ui/button";
@@ -33,7 +34,8 @@
 	import { Switch } from "$lib/components/ui/switch";
 	import * as Table from "$lib/components/ui/table";
 	import { amountClass } from "$lib/format";
-	import { queryFlag, queryText } from "$lib/queryState";
+	import { clampOffset, PAGE_SIZE } from "$lib/pages";
+	import { queryCount, queryFlag, queryText } from "$lib/queryState";
 	import { p } from "$lib/router";
 	import { querySort } from "$lib/sorting";
 
@@ -109,6 +111,8 @@
 	let previewOpen = $state(false);
 	let previewError = $state<string>();
 
+	const entriesOffset = queryCount("offset");
+
 	const sortKeys = ["text", "merchant", "transactionCount"] as const;
 	type SortKey = (typeof sortKeys)[number];
 	const sort = querySort(
@@ -117,6 +121,7 @@
 		{ key: "merchant", descending: false },
 		// Counts are looked at from the largest, texts from A
 		(key) => key === "transactionCount",
+		() => (entriesOffset.value = 0),
 	);
 
 	const compareEntries = (a: MerchantMapEntry, b: MerchantMapEntry) => {
@@ -141,6 +146,10 @@
 			)
 			.toSorted(compareEntries);
 	});
+
+	// An offset past the end, e.g. after deletes shortened the list, shows its last page
+	const entriesPage = $derived(clampOffset(entriesOffset.value, shown.length));
+	const shownPage = $derived(shown.slice(entriesPage, entriesPage + PAGE_SIZE));
 
 	const merchantNames = $derived(
 		merchants.filter((merchant) => !merchant.deletedAt).map((merchant) => merchant.name),
@@ -432,7 +441,12 @@
 {/if}
 
 <div class="flex flex-wrap items-center gap-4">
-	<Input class="max-w-xs" placeholder="Text or merchant" bind:value={filter.value} />
+	<Input
+		class="max-w-xs"
+		placeholder="Text or merchant"
+		bind:value={filter.value}
+		oninput={() => (entriesOffset.value = 0)}
+	/>
 	<Button disabled={busy} onclick={startAdd}>Add entry</Button>
 </div>
 
@@ -456,7 +470,7 @@
 		</Table.Row>
 	</Table.Header>
 	<Table.Body>
-		{#each shown as entry (entry.id)}
+		{#each shownPage as entry (entry.id)}
 			<Table.Row>
 				<Table.Cell>{fieldLabels[entry.field]}</Table.Cell>
 				<Table.Cell class="min-w-48 font-mono text-xs whitespace-pre-wrap wrap-anywhere">{entry.text}</Table.Cell>
@@ -505,6 +519,13 @@
 		{/each}
 	</Table.Body>
 </Table.Root>
+{#if shown.length > PAGE_SIZE}
+	<Pagination
+		bind:offset={() => entriesPage, (offset) => (entriesOffset.value = offset)}
+		limit={PAGE_SIZE}
+		total={shown.length}
+	/>
+{/if}
 
 <datalist id="merchant-names">
 	{#each merchantNames as name (name)}
