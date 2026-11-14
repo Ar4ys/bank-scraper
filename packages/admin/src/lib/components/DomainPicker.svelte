@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { normalizeDomain } from "@bank-scraper/shared";
+	import ExternalLink from "@lucide/svelte/icons/external-link";
 
 	import { searchBrands, type BrandSearchResult } from "$lib/brandfetch";
 	import MerchantLogo from "$lib/components/MerchantLogo.svelte";
@@ -103,18 +104,30 @@
 					<p class="px-2 py-1.5 text-sm text-destructive">{searchError}</p>
 				{:else}
 					{#each results as result (result.brandId)}
-						<button
-							class="flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
-							onclick={() => pick(normalizeDomain(result.domain) ?? result.domain)}
-						>
-							{#if result.icon}
-								<img class="size-6 shrink-0 rounded-sm" src={result.icon} alt="" />
-							{:else}
-								<span class="size-6 shrink-0"></span>
-							{/if}
-							<span class="min-w-0 flex-1 truncate font-medium">{result.name ?? result.domain}</span>
-							<span class="shrink-0 text-muted-foreground">{result.domain}</span>
-						</button>
+						<div class="flex items-center gap-1 rounded-md hover:bg-muted">
+							<button
+								class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-2 py-1.5 text-left text-sm"
+								onclick={() => pick(normalizeDomain(result.domain) ?? result.domain)}
+							>
+								{#if result.icon}
+									<img class="size-6 shrink-0 rounded-sm" src={result.icon} alt="" />
+								{:else}
+									<span class="size-6 shrink-0"></span>
+								{/if}
+								<span class="min-w-0 flex-1 truncate font-medium">{result.name ?? result.domain}</span>
+								<span class="shrink-0 text-muted-foreground">{result.domain}</span>
+							</button>
+							<a
+								class="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-foreground"
+								href={`https://${normalizeDomain(result.domain) ?? result.domain}`}
+								target="_blank"
+								rel="noopener noreferrer"
+								title="Open {result.domain} in a new tab"
+								aria-label="Open {result.domain} in a new tab"
+							>
+								<ExternalLink class="size-4" />
+							</a>
+						</div>
 					{:else}
 						<p class="px-2 py-1.5 text-sm text-muted-foreground">
 							{searching ? "Searching…" : "No brands found"}
