@@ -88,6 +88,26 @@ describe("Lunch Flow API", () => {
 		assert.deepEqual([card.amount, card.merchant, card.date], [-57.33, null, "2022-02-11"]);
 	});
 
+	it("sends the category of a transaction's merchant, and nothing without one", async () => {
+		const categoryId = "0192b7a4-5c1e-7c3a-9d2f-1a2b3c4d5e6f";
+		const transactions = async () => (await get(`/accounts/${account.id}/transactions`)).body;
+
+		const [cardBefore, transferBefore] = (await transactions()).transactions;
+		assert.equal("categoryId" in cardBefore, false);
+		assert.equal("categoryId" in transferBefore, false);
+
+		await db
+			.update(tables.merchants)
+			.set({ sureCategoryId: categoryId })
+			.where(eq(tables.merchants.name, "SOMEONE WHO RECEIVED MONEY"));
+
+		const [card, transfer] = (await transactions()).transactions;
+		assert.equal(transfer.categoryId, categoryId);
+		assert.equal("categoryId" in card, false);
+
+		await db.update(tables.merchants).set({ sureCategoryId: null });
+	});
+
 	it("filters by inclusive dates, named as Sure or as the docs name them", async () => {
 		const dates = async (query: string) =>
 			(await get(`/accounts/${account.id}/transactions?${query}`)).body.transactions.map(

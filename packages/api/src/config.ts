@@ -20,6 +20,20 @@ const configSchema = z.object({
 	USERSCRIPT_PATH: z.string().default("../userscript/dist/userscript.js"),
 	/** Git commit of the running build, recorded with every transaction version */
 	APP_GIT_COMMIT: z.string().default("unknown"),
+	/**
+	 * Base URL of Sure, without `/api/v1`, for reading its categories. Merchants get no categories
+	 * without it and `SURE_API_KEY`.
+	 */
+	SURE_API_URL: z
+		.url({ protocol: /^https?$/ })
+		.transform((url) => url.replace(/\/+$/, ""))
+		.optional(),
+	/** API key of Sure with read scope, sent as `X-Api-Key` */
+	SURE_API_KEY: z.string().nonempty().optional(),
 });
 
-export const config = configSchema.parse(process.env);
+export const config = configSchema
+	.refine((env) => (env.SURE_API_URL === undefined) === (env.SURE_API_KEY === undefined), {
+		message: "Set both SURE_API_URL and SURE_API_KEY, or neither",
+	})
+	.parse(process.env);

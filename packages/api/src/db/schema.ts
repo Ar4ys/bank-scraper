@@ -132,6 +132,8 @@ export const merchants = s.snakeCase.table("merchants", {
 	deletedAt: instant(),
 	/** When it was confirmed in the review; `null` while it waits to be reviewed */
 	reviewedAt: instant(),
+	/** Id of the category in Sure its transactions get; Sure ignores an id it doesn't have */
+	sureCategoryId: s.text(),
 	createdAt: instant().notNull().default(sqlDateTimeNow),
 	updatedAt: instant().notNull().default(sqlDateTimeNow),
 });

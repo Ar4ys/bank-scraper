@@ -54,6 +54,8 @@ export const adminMerchantsApi = new Hono()
 				deletedAt: merchant.deletedAt?.toString() ?? null,
 				/** `null` while the merchant waits to be reviewed */
 				reviewedAt: merchant.reviewedAt?.toString() ?? null,
+				/** Id of the category in Sure its transactions get, `null` for none */
+				sureCategoryId: merchant.sureCategoryId,
 				/** Always 0 for a deleted merchant: its transactions have no merchant */
 				transactionCount: counts.find((row) => row.merchantId === merchant.id)?.total ?? 0,
 				/** The names that stand for the merchant besides the one it is shown with */
@@ -111,6 +113,29 @@ export const adminMerchantsApi = new Hono()
 
 		return c.json({}, 200);
 	})
+
+	/**
+	 * PUT /api/admin/merchants/:id/category
+	 *
+	 * Takes effect in Sure on its next sync. Transactions keep their category in Sure when it is
+	 * cleared.
+	 */
+	.put(
+		"/:id/category",
+		idParam,
+		zValidator("json", z.object({ sureCategoryId: z.string().nonempty().nullable() })),
+		(c) => {
+			const merchant = findMerchant(c.req.valid("param").id);
+			if (!merchant) return c.json({ message: notFound.rejected.message }, 404);
+
+			db.update(merchants)
+				.set({ sureCategoryId: c.req.valid("json").sureCategoryId, updatedAt: sqlDateTimeNow })
+				.where(eq(merchants.id, merchant.id))
+				.run();
+
+			return c.json({}, 200);
+		},
+	)
 
 	/** POST /api/admin/merchants/:id/dismiss */
 	.post(
@@ -221,7 +246,11 @@ export const adminMerchantsApi = new Hono()
 					.run();
 				db.delete(merchants).where(eq(merchants.id, id)).run();
 				db.update(merchants)
-					.set({ reviewedAt: Temporal.Now.instant(), updatedAt: sqlDateTimeNow })
+					.set({
+						reviewedAt: Temporal.Now.instant(),
+						sureCategoryId: into.sureCategoryId ?? merchant.sureCategoryId,
+						updatedAt: sqlDateTimeNow,
+					})
 					.where(eq(merchants.id, intoId))
 					.run();
 

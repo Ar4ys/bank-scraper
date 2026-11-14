@@ -1,0 +1,1 @@
+ALTER TABLE `merchants` ADD `sure_category_id` text;

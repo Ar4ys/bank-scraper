@@ -14,6 +14,7 @@ import { z } from "zod";
 import { adminMerchantMapApi } from "./adminMerchantMap.ts";
 import { adminMerchantsApi } from "./adminMerchants.ts";
 import { adminRulesApi } from "./adminRules.ts";
+import { adminSureApi } from "./adminSure.ts";
 import { db, tables } from "./db/db.ts";
 import {
 	BalanceSource,
@@ -100,6 +101,7 @@ export const adminApi = new Hono()
 	.route("/rules", adminRulesApi)
 	.route("/merchants", adminMerchantsApi)
 	.route("/merchant-map", adminMerchantMapApi)
+	.route("/sure", adminSureApi)
 
 	/** GET /api/admin/dashboard */
 	.get("/dashboard", async (c) => {

@@ -25,7 +25,7 @@ const transactionsQuerySchema = z.object({
 const badRequest = { error: "Bad Request", message: "Invalid request parameters" };
 const accountNotFound = { error: "Not Found", message: "Account not found" };
 
-const { accounts, transactions } = tables;
+const { accounts, merchants, transactions } = tables;
 
 /**
  * The part of the Lunch Flow Personal API that Sure uses, backed by our transactions:
@@ -73,8 +73,9 @@ export const lunchflowApi = new Hono()
 			if (!account) return c.json(accountNotFound, 404);
 
 			const rows = await db
-				.select()
+				.select({ transaction: transactions, sureCategoryId: merchants.sureCategoryId })
 				.from(transactions)
+				.leftJoin(merchants, eq(merchants.id, transactions.merchantId))
 				.where(
 					and(
 						eq(transactions.accountId, id),
@@ -85,7 +86,7 @@ export const lunchflowApi = new Hono()
 				.orderBy(transactions.date, transactions.id);
 
 			return c.json({
-				transactions: rows.map((transaction) => ({
+				transactions: rows.map(({ transaction, sureCategoryId }) => ({
 					id: transaction.id,
 					accountId: transaction.accountId,
 					amount: toMajorUnits(transaction.amount),
@@ -94,6 +95,8 @@ export const lunchflowApi = new Hono()
 					merchant: transaction.merchant,
 					description: transaction.description,
 					isPending: transaction.isPending,
+					// Read by the Sure fork, not part of Lunch Flow's API
+					...(sureCategoryId === null ? {} : { categoryId: sureCategoryId }),
 				})),
 				total: rows.length,
 			});
