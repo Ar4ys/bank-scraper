@@ -21,6 +21,7 @@
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
 	import SortButton from "$lib/components/SortButton.svelte";
+	import TransactionsButton from "$lib/components/TransactionsButton.svelte";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -287,7 +288,9 @@
 	{@const draft = drafts[place.key]}
 	{@const shownAddresses = expanded[place.key] ? place.addresses : place.addresses.slice(0, 3)}
 	<Table.Row>
-		<Table.Cell class="text-right tabular-nums">{place.payments}</Table.Cell>
+		<Table.Cell class="text-right">
+			<TransactionsButton count={place.payments} onclick={() => viewTransactions(place)} />
+		</Table.Cell>
 		<Table.Cell class="whitespace-nowrap text-xs">
 			{place.firstDate}<br />{place.lastDate}
 		</Table.Cell>
@@ -326,9 +329,6 @@
 							{place.ignored.forever ? "Ignored forever" : "Until a new payment"}
 						</span>
 					{/if}
-					<Button variant="outline" size="sm" onclick={() => viewTransactions(place)}>
-						View transactions
-					</Button>
 					<Button
 						size="sm"
 						disabled={busy || !draft.text.trim() || !draft.merchant.trim()}
@@ -460,25 +460,30 @@
 						</Badge>
 					{/if}
 				</Table.Cell>
-				<Table.Cell class="text-right tabular-nums">
-					<button
-						class="cursor-pointer hover:underline hover:underline-offset-4"
-						title="View transactions"
+				<Table.Cell class="text-right">
+					<TransactionsButton
+						count={entry.transactionCount}
 						onclick={() => viewEntryTransactions(entry)}
-					>
-						{entry.transactionCount}
-					</button>
+					/>
 				</Table.Cell>
 				<Table.Cell class="whitespace-nowrap text-right">
-					<Button variant="outline" size="sm" onclick={() => viewEntryTransactions(entry)}>
-						View transactions
-					</Button>
 					<Button variant="outline" size="sm" disabled={busy} onclick={() => startEdit(entry)}>
 						Edit
 					</Button>
-					<Button variant="destructive" size="sm" disabled={busy} onclick={() => remove(entry)}>
-						Delete
-					</Button>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger disabled={busy}>
+							{#snippet child({ props })}
+								<Button {...props} variant="ghost" size="icon-sm" aria-label="More actions">
+									<EllipsisVertical />
+								</Button>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end" class="w-auto">
+							<DropdownMenu.Item variant="destructive" onSelect={() => remove(entry)}>
+								Delete
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
 				</Table.Cell>
 			</Table.Row>
 		{:else}

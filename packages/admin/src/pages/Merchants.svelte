@@ -1,4 +1,6 @@
 <script lang="ts">
+	import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
+
 	import {
 		deleteMerchant,
 		detachMerchantName,
@@ -24,9 +26,11 @@
 	import MerchantChanges from "$lib/components/MerchantChanges.svelte";
 	import MerchantTransactions from "$lib/components/MerchantTransactions.svelte";
 	import SortButton from "$lib/components/SortButton.svelte";
+	import TransactionsButton from "$lib/components/TransactionsButton.svelte";
 	import { Badge } from "$lib/components/ui/badge";
 	import { Button } from "$lib/components/ui/button";
 	import * as Dialog from "$lib/components/ui/dialog";
+	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
 	import { Switch } from "$lib/components/ui/switch";
@@ -139,8 +143,7 @@
 			.toSorted(compareMerchants(reviewSort)),
 	);
 	/** Columns of a merchant's first line; its second line spans them all */
-	const reviewColumns = $derived(sureCategories === null ? 4 : 5);
-	const allColumns = $derived(reviewColumns + 1);
+	const columns = $derived(sureCategories === null ? 4 : 5);
 
 	const suggestionsOf = (merchant: Merchant) =>
 		(suggestions[merchant.id] ?? []).flatMap((suggestion) => {
@@ -498,11 +501,13 @@
 							<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
 						</Table.Cell>
 					{/if}
-					<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
+					<Table.Cell class="text-right">
+						<TransactionsButton
+							count={merchant.transactionCount}
+							onclick={() => viewTransactions(merchant)}
+						/>
+					</Table.Cell>
 					<Table.Cell class="whitespace-nowrap text-right">
-						<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
-							View transactions
-						</Button>
 						<Button variant="outline" size="sm" disabled={busy} onclick={() => startMerge(merchant)}>
 							Merge into…
 						</Button>
@@ -513,7 +518,7 @@
 				</Table.Row>
 				{#if secondLine}
 					<Table.Row>
-						<Table.Cell colspan={reviewColumns} class="space-y-1.5 pt-0 whitespace-normal">
+						<Table.Cell colspan={columns} class="space-y-1.5 pt-0 whitespace-normal">
 							{@render mergedNames(merchant, false)}
 							{@render duplicates(merchant)}
 						</Table.Cell>
@@ -534,7 +539,6 @@
 			{#if sureCategories !== null}
 				<Table.Head><SortButton sort={allSort} key="category" label="Category" /></Table.Head>
 			{/if}
-			<Table.Head></Table.Head>
 			<Table.Head class="text-right">
 				<SortButton sort={allSort} key="transactionCount" label="Transactions" />
 			</Table.Head>
@@ -558,7 +562,13 @@
 						<CategoryPicker bind:value={categories[merchant.id]} categories={sureCategories} />
 					</Table.Cell>
 				{/if}
-				<Table.Cell>
+				<Table.Cell class="text-right">
+					<TransactionsButton
+						count={merchant.transactionCount}
+						onclick={() => viewTransactions(merchant)}
+					/>
+				</Table.Cell>
+				<Table.Cell class="whitespace-nowrap text-right">
 					<Button
 						size="sm"
 						disabled={busy ||
@@ -568,24 +578,27 @@
 					>
 						Save
 					</Button>
-				</Table.Cell>
-				<Table.Cell class="text-right tabular-nums">{merchant.transactionCount}</Table.Cell>
-				<Table.Cell class="whitespace-nowrap text-right">
-					<Button variant="outline" size="sm" onclick={() => viewTransactions(merchant)}>
-						View transactions
-					</Button>
-					<Button variant="outline" size="sm" disabled={busy} onclick={() => startMerge(merchant)}>
-						Merge into…
-					</Button>
-					<Button variant="destructive" size="sm" disabled={busy} onclick={() => remove(merchant)}>
-						Delete
-					</Button>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger disabled={busy}>
+							{#snippet child({ props })}
+								<Button {...props} variant="ghost" size="icon-sm" aria-label="More actions">
+									<EllipsisVertical />
+								</Button>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end" class="w-auto">
+							<DropdownMenu.Item onSelect={() => startMerge(merchant)}>Merge into…</DropdownMenu.Item>
+							<DropdownMenu.Item variant="destructive" onSelect={() => remove(merchant)}>
+								Delete
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
 				</Table.Cell>
 			</Table.Row>
 			{#if secondLine}
 				<!-- Its own row: next to the name, pickers and buttons the chips get squeezed -->
 				<Table.Row>
-					<Table.Cell colspan={allColumns} class="space-y-1.5 pt-0 whitespace-normal">
+					<Table.Cell colspan={columns} class="space-y-1.5 pt-0 whitespace-normal">
 						{@render mergedNames(merchant, true)}
 						{@render duplicates(merchant)}
 					</Table.Cell>
@@ -593,7 +606,7 @@
 			{/if}
 		{:else}
 			<Table.Row>
-				<Table.Cell colspan={allColumns} class="text-muted-foreground">No merchants</Table.Cell>
+				<Table.Cell colspan={columns} class="text-muted-foreground">No merchants</Table.Cell>
 			</Table.Row>
 		{/each}
 	</Table.Body>
@@ -629,14 +642,20 @@
 						<Button variant="outline" size="sm" disabled={busy} onclick={() => restore(merchant)}>
 							Restore
 						</Button>
-						<Button
-							variant="destructive"
-							size="sm"
-							disabled={busy}
-							onclick={() => removePermanently(merchant)}
-						>
-							Permanently remove
-						</Button>
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger disabled={busy}>
+								{#snippet child({ props })}
+									<Button {...props} variant="ghost" size="icon-sm" aria-label="More actions">
+										<EllipsisVertical />
+									</Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="end" class="w-auto">
+								<DropdownMenu.Item variant="destructive" onSelect={() => removePermanently(merchant)}>
+									Permanently remove
+								</DropdownMenu.Item>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
 					</Table.Cell>
 				</Table.Row>
 			{:else}
