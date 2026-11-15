@@ -9,6 +9,8 @@ export const transactionFieldsSchema = z.object({
 	currency: z.string(),
 	merchant: z.string().nullable(),
 	description: z.string(),
+	/** Details of a transfer, one `Label: value` per line */
+	notes: z.string().nullable(),
 	isPending: z.boolean(),
 });
 

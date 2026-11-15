@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 import * as tables from "../db/schema.ts";
 import { createTestDb } from "../db/testDb.ts";
-import { rawCardTransaction, rawHold } from "./fixtures.ts";
+import { rawCardTransaction, rawHold, rawTransferSend } from "./fixtures.ts";
 
 const { db, cleanup } = await createTestDb();
 const { ingestRawTransactions } = await import("../ingest.ts");
@@ -292,6 +292,43 @@ describe("processing", () => {
 		const report = processBankTransactions(listBankTransactionKeys());
 
 		assert.deepEqual([report.changes.length, report.unchanged], [0, 1]);
+	});
+
+	// Stands in for a version stored before transactions had notes
+	async function dropNotesFromVersions() {
+		for (const version of await versions()) {
+			const { notes: _, ...data } = version.data;
+			await db
+				.update(tables.transactionVersions)
+				// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+				.set({ data: data as typeof version.data })
+				.where(eq(tables.transactionVersions.id, version.id));
+		}
+	}
+
+	it("reads a version without notes as one with empty notes", async () => {
+		await ingest(rawCardTransaction());
+		await dropNotesFromVersions();
+
+		const report = processBankTransactions(listBankTransactionKeys());
+
+		assert.deepEqual([report.changes.length, report.unchanged], [0, 1]);
+	});
+
+	it("adds a version for a transfer that gets notes", async () => {
+		await ingest(rawTransferSend());
+		await dropNotesFromVersions();
+
+		const report = processBankTransactions(listBankTransactionKeys());
+
+		assert.deepEqual(
+			report.changes.map((change) => [
+				change.cause,
+				change.before?.notes,
+				change.after.notes?.split("\n")[0],
+			]),
+			[["reprocess", null, "To: SOMEONE WHO RECEIVED MONEY"]],
+		);
 	});
 
 	const reprocessForMerchants = () =>

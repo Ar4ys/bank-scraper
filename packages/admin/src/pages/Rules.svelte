@@ -28,6 +28,7 @@
 	import * as Dialog from "$lib/components/ui/dialog";
 	import { Input } from "$lib/components/ui/input";
 	import { Label } from "$lib/components/ui/label";
+	import { Textarea } from "$lib/components/ui/textarea";
 	import { Switch } from "$lib/components/ui/switch";
 	import { formatInstant } from "$lib/format";
 
@@ -36,6 +37,8 @@
 		{ key: "merchant", label: "Merchant", placeholder: "Bolt" },
 		{ key: "description", label: "Description", placeholder: "Ride {match.1} in {details.city}" },
 		{ key: "date", label: "Date", placeholder: "{details.exec_date}" },
+		// A textarea, so that a template can hold the line breaks of the notes
+		{ key: "notes", label: "Notes", placeholder: "To: {other_side}", multiline: true },
 	] as const;
 
 	const operators = ["contains", "equals", "regex"] as const;
@@ -51,7 +54,7 @@
 		/** The condition or the internal field the input belongs to */
 		owner: object | string;
 		part: "path" | "pattern" | "template";
-		element: HTMLInputElement;
+		element: HTMLInputElement | HTMLTextAreaElement;
 		/** What a clicked field puts into the input, nothing if it has no text for it */
 		textFor: (path: string) => string | undefined;
 		/** Whether that text replaces what the input holds, or goes where its caret is */
@@ -187,7 +190,8 @@
 	const sampleKey = () => ({ accountId: Number(sampleAccountId), bankId: sampleBankId.trim() });
 
 	const targetOnFocus =
-		(target: Omit<FieldTarget, "element">) => (event: FocusEvent & { currentTarget: HTMLInputElement }) => {
+		(target: Omit<FieldTarget, "element">) =>
+		(event: FocusEvent & { currentTarget: HTMLInputElement | HTMLTextAreaElement }) => {
 			fieldTarget = { ...target, element: event.currentTarget };
 		};
 
@@ -519,26 +523,41 @@
 
 			<div class="grid gap-3 md:grid-cols-3">
 				{#each fields as field (field.key)}
-					<div class="space-y-1">
+					{@const onfocus = targetOnFocus({
+						rule,
+						owner: field.key,
+						part: "template",
+						textFor: (path) => `{${path}}`,
+						replaces: false,
+						write: (template) => setTemplate(rule, field.key, template),
+					})}
+					<div class="space-y-1 {'multiline' in field ? 'md:col-span-3' : ''}">
 						<Label for="{field.key}-{index}">{field.label}</Label>
-						<Input
-							id="{field.key}-{index}"
-							class="font-mono {targetClass(rule, field.key, 'template')}"
-							list={field.key === "merchant" ? "merchant-names" : undefined}
-							placeholder={field.placeholder}
-							value={rule.set[field.key] ?? ""}
-							oninput={(event) => setTemplate(rule, field.key, event.currentTarget.value)}
-							onfocus={targetOnFocus({
-								rule,
-								owner: field.key,
-								part: "template",
-								textFor: (path) => `{${path}}`,
-								replaces: false,
-								write: (template) => setTemplate(rule, field.key, template),
-							})}
-						/>
+						{#if "multiline" in field}
+							<Textarea
+								id="{field.key}-{index}"
+								class="min-h-20 font-mono {targetClass(rule, field.key, 'template')}"
+								placeholder={field.placeholder}
+								value={rule.set[field.key] ?? ""}
+								oninput={(event) => setTemplate(rule, field.key, event.currentTarget.value)}
+								{onfocus}
+							/>
+						{:else}
+							<Input
+								id="{field.key}-{index}"
+								class="font-mono {targetClass(rule, field.key, 'template')}"
+								list={field.key === "merchant" ? "merchant-names" : undefined}
+								placeholder={field.placeholder}
+								value={rule.set[field.key] ?? ""}
+								oninput={(event) => setTemplate(rule, field.key, event.currentTarget.value)}
+								{onfocus}
+							/>
+						{/if}
 						{#if sample && captures && rule.set[field.key] !== undefined}
-							<p class="truncate text-xs text-muted-foreground" title="For the sample transaction">
+							<p
+								class="text-xs text-muted-foreground {'multiline' in field ? 'whitespace-pre-line' : 'truncate'}"
+								title="For the sample transaction"
+							>
 								→ {renderTemplate(rule.set[field.key] ?? "", sample, captures) || "(empty)"}
 							</p>
 						{/if}

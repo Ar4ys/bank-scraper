@@ -84,7 +84,7 @@ describe("admin rules API", () => {
 		assert.equal(body.unchanged, 1);
 		assert.deepEqual(await merchants(), [
 			["card-1", null],
-			["transfer-1", "SOMEONE WHO RECEIVED MONEY"],
+			["transfer-1", null],
 		]);
 	});
 

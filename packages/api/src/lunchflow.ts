@@ -102,6 +102,7 @@ export const lunchflowApi = new Hono()
 					// Read by the Sure fork, not part of Lunch Flow's API
 					...(sureCategoryId === null ? {} : { categoryId: sureCategoryId }),
 					...(domain === null ? {} : { merchantDomain: domain }),
+					...(transaction.notes === null ? {} : { notes: transaction.notes }),
 				})),
 				total: rows.length,
 			});

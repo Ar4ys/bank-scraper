@@ -300,7 +300,7 @@ export const adminApi = new Hono()
 				merchantId: z.string().optional(),
 				/** Lists only transactions whose merchant this merchant map entry sets now */
 				merchantMapEntryId: z.string().optional(),
-				/** Text to find in merchant, description or the bank's id */
+				/** Text to find in merchant, description, notes or the bank's id */
 				search: z.string().optional(),
 			}),
 		),
@@ -320,6 +320,7 @@ export const adminApi = new Hono()
 					? or(
 							like(transactions.merchant, pattern),
 							like(transactions.description, pattern),
+							like(transactions.notes, pattern),
 							like(transactions.bankId, pattern),
 						)
 					: undefined,

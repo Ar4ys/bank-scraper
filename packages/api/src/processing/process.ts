@@ -228,6 +228,12 @@ function processOne(
 
 	const merchant = resolveMerchant(derived.fields.merchant, merchantDirectory, dryRun);
 	const derivedFields: TransactionFieldsJson = { ...derived.fields, merchant: merchant.name };
+	// Versions stored before transactions had notes lack the key. Read as `null`, so that adding
+	// the field doesn't version every transaction whose notes stay empty.
+	const versionData = latestVersion && {
+		...latestVersion.data,
+		notes: latestVersion.data.notes ?? null,
+	};
 
 	/** Remembers what the transaction was processed with, so that the next change gets the right cause */
 	const markProcessed = (transactionId: string) => {
@@ -250,7 +256,7 @@ function processOne(
 		setRawStatus(RawTransactionStatus.Processed);
 	};
 
-	if (transaction && latestVersion && isDeepStrictEqual(latestVersion.data, derivedFields)) {
+	if (transaction && versionData && isDeepStrictEqual(versionData, derivedFields)) {
 		report.unchanged++;
 		if (!dryRun) markProcessed(transaction.id);
 		return;
@@ -271,8 +277,8 @@ function processOne(
 
 	if (
 		causeOfCaller &&
-		latestVersion &&
-		isDeepStrictEqual(withoutMerchant(latestVersion.data), withoutMerchant(derivedFields))
+		versionData &&
+		isDeepStrictEqual(withoutMerchant(versionData), withoutMerchant(derivedFields))
 	) {
 		cause = causeOfCaller;
 	}
@@ -283,7 +289,7 @@ function processOne(
 		transactionId: transaction?.id ?? null,
 		cause,
 		txType: derived.txType,
-		before: latestVersion?.data ?? null,
+		before: versionData ?? null,
 		after: derivedFields,
 		fieldSourcesBefore: latestVersion?.fieldSources ?? null,
 		fieldSources: derived.fieldSources,

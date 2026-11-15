@@ -41,6 +41,34 @@ describe("matchText", () => {
 });
 
 describe("findMapEntry", () => {
+	const transferTo = (name: string) => parse(rawTransferSend({ other_side: name }));
+
+	it("finds a counterparty entry only by the whole name, ignoring case and whitespace", () => {
+		const anna = entry("ANNA", "Anna", MerchantMapField.Counterparty);
+		const kowalska = entry("Anna  Kowalska", "Anna K.", MerchantMapField.Counterparty);
+
+		assert.equal(findMapEntry(transferTo("anna"), [anna, kowalska], false), anna);
+		assert.equal(findMapEntry(transferTo("ANNA KOWALSKA"), [anna, kowalska], false), kowalska);
+		assert.equal(findMapEntry(transferTo("JOANNA"), [anna, kowalska], false), undefined);
+	});
+
+	it("names a card transfer by its receiver", () => {
+		const paypal = entry("PAYPAL *USER_NAME", "User", MerchantMapField.Counterparty);
+
+		assert.equal(
+			findMapEntry(parse(ipkoExample("CARD_TRANSACTION/card_transfer")), [paypal], false),
+			paypal,
+		);
+	});
+
+	it("keeps address entries off transfers and counterparty entries off payments", () => {
+		const address = entry("SOMEONE", "Someone");
+		const counterparty = entry("LIDL 3011", "Lidl", MerchantMapField.Counterparty);
+
+		assert.equal(findMapEntry(transferTo("SOMEONE"), [address], false), undefined);
+		assert.equal(findMapEntry(parse(cardPaymentAt("LIDL 3011")), [counterparty], false), undefined);
+	});
+
 	it("finds an entry whose text the address contains, ignoring case and whitespace", () => {
 		const uber = entry("UBER *EATS", "Uber Eats");
 

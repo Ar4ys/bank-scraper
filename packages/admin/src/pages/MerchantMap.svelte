@@ -7,6 +7,7 @@
 		loadMerchantMap,
 		loadMerchantMapEntryCoverage,
 		loadMerchants,
+		loadRecurringCounterparties,
 		loadRecurringPlaces,
 		restorePlace,
 		updateMerchantMapEntry,
@@ -16,6 +17,7 @@
 		type MerchantMapEntry,
 		type MerchantMapEntryCoverage,
 		type MerchantMapEntryInput,
+		type RecurringCounterparty,
 		type RecurringPlace,
 	} from "$lib/api";
 	import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
@@ -49,27 +51,63 @@
 	const fieldLabels: Record<MerchantMapEntry["field"], string> = {
 		address: "Address",
 		city: "City",
+		counterparty: "Recipient or sender",
 	};
+
+	/** A place or a person without a merchant, in the shape both lists are shown in */
+	type Suggestion = {
+		field: "address" | "counterparty";
+		key: string;
+		payments: number;
+		/** Only for people: the transfers by side */
+		sides?: { sent: number; received: number };
+		firstDate: string;
+		lastDate: string;
+		/** The addresses of a place, the spellings of a person's name */
+		texts: Array<{ text: string; payments: number }>;
+		proposedText: string;
+		proposedMerchant: string;
+		transactions: RecurringPlace["transactions"];
+		ignored: RecurringPlace["ignored"];
+	};
+
+	const placeSuggestion = (place: RecurringPlace): Suggestion => ({
+		...place,
+		field: "address",
+		texts: place.addresses.map(({ address, payments }) => ({ text: address, payments })),
+		proposedMerchant: "",
+	});
+
+	const personSuggestion = ({ sent, received, names, ...person }: RecurringCounterparty): Suggestion => ({
+		...person,
+		field: "counterparty",
+		sides: { sent, received },
+		texts: names.map((spelling) => ({ text: spelling.name, payments: spelling.payments })),
+	});
 
 	let entries = $state<MerchantMapEntry[]>([]);
 	let merchants = $state<Merchant[]>([]);
-	let places = $state<RecurringPlace[]>([]);
-	/** The entry each place would get, editable before it is named */
+	let places = $state<Suggestion[]>([]);
+	let people = $state<Suggestion[]>([]);
+	/** The entry each place or person would get, editable before it is named */
 	let drafts = $state<Record<string, { text: string; merchant: string }>>({});
-	/** Places whose addresses are all shown */
+	/** Places and people whose texts are all shown */
 	let expanded = $state<Record<string, boolean>>({});
 	let accounts = $state<Account[]>([]);
 	const showIgnored = queryFlag("showIgnored");
+	const showIgnoredPeople = queryFlag("showIgnoredPeople");
 
 	const openPlaces = $derived(places.filter((place) => !place.ignored));
 	const ignoredList = $derived(places.filter((place) => place.ignored));
+	const openPeople = $derived(people.filter((person) => !person.ignored));
+	const ignoredPeople = $derived(people.filter((person) => person.ignored));
 
 	let transactionsOpen = $state(false);
-	let transactionsOf = $state<RecurringPlace>();
+	let transactionsOf = $state<Suggestion>();
 
 	const accountName = (id: number) => accounts.find((account) => account.id === id)?.name ?? id;
 
-	function viewTransactions(place: RecurringPlace) {
+	function viewTransactions(place: Suggestion) {
 		transactionsOf = place;
 		transactionsOpen = true;
 	}
@@ -157,16 +195,21 @@
 
 	async function load() {
 		try {
-			[entries, merchants, places, accounts] = await Promise.all([
+			let loadedPlaces: RecurringPlace[];
+			let loadedPeople: RecurringCounterparty[];
+			[entries, merchants, loadedPlaces, loadedPeople, accounts] = await Promise.all([
 				loadMerchantMap(),
 				loadMerchants(),
 				loadRecurringPlaces(),
+				loadRecurringCounterparties(),
 				loadAccounts(),
 			]);
+			places = loadedPlaces.map(placeSuggestion);
+			people = loadedPeople.map(personSuggestion);
 			drafts = Object.fromEntries(
-				places.map((place) => [
-					place.key,
-					drafts[place.key] ?? { text: place.proposedText, merchant: "" },
+				[...places, ...people].map((item) => [
+					item.key,
+					drafts[item.key] ?? { text: item.proposedText, merchant: item.proposedMerchant },
 				]),
 			);
 		} catch (e) {
@@ -249,12 +292,12 @@
 		);
 	}
 
-	function name(place: RecurringPlace) {
+	function name(place: Suggestion) {
 		const draft = drafts[place.key];
 		if (!draft) return;
 
 		const input = {
-			field: "address" as const,
+			field: place.field,
 			text: draft.text.trim(),
 			merchant: draft.merchant.trim(),
 			overridesBankMerchant: false,
@@ -281,10 +324,10 @@
 		}
 	}
 
-	const ignore = (place: RecurringPlace, forever: boolean) =>
+	const ignore = (place: Suggestion, forever: boolean) =>
 		act(() => ignorePlace(place.key, forever));
 
-	const restore = (place: RecurringPlace) => act(() => restorePlace(place.key));
+	const restore = (place: Suggestion) => act(() => restorePlace(place.key));
 
 	const remove = (entry: MerchantMapEntry) =>
 		propose({
@@ -301,16 +344,22 @@
 	The merchant of card and mobile payments for which the bank names none: a payment whose address
 	(or city) contains an entry's text gets its merchant. Case and repeated spaces do not count. When
 	several entries match, the longest text wins. A merchant name from the bank is replaced only by
-	entries that override it, and a rule that sets the merchant overrides the map. Every change shows the transactions it affects
-	before it is applied.
+	entries that override it. Transfers get a merchant only from a "Recipient or sender" entry whose
+	text is exactly their recipient's or sender's name. A rule that sets the merchant overrides the
+	map. Every change shows the transactions it affects before it is applied.
 </p>
 
-{#snippet placeRow(place: RecurringPlace)}
+{#snippet placeRow(place: Suggestion)}
 	{@const draft = drafts[place.key]}
-	{@const shownAddresses = expanded[place.key] ? place.addresses : place.addresses.slice(0, 3)}
+	{@const shownTexts = expanded[place.key] ? place.texts : place.texts.slice(0, 3)}
 	<Table.Row>
 		<Table.Cell class="text-right">
 			<TransactionsButton count={place.payments} onclick={() => viewTransactions(place)} />
+			{#if place.sides}
+				<div class="text-xs whitespace-nowrap text-muted-foreground">
+					{place.sides.sent} sent, {place.sides.received} received
+				</div>
+			{/if}
 		</Table.Cell>
 		<Table.Cell class="whitespace-nowrap text-xs">
 			{place.firstDate}<br />{place.lastDate}
@@ -321,18 +370,18 @@
 				title="View transactions"
 				onclick={() => viewTransactions(place)}
 			>
-				{#each shownAddresses as { address, payments } (address)}
+				{#each shownTexts as { text, payments } (text)}
 					<div class="whitespace-pre-wrap wrap-anywhere">
-						{address} <span class="text-muted-foreground">×{payments}</span>
+						{text} <span class="text-muted-foreground">×{payments}</span>
 					</div>
 				{/each}
 			</button>
-			{#if place.addresses.length > 3}
+			{#if place.texts.length > 3}
 				<button
 					class="cursor-pointer text-muted-foreground underline underline-offset-4"
 					onclick={() => (expanded[place.key] = !expanded[place.key])}
 				>
-					{expanded[place.key] ? "Show fewer" : `Show all ${place.addresses.length}`}
+					{expanded[place.key] ? "Show fewer" : `Show all ${place.texts.length}`}
 				</button>
 			{/if}
 		</Table.Cell>
@@ -392,13 +441,13 @@
 	</Table.Row>
 {/snippet}
 
-{#snippet placesTable(list: RecurringPlace[])}
+{#snippet placesTable(list: Suggestion[], people = false)}
 	<Table.Root>
 		<Table.Header>
 			<Table.Row>
-				<Table.Head class="text-right">Payments</Table.Head>
+				<Table.Head class="text-right">{people ? "Transfers" : "Payments"}</Table.Head>
 				<Table.Head>Dates</Table.Head>
-				<Table.Head>Addresses</Table.Head>
+				<Table.Head>{people ? "Names" : "Addresses"}</Table.Head>
 				<Table.Head>Text</Table.Head>
 				<Table.Head>Merchant</Table.Head>
 				<Table.Head></Table.Head>
@@ -436,7 +485,35 @@
 			{@render placesTable(ignoredList)}
 		{/if}
 	{/if}
+{/if}
 
+{#if people.length}
+	<h2 class="pt-2 text-lg font-semibold">People without a merchant ({openPeople.length})</h2>
+	<p class="text-sm text-muted-foreground">
+		Transfers and card transfers (such as PayPal) without a merchant, grouped by the recipient's or
+		sender's name, sent and received together, from three transfers on. Naming one adds an entry
+		that matches that name exactly. An ignored person leaves the list, for now (until a transfer
+		dated after the day they were ignored) or forever.
+	</p>
+
+	{#if openPeople.length}
+		{@render placesTable(openPeople, true)}
+	{:else}
+		<p class="text-sm text-muted-foreground">No people left to name.</p>
+	{/if}
+
+	{#if ignoredPeople.length}
+		<span class="flex items-center gap-2 pt-2">
+			<Switch id="show-ignored-people" bind:checked={showIgnoredPeople.value} />
+			<Label for="show-ignored-people" class="cursor-pointer">Ignored ({ignoredPeople.length})</Label>
+		</span>
+		{#if showIgnoredPeople.value}
+			{@render placesTable(ignoredPeople, true)}
+		{/if}
+	{/if}
+{/if}
+
+{#if places.length || people.length}
 	<h2 class="pt-4 text-lg font-semibold">Entries ({entries.length})</h2>
 {/if}
 
@@ -552,10 +629,13 @@
 				>
 					<option value="address">{fieldLabels.address}</option>
 					<option value="city">{fieldLabels.city}</option>
+					<option value="counterparty">{fieldLabels.counterparty}</option>
 				</select>
 			</div>
 			<div class="space-y-1">
-				<Label for="entry-text">Text the field contains</Label>
+				<Label for="entry-text">
+					{form.field === "counterparty" ? "Name, exactly as the bank gives it" : "Text the field contains"}
+				</Label>
 				<Input id="entry-text" class="font-mono" bind:value={form.text} />
 			</div>
 			<div class="space-y-1">
@@ -567,6 +647,8 @@
 					bind:value={form.merchant}
 				/>
 			</div>
+			<!-- Transfers have no merchant from the bank to override -->
+			{#if form.field !== "counterparty"}
 			<div class="flex items-start gap-3">
 				<Switch id="entry-overrides" bind:checked={form.overridesBankMerchant} />
 				<div class="space-y-0.5">
@@ -578,6 +660,7 @@
 					</p>
 				</div>
 			</div>
+			{/if}
 		</div>
 
 		<Dialog.Footer>
@@ -627,10 +710,13 @@
 		onOpenAutoFocus={(event) => event.preventDefault()}
 	>
 		<Dialog.Header>
-			<Dialog.Title>Payments of "{transactionsOf?.proposedText}"</Dialog.Title>
+			<Dialog.Title>
+				{transactionsOf?.field === "counterparty" ? "Transfers" : "Payments"} of "{transactionsOf?.proposedText}"
+			</Dialog.Title>
 			<Dialog.Description>
-				{transactionsOf?.payments} payment(s) without a merchant. A row opens its transaction in a new
-				tab.
+				{transactionsOf?.payments}
+				{transactionsOf?.field === "counterparty" ? "transfer(s)" : "payment(s)"} without a merchant. A
+				row opens its transaction in a new tab.
 			</Dialog.Description>
 		</Dialog.Header>
 

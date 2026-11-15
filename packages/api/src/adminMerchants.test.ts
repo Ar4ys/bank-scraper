@@ -69,7 +69,6 @@ describe("admin merchants API", () => {
 				["Lidl", 1, [], null],
 				["McDonald's", 1, [], null],
 				["PAYPAL *MCD", 1, [], null],
-				["SOMEONE WHO RECEIVED MONEY", 1, [], null],
 			],
 		);
 	});

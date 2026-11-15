@@ -21,6 +21,7 @@ import {
 } from "./db/schema.ts";
 import { explainMapEntry } from "./processing/entryCoverage.ts";
 import { matchText } from "./processing/merchantMap.ts";
+import { counterpartyKeyPrefix, listRecurringCounterparties } from "./processing/people.ts";
 import { listRecurringPlaces } from "./processing/places.ts";
 
 const { merchantMapEntries, transactions, ignoredPlaces } = tables;
@@ -29,9 +30,16 @@ const entryInputSchema = z.object({
 	field: z.enum(MerchantMapField),
 	text: z.string().trim().nonempty(),
 	merchant: z.string().trim().nonempty(),
-	/** Left out: `false` for a new entry, unchanged for an edited one */
+	/**
+	 * Left out: `false` for a new entry, unchanged for an edited one. Always `false` for a
+	 * `counterparty` entry.
+	 */
 	overridesBankMerchant: z.boolean().optional(),
 });
+
+/** Transfers have no merchant from the bank, so a counterparty entry has nothing to override */
+const canOverride = (field: MerchantMapField, overridesBankMerchant: boolean) =>
+	field !== MerchantMapField.Counterparty && overridesBankMerchant;
 
 const notFound = reject(404, "Merchant map entry not found");
 
@@ -120,7 +128,10 @@ export const adminMerchantMapApi = new Hono()
 	/** GET /api/admin/merchant-map/places */
 	.get("/places", (c) => c.json(listRecurringPlaces(), 200))
 
-	/** POST /api/admin/merchant-map/places/ignore */
+	/** GET /api/admin/merchant-map/people */
+	.get("/people", (c) => c.json(listRecurringCounterparties(), 200))
+
+	/** POST /api/admin/merchant-map/places/ignore, for places and people alike */
 	.post(
 		"/places/ignore",
 		zValidator(
@@ -137,7 +148,10 @@ export const adminMerchantMapApi = new Hono()
 			// The server's today can be before the date of the place's newest payment (its clock runs on
 			// another time zone than the bank's dates), which would bring the place back at once
 			const today = Temporal.Now.plainDateISO();
-			const lastDate = listRecurringPlaces().find((place) => place.key === key)?.lastDate;
+			const list = key.startsWith(counterpartyKeyPrefix)
+				? listRecurringCounterparties()
+				: listRecurringPlaces();
+			const lastDate = list.find((item) => item.key === key)?.lastDate;
 			const ignoredOn =
 				lastDate && Temporal.PlainDate.compare(Temporal.PlainDate.from(lastDate), today) > 0
 					? Temporal.PlainDate.from(lastDate)
@@ -152,7 +166,7 @@ export const adminMerchantMapApi = new Hono()
 		},
 	)
 
-	/** POST /api/admin/merchant-map/places/restore */
+	/** POST /api/admin/merchant-map/places/restore, for places and people alike */
 	.post("/places/restore", zValidator("json", z.object({ key: z.string().nonempty() })), (c) => {
 		db.delete(ignoredPlaces)
 			.where(eq(ignoredPlaces.key, c.req.valid("json").key))
@@ -172,7 +186,13 @@ export const adminMerchantMapApi = new Hono()
 
 			const entry = db
 				.insert(merchantMapEntries)
-				.values({ field, text, matchKey, merchant, overridesBankMerchant })
+				.values({
+					field,
+					text,
+					matchKey,
+					merchant,
+					overridesBankMerchant: canOverride(field, overridesBankMerchant),
+				})
 				.returning({ id: merchantMapEntries.id })
 				.get();
 
@@ -204,7 +224,10 @@ export const adminMerchantMapApi = new Hono()
 					text,
 					matchKey,
 					merchant: input.merchant ?? entry.merchant,
-					overridesBankMerchant: input.overridesBankMerchant ?? entry.overridesBankMerchant,
+					overridesBankMerchant: canOverride(
+						field,
+						input.overridesBankMerchant ?? entry.overridesBankMerchant,
+					),
 					updatedAt: sqlDateTimeNow,
 				})
 				.where(eq(merchantMapEntries.id, id))

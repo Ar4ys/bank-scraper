@@ -15,7 +15,7 @@ after(cleanup);
 await ingestRawTransactions({
 	accountNumber: "PL00",
 	transactions: [
-		{ bankId: "card-1", data: rawCardTransaction() },
+		{ bankId: "card-1", data: rawCardTransaction({ details: { merchant_name: "Lidl" } }) },
 		{ bankId: "transfer-1", data: rawTransferSend() },
 	],
 });
@@ -80,12 +80,18 @@ describe("Lunch Flow API", () => {
 				amount: -940,
 				currency: "PLN",
 				date: "2022-03-29",
-				merchant: "SOMEONE WHO RECEIVED MONEY",
+				merchant: null,
 				description: "CUSTOM TRANSFER NAME",
+				notes: [
+					"To: SOMEONE WHO RECEIVED MONEY",
+					"Account: 12 3456 7890 1234 5678 9012 3456",
+					"Title: CUSTOM TRANSFER NAME",
+				].join("\n"),
 				isPending: false,
 			},
 		);
-		assert.deepEqual([card.amount, card.merchant, card.date], [-57.33, null, "2022-02-11"]);
+		assert.deepEqual([card.amount, card.merchant, card.date], [-57.33, "Lidl", "2022-02-11"]);
+		assert.equal("notes" in card, false);
 	});
 
 	it("sends the category of a transaction's merchant, and nothing without one", async () => {
@@ -99,11 +105,11 @@ describe("Lunch Flow API", () => {
 		await db
 			.update(tables.merchants)
 			.set({ sureCategoryId: categoryId })
-			.where(eq(tables.merchants.name, "SOMEONE WHO RECEIVED MONEY"));
+			.where(eq(tables.merchants.name, "Lidl"));
 
 		const [card, transfer] = (await transactions()).transactions;
-		assert.equal(transfer.categoryId, categoryId);
-		assert.equal("categoryId" in card, false);
+		assert.equal(card.categoryId, categoryId);
+		assert.equal("categoryId" in transfer, false);
 
 		await db.update(tables.merchants).set({ sureCategoryId: null });
 	});
@@ -117,11 +123,11 @@ describe("Lunch Flow API", () => {
 		await db
 			.update(tables.merchants)
 			.set({ domain: "example.com" })
-			.where(eq(tables.merchants.name, "SOMEONE WHO RECEIVED MONEY"));
+			.where(eq(tables.merchants.name, "Lidl"));
 
 		const [card, transfer] = await transactions();
-		assert.equal(transfer.merchantDomain, "example.com");
-		assert.equal("merchantDomain" in card, false);
+		assert.equal(card.merchantDomain, "example.com");
+		assert.equal("merchantDomain" in transfer, false);
 
 		await db.update(tables.merchants).set({ domain: null });
 	});

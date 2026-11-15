@@ -7,6 +7,8 @@ import { z } from "zod";
 
 import { IpkoTxType, type IpkoTransaction } from "../ipkoSchemas.ts";
 import { assertNever } from "../utils.ts";
+import { isTransfer } from "./counterparty.ts";
+import { transferNotes } from "./notes.ts";
 
 type Money = { amount: TransactionAmount; currency: string };
 
@@ -56,8 +58,12 @@ function deriveMerchantAndDescription(tx: IpkoTransaction): {
 				description: joinParts(["ATM", tx.details.address, tx.details.city, tx.details.country]),
 			};
 
+		// A transfer's other side is mostly a one-off person or payee, so it is named by the merchant
+		// map only. It stays recognizable through the notes.
 		case IpkoTxType.TransferSend:
 		case IpkoTxType.TransferReceive:
+			return { merchant: undefined, description: tx.details.title };
+
 		case IpkoTxType.TransitTicketPurchase:
 		case IpkoTxType.PhoneTopUp:
 			return { merchant: tx.other_side, description: tx.details.title };
@@ -65,7 +71,7 @@ function deriveMerchantAndDescription(tx: IpkoTransaction): {
 		case IpkoTxType.ForeignTransferSend:
 		case IpkoTxType.ForeignTransferReceive:
 			return {
-				merchant: tx.other_side,
+				merchant: undefined,
 				description:
 					tx.details.title +
 					originalAmountSuffix(tx, tx.details.original_amount, tx.details.exchange_rate),
@@ -89,6 +95,7 @@ export function deriveDefaults(tx: IpkoTransaction): TransactionFields {
 		currency: tx.money.currency,
 		merchant: merchant?.trim() || null,
 		description,
+		notes: (isTransfer(tx) && transferNotes(tx)) || null,
 		isPending: false,
 	};
 }

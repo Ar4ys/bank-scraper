@@ -3,7 +3,8 @@ import { eq } from "drizzle-orm";
 
 import { db, tables } from "../db/db.ts";
 import { type MerchantMapEntry } from "../db/schema.ts";
-import { IpkoTxType, ipkoTransactionSchema } from "../ipkoSchemas.ts";
+import { IpkoTxType, ipkoTransactionSchema, type IpkoTransaction } from "../ipkoSchemas.ts";
+import { counterpartyOf } from "./counterparty.ts";
 import { matchText } from "./merchantMap.ts";
 import { getLatestRuleRevision, mapEntryLabel } from "./process.ts";
 
@@ -16,7 +17,10 @@ export type OtherMerchantSource =
 	| { kind: "stale" };
 
 export type EntryCoverage = {
-	/** Card and mobile payments whose field contains the entry's text */
+	/**
+	 * Card and mobile payments whose field contains the entry's text, or for a counterparty entry the
+	 * transfers whose counterparty it is
+	 */
 	matching: number;
 	/** Of those, the ones whose merchant the entry sets */
 	set: number;
@@ -24,9 +28,28 @@ export type EntryCoverage = {
 	others: Array<OtherMerchantSource & { payments: number }>;
 };
 
+/** Whether the entry's text matches the transaction, whichever entry wins it */
+function entryMatches(entry: MerchantMapEntry, tx: IpkoTransaction) {
+	if (entry.field === "counterparty") {
+		const counterparty = counterpartyOf(tx);
+		return counterparty !== undefined && matchText(counterparty) === entry.matchKey;
+	}
+
+	if (tx.$type !== IpkoTxType.CardTransaction && tx.$type !== IpkoTxType.MobileTransaction) {
+		return false;
+	}
+	const field = entry.field === "address" ? tx.details.address : tx.details.city;
+	return field !== undefined && matchText(field).includes(entry.matchKey);
+}
+
+/** Whether the bank names a merchant for the transaction */
+const bankNamesMerchant = (tx: IpkoTransaction) =>
+	(tx.$type === IpkoTxType.CardTransaction || tx.$type === IpkoTxType.MobileTransaction) &&
+	Boolean(tx.details.merchant_name?.trim());
+
 /**
- * Which payments a merchant map entry's text matches, and what sets the merchant of those it
- * doesn't name. Reads and parses every processed card and mobile payment on each call.
+ * Which transactions a merchant map entry's text matches, and what sets the merchant of those it
+ * doesn't name. Reads and parses every processed transaction on each call.
  */
 export function explainMapEntry(entry: MerchantMapEntry): EntryCoverage {
 	const { transactions, rawTransactions, merchantMapEntries } = tables;
@@ -59,11 +82,7 @@ export function explainMapEntry(entry: MerchantMapEntry): EntryCoverage {
 		if (!parsed.success) continue;
 
 		const tx = parsed.data;
-		if (tx.$type !== IpkoTxType.CardTransaction && tx.$type !== IpkoTxType.MobileTransaction) {
-			continue;
-		}
-		const field = entry.field === "address" ? tx.details.address : tx.details.city;
-		if (field === undefined || !matchText(field).includes(entry.matchKey)) continue;
+		if (!entryMatches(entry, tx)) continue;
 
 		coverage.matching++;
 		const source = row.fieldSources?.merchant;
@@ -78,7 +97,7 @@ export function explainMapEntry(entry: MerchantMapEntry): EntryCoverage {
 			count(source, { kind: "entry", label: other ? mapEntryLabel(other) : "a deleted entry" });
 		} else if (source !== undefined && source !== defaultFieldSource) {
 			count(source, { kind: "rule", label: rules.get(source) ?? "a rule no longer applied" });
-		} else if (tx.details.merchant_name?.trim()) {
+		} else if (bankNamesMerchant(tx)) {
 			count("bank", { kind: "bank" });
 		} else {
 			count("stale", { kind: "stale" });

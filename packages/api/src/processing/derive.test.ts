@@ -110,75 +110,85 @@ describe("deriveTransaction defaults", () => {
 		],
 		[
 			"REALIZED_DPW/foreign_transfer_in",
-			"Someone who did the transfer",
+			null,
 			"SEPA Transfer from Germany to Poland (orig 150.00 EUR, rate 4.2500)",
 			"637.50",
 			"2025-05-31",
 		],
 		[
 			"REALIZED_DPW/foreign_transfer_out_eur",
-			"SOMEONE WHO RECEIVED MONEY",
+			null,
 			"Transfered from Poland to Germany (orig 20.00 EUR, rate 4.3000)",
 			"-86.00",
 			"2023-03-04",
 		],
 		[
 			"REALIZED_DPW/foreign_transfer_out_pln",
-			"SOMEONE WHO RECEIVED MONEY",
+			null,
 			"Transfered from Poland to Germany",
 			"-47.00",
 			"2022-05-29",
 		],
 		[
 			"TRANSFER_NORMAL/blik_transfer",
-			"SOMEONE WHO RECEIVED MONEY",
+			null,
 			"PEREKAZ OD: 48123456789 DO: 489*****321",
 			"-1.00",
 			"2021-12-15",
 		],
 		[
 			"TRANSFER_NORMAL/blik_transfer_receive",
-			"SOMEONE WHO SENT MONEY",
+			null,
 			"PRZELEW BLIK NA TELEFON",
 			"1.00",
 			"2021-12-08",
 		],
-		[
-			"TRANSFER_NORMAL/iban_transfer",
-			"SOMEONE WHO RECEIVED MONEY",
-			"CUSTOM TRANSFER NAME",
-			"-940.00",
-			"2022-03-29",
-		],
+		["TRANSFER_NORMAL/iban_transfer", null, "CUSTOM TRANSFER NAME", "-940.00", "2022-03-29"],
 		[
 			"TRANSFER_NORMAL/iban_transfer_receive+lil_different",
-			"COMPANY NAME",
+			null,
 			"INCOMING TRANSFER FOR NAME SURNAME",
 			"4100.00",
 			"2023-12-24",
 		],
 		[
 			"TRANSFER_NORMAL/iban_transfer_receive",
-			"NAME OF THE COMPANY",
+			null,
 			"Incoming transfer for Name Surname",
 			"2750.00",
 			"2022-02-11",
 		],
 		[
 			"TRANSFER_NORMAL/iban_transfer_repeat+recepient_id",
-			"COMPANY NAME",
+			null,
 			"AUTOMATIC SCHEDULED TRANSFER",
 			"-47.00",
 			"2022-02-25",
 		],
 		[
 			"TRANSFER_NORMAL/iban_transfer_repeat",
-			"NAME SURNAME",
+			null,
 			"AUTOMATIC SCHEDULED TRANSFER",
 			"-800.00",
 			"2025-02-18",
 		],
 	];
+
+	const polishAccount = "Account: 12 3456 7890 1234 5678 9012 3456";
+	const iban = "Account: DE12 3456 7890 1234 5678 90";
+	const notes: Record<string, string> = {
+		"CARD_TRANSACTION/card_transfer": "To: PAYPAL *USER_NAME",
+		"REALIZED_DPW/foreign_transfer_in": `From: Someone who did the transfer\n${iban}\nTitle: SEPA Transfer from Germany to Poland`,
+		"REALIZED_DPW/foreign_transfer_out_eur": `To: SOMEONE WHO RECEIVED MONEY\n${iban}\nTitle: Transfered from Poland to Germany`,
+		"REALIZED_DPW/foreign_transfer_out_pln": `To: SOMEONE WHO RECEIVED MONEY\n${iban}\nTitle: Transfered from Poland to Germany`,
+		"TRANSFER_NORMAL/blik_transfer": `To: SOMEONE WHO RECEIVED MONEY\n${polishAccount}\nTitle: PEREKAZ OD: 48123456789 DO: 489*****321`,
+		"TRANSFER_NORMAL/blik_transfer_receive": `From: SOMEONE WHO SENT MONEY\n${polishAccount}\nTitle: PRZELEW BLIK NA TELEFON`,
+		"TRANSFER_NORMAL/iban_transfer": `To: SOMEONE WHO RECEIVED MONEY\n${polishAccount}\nTitle: CUSTOM TRANSFER NAME`,
+		"TRANSFER_NORMAL/iban_transfer_receive+lil_different": `From: COMPANY NAME\nAddress: COMPANY ADDRESS\n${polishAccount}\nTitle: INCOMING TRANSFER FOR NAME SURNAME`,
+		"TRANSFER_NORMAL/iban_transfer_receive": `From: NAME OF THE COMPANY\nAddress: ADDRESS OF THE COMPANY\n${polishAccount}\nTitle: Incoming transfer for Name Surname`,
+		"TRANSFER_NORMAL/iban_transfer_repeat+recepient_id": `To: COMPANY NAME\n${polishAccount}\nTitle: AUTOMATIC SCHEDULED TRANSFER`,
+		"TRANSFER_NORMAL/iban_transfer_repeat": `To: NAME SURNAME\n${polishAccount}\nTitle: AUTOMATIC SCHEDULED TRANSFER`,
+	};
 
 	for (const [name, merchant, description, amount, date] of expected) {
 		it(`derives ${name}`, () => {
@@ -188,6 +198,7 @@ describe("deriveTransaction defaults", () => {
 				currency: "PLN",
 				merchant,
 				description,
+				notes: notes[name] ?? null,
 				isPending: false,
 			});
 		});
@@ -251,10 +262,21 @@ describe("deriveTransaction rules", () => {
 	});
 
 	it("leaves transactions the rule does not match alone", () => {
+		assert.equal(derive(rawTransferSend(), [lidlRule]).fields.description, "CUSTOM TRANSFER NAME");
+	});
+
+	it("sets notes, and no notes when the template renders nothing", () => {
+		const notesRule = (template: string) =>
+			rule({
+				conditions: [{ path: "details.title", operator: "contains", pattern: "CUSTOM" }],
+				set: { notes: template },
+			});
+
 		assert.equal(
-			derive(rawTransferSend(), [lidlRule]).fields.merchant,
-			"SOMEONE WHO RECEIVED MONEY",
+			derive(rawTransferSend(), [notesRule("Rent {details.title}")]).fields.notes,
+			"Rent CUSTOM TRANSFER NAME",
 		);
+		assert.equal(derive(rawTransferSend(), [notesRule("  ")]).fields.notes, null);
 	});
 
 	it("takes each field from the first rule by priority that sets it", () => {

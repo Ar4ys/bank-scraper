@@ -62,6 +62,10 @@
 	<dl class="grid grid-cols-[10rem_1fr] gap-y-1 text-sm">
 		<dt class="text-muted-foreground">Description</dt>
 		<dd>{transaction.description}</dd>
+		<dt class="text-muted-foreground">Notes</dt>
+		<dd class="whitespace-pre-line">
+			{#if transaction.notes}{transaction.notes}{:else}<span class="text-muted-foreground">—</span>{/if}
+		</dd>
 		<dt class="text-muted-foreground">Date</dt>
 		<dd class="tabular-nums">{transaction.date}</dd>
 		<dt class="text-muted-foreground">Set by</dt>

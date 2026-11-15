@@ -17,7 +17,12 @@ Collects my PKO Bank Polski (iPKO) transactions from the web UI into a local SQL
    that cannot be parsed keeps the error on its row and leaves its transaction untouched. Holds are
    stored but never become transactions.
 4. For a card or mobile payment the bank names no merchant for, the merchant map (see "Merchant
-   map" below) can name one from the payment's address or city. The merchant that defaults, the
+   map" below) can name one from the payment's address or city. Transfers (domestic, BLIK, standing
+   orders, foreign and card transfers such as PayPal) get no merchant from the bank's data, since
+   their other side is mostly a one-off person or payee: only a map entry for their recipient or
+   sender, or a rule, names one. Their details go into the transaction's notes instead, one
+   `Label: value` per line: `To` or `From`, `Address`, `Account` and `Title`, each when the bank
+   gives it. The merchant that defaults, the
    map and rules derive is only a name. It is looked up, ignoring case, among
    the merchants of the admin app's Merchants page, and the transaction gets that merchant. A name
    that is not known yet becomes a new merchant. Merchants can be renamed, merged, deleted and
@@ -106,6 +111,9 @@ has. Upstream Sure does neither:
   (`determine_sync_start_date` in `app/models/lunchflow_item/importer.rb`), so older transactions
   arrive, and so does a rule or merchant change that rewrites them.
 
+The fork also reads the fields this API adds to Lunch Flow's: `categoryId`, `merchantDomain` and
+`notes`, see "Lunch Flow API" below.
+
 A transaction that was edited in Sure is not updated by later syncs.
 
 ### Backup
@@ -148,6 +156,8 @@ the transaction's last version recorded. The changes can be filtered by field an
 - Long lists show 50 rows per page (Transactions and Raw transactions 100), with page numbers. The
   Merchants and Merchant map lists sort by their column headers. Search, sort and page are kept in
   the URL; searching or sorting goes back to the first page.
+- The Transactions search looks in merchant, description, notes and the bank's id, so a transfer
+  without a merchant is found by its recipient's name or account.
 - A transaction count opens that list's transactions everywhere: the number with a receipt icon.
   Rarer and destructive row actions (Delete, Merge into… in "All merchants") sit in the ⋮ menu.
 - The Merchants page shares one category popover, one row menu and one domain dialog between its
@@ -205,11 +215,17 @@ API sends it as `merchantDomain`, and the Sure fork sets the merchant's website 
 
 ### Merchant map
 
-The merchant of card and mobile payments for which the bank names none, edited on the Merchant map
-page: each entry says "a payment whose address (or city) contains this text gets this merchant".
+The merchant of card and mobile payments for which the bank names none, and of transfers, edited on
+the Merchant map page: each entry says "a payment whose address (or city) contains this text gets
+this merchant", or for the field "Recipient or sender", "a transfer to or from exactly this name
+gets this merchant".
 
 - Matching ignores case and treats every run of whitespace as one space. When several entries
   match, the longest text wins, and of equally long ones the oldest entry.
+- A "Recipient or sender" entry matches the whole name only: "ANNA" names neither "ANNA KOWALSKA"
+  nor "JOANNA". For a card transfer the name is its receiver as the bank gives it, such as
+  `PAYPAL *USER_NAME`. Such an entry never overrides anything: transfers have no merchant from the
+  bank.
 - A merchant name from the bank is replaced only by entries with "Override the bank's merchant" on,
   for a bank name that covers several services (the bank calls Bolt's rides, food and scooters all
   "Bolt"). For such a payment only those entries compete, longest first. A rule that sets the
@@ -228,13 +244,18 @@ page: each entry says "a payment whose address (or city) contains this text gets
   are one place), from three payments on. "Name it" adds an entry for a proposed text, the longest
   one all the addresses of the place share, after the usual preview. Payments of a deleted merchant
   are listed too.
-- A place that is not worth a merchant can be ignored: "Ignore for now" until it gets a payment
-  dated after the day it was ignored, "Ignore forever" whatever comes. Ignored places are listed
-  under "Ignored", where "Restore" puts them back. Ignoring changes no transaction.
+- "People without a merchant", below the places, lists transfers and card transfers that have no
+  merchant, grouped by their recipient's or sender's name (ignoring case and repeated spaces), sent
+  and received together, from three transfers on. "Name it" proposes a "Recipient or sender" entry
+  with the most frequent spelling of the name as its text, and the name in title case as the
+  merchant.
+- A place or a person that is not worth a merchant can be ignored: "Ignore for now" until it gets a
+  payment dated after the day it was ignored, "Ignore forever" whatever comes. Ignored ones are
+  listed under "Ignored", where "Restore" puts them back. Ignoring changes no transaction.
 
 ### Rules
 
-The code derives merchant, description and date of a transaction from the bank's data. Rules, edited
+The code derives merchant, description, notes and date of a transaction from the bank's data. Rules, edited
 on the Rules page, override that without a deploy, e.g. to name the merchant when the bank only puts
 `BOLT.EU/P/2312261215` into the address of a card payment.
 
@@ -350,6 +371,13 @@ Lunch Flow key in `x-api-key` or as `Authorization: Bearer`.
 | `GET /api/lunchflow/accounts/:id/transactions` | Transactions, filtered by `start_date`/`end_date` or `from`/`to` |
 | `GET /api/lunchflow/accounts/:id/balance`      | Scraped ledger or balance, as set per account; 404 until scraped |
 | `GET /api/lunchflow/accounts/:id/holdings`     | Always 501, which Sure reads as "no holdings"                    |
+
+A transaction carries three fields that Lunch Flow's API doesn't have, each left out when empty.
+The Sure fork reads them:
+
+- `categoryId`: the default category of its merchant, see "Merchant categories".
+- `merchantDomain`: the domain of its merchant, see "Merchant domains".
+- `notes`: the transaction's notes, which the fork writes into the notes of the Sure entry.
 
 Requests for [Bruno](https://www.usebruno.com) are in `packages/api/bruno/`.
 

@@ -202,6 +202,7 @@ export const transactions = s.snakeCase.table(
 		/** The merchant whose name `merchant` is */
 		merchantId: s.text().references(() => merchants.id),
 		description: s.text().notNull(),
+		notes: s.text(),
 		isPending: s.integer({ mode: "boolean" }).notNull(),
 		/**
 		 * What the transaction was last processed with, whether or not that changed its fields. The
@@ -283,16 +284,21 @@ export const rules = s.snakeCase.table("rules", {
 });
 
 export type MerchantMapField = DefineEnum<typeof MerchantMapField>;
-/** The field of a card or mobile payment's `details` that a merchant map entry is looked for in */
+/**
+ * What a merchant map entry is looked for in: the address or the city of a card or mobile payment,
+ * or the counterparty of a transfer, see `counterpartyOf`
+ */
 export const MerchantMapField = Object.freeze({
 	Address: "address",
 	City: "city",
+	Counterparty: "counterparty",
 });
 
 export type MerchantMapEntry = typeof merchantMapEntries.$inferSelect;
 /**
  * The merchant of card and mobile payments for which the bank names none: a payment whose field
- * contains the text gets the merchant. When several entries match, the longest text wins.
+ * contains the text gets the merchant. When several entries match, the longest text wins. A
+ * `counterparty` entry names the transfers whose counterparty is the text, as a whole.
  */
 export const merchantMapEntries = s.snakeCase.table(
 	"merchant_map_entries",
@@ -305,7 +311,10 @@ export const merchantMapEntries = s.snakeCase.table(
 		matchKey: s.text().notNull(),
 		/** A merchant name, looked up like the merchant text of a rule */
 		merchant: s.text().notNull(),
-		/** Applies also to payments the bank names a merchant for, replacing that merchant */
+		/**
+		 * Applies also to payments the bank names a merchant for, replacing that merchant. Always off
+		 * for `counterparty` entries: transfers have no merchant from the bank.
+		 */
 		overridesBankMerchant: s.integer({ mode: "boolean" }).notNull().default(false),
 		createdAt: instant().notNull().default(sqlDateTimeNow),
 		updatedAt: instant().notNull().default(sqlDateTimeNow),
@@ -316,9 +325,9 @@ export const merchantMapEntries = s.snakeCase.table(
 );
 
 export type IgnoredPlace = typeof ignoredPlaces.$inferSelect;
-/** Places without a merchant that are left out of the list of places to name */
+/** Places and people without a merchant that are left out of the lists of them to name */
 export const ignoredPlaces = s.snakeCase.table("ignored_places", {
-	/** The place's `placeKey` */
+	/** The place's `placeKey`, or the counterparty's key, see `listRecurringCounterparties` */
 	key: s.text().primaryKey(),
 	/** Ignored even when it gets new payments; otherwise until a payment dated after `ignoredOn` */
 	forever: s.integer({ mode: "boolean" }).notNull(),

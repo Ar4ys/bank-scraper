@@ -16,6 +16,7 @@ import { type FieldSources } from "../db/schema.ts";
 function fieldValueFromText(field: TransactionField, text: string) {
 	switch (field) {
 		case "merchant":
+		case "notes":
 			return text.trim() || null;
 
 		case "isPending":

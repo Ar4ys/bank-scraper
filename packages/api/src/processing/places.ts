@@ -41,7 +41,7 @@ export type RecurringPlace = {
 };
 
 /** Whether an ignore still holds for a place whose newest payment is dated `lastDate` */
-function ignoredState(
+export function ignoredState(
 	ignore: IgnoredPlace | undefined,
 	lastDate: string,
 ): RecurringPlace["ignored"] {

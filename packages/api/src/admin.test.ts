@@ -45,7 +45,7 @@ describe("admin API", () => {
 		assert.deepEqual((await request("/dashboard")).body, {
 			rawByStatus: { unprocessed: 0, processed: 2, hold: 1, error: 1 },
 			transactions: 2,
-			transactionsWithoutMerchant: 0,
+			transactionsWithoutMerchant: 1,
 		});
 	});
 
@@ -131,17 +131,18 @@ describe("admin API", () => {
 		assert.deepEqual(
 			body.items.map((item: any) => [item.bankId, item.date, item.amount, item.merchant]),
 			[
-				["transfer-1", "2022-03-29", "-940.00", "SOMEONE WHO RECEIVED MONEY"],
+				["transfer-1", "2022-03-29", "-940.00", null],
 				["card-1", "2022-02-11", "-57.33", "Bolt"],
 			],
 		);
 
+		// Only the notes of the transfer hold the name
 		const found = await request("/transactions?search=someone");
 		assert.deepEqual(
 			found.body.items.map((item: any) => item.bankId),
 			["transfer-1"],
 		);
-		assert.equal((await request("/transactions?withoutMerchant=true")).body.total, 0);
+		assert.equal((await request("/transactions?withoutMerchant=true")).body.total, 1);
 		assert.equal((await request("/transactions?limit=1&offset=1")).body.items[0].bankId, "card-1");
 	});
 
