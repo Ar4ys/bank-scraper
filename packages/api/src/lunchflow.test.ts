@@ -82,11 +82,9 @@ describe("Lunch Flow API", () => {
 				date: "2022-03-29",
 				merchant: null,
 				description: "CUSTOM TRANSFER NAME",
-				notes: [
-					"To: SOMEONE WHO RECEIVED MONEY",
-					"Account: 12 3456 7890 1234 5678 9012 3456",
-					"Title: CUSTOM TRANSFER NAME",
-				].join("\n"),
+				notes: ["To: SOMEONE WHO RECEIVED MONEY", "Account: 12 3456 7890 1234 5678 9012 3456"].join(
+					"\n",
+				),
 				isPending: false,
 			},
 		);

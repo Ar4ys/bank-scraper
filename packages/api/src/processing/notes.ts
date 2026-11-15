@@ -83,7 +83,6 @@ export function transferNotes(tx: TransferTransaction): string | undefined {
 					],
 					["Account", formatAccount(tx.details.other_account)],
 					["Phone", blik?.phone],
-					["Title", blik?.title ?? tx.details.title],
 				];
 
 	const text = lines

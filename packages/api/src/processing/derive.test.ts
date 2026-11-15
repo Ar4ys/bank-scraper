@@ -172,16 +172,16 @@ describe("deriveTransaction defaults", () => {
 	const iban = "Account: DE12 3456 7890 1234 5678 90";
 	const notes: Record<string, string> = {
 		"CARD_TRANSACTION/card_transfer": "To: PAYPAL *USER_NAME",
-		"REALIZED_DPW/foreign_transfer_in": `From: Someone who did the transfer\n${iban}\nTitle: SEPA Transfer from Germany to Poland`,
-		"REALIZED_DPW/foreign_transfer_out_eur": `To: SOMEONE WHO RECEIVED MONEY\n${iban}\nTitle: Transfered from Poland to Germany`,
-		"REALIZED_DPW/foreign_transfer_out_pln": `To: SOMEONE WHO RECEIVED MONEY\n${iban}\nTitle: Transfered from Poland to Germany`,
-		"TRANSFER_NORMAL/blik_transfer": `To: SOMEONE WHO RECEIVED MONEY\n${polishAccount}\nPhone: 489*****321\nTitle: PEREKAZ`,
-		"TRANSFER_NORMAL/blik_transfer_receive": `From: SOMEONE WHO SENT MONEY\n${polishAccount}\nTitle: PRZELEW BLIK NA TELEFON`,
-		"TRANSFER_NORMAL/iban_transfer": `To: SOMEONE WHO RECEIVED MONEY\n${polishAccount}\nTitle: CUSTOM TRANSFER NAME`,
-		"TRANSFER_NORMAL/iban_transfer_receive+lil_different": `From: COMPANY NAME\nAddress: COMPANY ADDRESS\n${polishAccount}\nTitle: INCOMING TRANSFER FOR NAME SURNAME`,
-		"TRANSFER_NORMAL/iban_transfer_receive": `From: NAME OF THE COMPANY\nAddress: ADDRESS OF THE COMPANY\n${polishAccount}\nTitle: Incoming transfer for Name Surname`,
-		"TRANSFER_NORMAL/iban_transfer_repeat+recepient_id": `To: COMPANY NAME\n${polishAccount}\nTitle: AUTOMATIC SCHEDULED TRANSFER`,
-		"TRANSFER_NORMAL/iban_transfer_repeat": `To: NAME SURNAME\n${polishAccount}\nTitle: AUTOMATIC SCHEDULED TRANSFER`,
+		"REALIZED_DPW/foreign_transfer_in": `From: Someone who did the transfer\n${iban}`,
+		"REALIZED_DPW/foreign_transfer_out_eur": `To: SOMEONE WHO RECEIVED MONEY\n${iban}`,
+		"REALIZED_DPW/foreign_transfer_out_pln": `To: SOMEONE WHO RECEIVED MONEY\n${iban}`,
+		"TRANSFER_NORMAL/blik_transfer": `To: SOMEONE WHO RECEIVED MONEY\n${polishAccount}\nPhone: 489*****321`,
+		"TRANSFER_NORMAL/blik_transfer_receive": `From: SOMEONE WHO SENT MONEY\n${polishAccount}`,
+		"TRANSFER_NORMAL/iban_transfer": `To: SOMEONE WHO RECEIVED MONEY\n${polishAccount}`,
+		"TRANSFER_NORMAL/iban_transfer_receive+lil_different": `From: COMPANY NAME\nAddress: COMPANY ADDRESS\n${polishAccount}`,
+		"TRANSFER_NORMAL/iban_transfer_receive": `From: NAME OF THE COMPANY\nAddress: ADDRESS OF THE COMPANY\n${polishAccount}`,
+		"TRANSFER_NORMAL/iban_transfer_repeat+recepient_id": `To: COMPANY NAME\n${polishAccount}`,
+		"TRANSFER_NORMAL/iban_transfer_repeat": `To: NAME SURNAME\n${polishAccount}`,
 	};
 
 	for (const [name, merchant, description, amount, date] of expected) {

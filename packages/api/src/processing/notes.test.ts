@@ -112,7 +112,6 @@ describe("transferNotes", () => {
 				"To: JAN KOWALSKI",
 				"Address: UL. DLUGA 7 00-001 WARSZAWA",
 				"Account: 12 3456 7890 1234 5678 9012 3456",
-				"Title: CUSTOM TRANSFER NAME",
 			].join("\n"),
 		);
 	});
@@ -124,14 +123,13 @@ describe("transferNotes", () => {
 		);
 	});
 
-	it("adds the other side's phone of a BLIK transfer and drops the numbers from the title", () => {
+	it("adds the other side's phone of a BLIK transfer", () => {
 		assert.equal(
 			notesOf(ipkoExample("TRANSFER_NORMAL/blik_transfer")),
 			[
 				"To: SOMEONE WHO RECEIVED MONEY",
 				"Account: 12 3456 7890 1234 5678 9012 3456",
 				"Phone: 489*****321",
-				"Title: PEREKAZ",
 			].join("\n"),
 		);
 	});
