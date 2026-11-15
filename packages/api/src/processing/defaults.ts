@@ -8,7 +8,7 @@ import { z } from "zod";
 import { IpkoTxType, type IpkoTransaction } from "../ipkoSchemas.ts";
 import { assertNever } from "../utils.ts";
 import { isTransfer } from "./counterparty.ts";
-import { transferNotes } from "./notes.ts";
+import { blikTitle, transferNotes } from "./notes.ts";
 
 type Money = { amount: TransactionAmount; currency: string };
 
@@ -62,7 +62,7 @@ function deriveMerchantAndDescription(tx: IpkoTransaction): {
 		// map only. It stays recognizable through the notes.
 		case IpkoTxType.TransferSend:
 		case IpkoTxType.TransferReceive:
-			return { merchant: undefined, description: tx.details.title };
+			return { merchant: undefined, description: blikTitle(tx)?.title ?? tx.details.title };
 
 		case IpkoTxType.TransitTicketPurchase:
 		case IpkoTxType.PhoneTopUp:

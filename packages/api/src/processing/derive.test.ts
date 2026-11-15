@@ -129,13 +129,7 @@ describe("deriveTransaction defaults", () => {
 			"-47.00",
 			"2022-05-29",
 		],
-		[
-			"TRANSFER_NORMAL/blik_transfer",
-			null,
-			"PEREKAZ OD: 48123456789 DO: 489*****321",
-			"-1.00",
-			"2021-12-15",
-		],
+		["TRANSFER_NORMAL/blik_transfer", null, "PEREKAZ", "-1.00", "2021-12-15"],
 		[
 			"TRANSFER_NORMAL/blik_transfer_receive",
 			null,
@@ -181,7 +175,7 @@ describe("deriveTransaction defaults", () => {
 		"REALIZED_DPW/foreign_transfer_in": `From: Someone who did the transfer\n${iban}\nTitle: SEPA Transfer from Germany to Poland`,
 		"REALIZED_DPW/foreign_transfer_out_eur": `To: SOMEONE WHO RECEIVED MONEY\n${iban}\nTitle: Transfered from Poland to Germany`,
 		"REALIZED_DPW/foreign_transfer_out_pln": `To: SOMEONE WHO RECEIVED MONEY\n${iban}\nTitle: Transfered from Poland to Germany`,
-		"TRANSFER_NORMAL/blik_transfer": `To: SOMEONE WHO RECEIVED MONEY\n${polishAccount}\nTitle: PEREKAZ OD: 48123456789 DO: 489*****321`,
+		"TRANSFER_NORMAL/blik_transfer": `To: SOMEONE WHO RECEIVED MONEY\n${polishAccount}\nPhone: 489*****321\nTitle: PEREKAZ`,
 		"TRANSFER_NORMAL/blik_transfer_receive": `From: SOMEONE WHO SENT MONEY\n${polishAccount}\nTitle: PRZELEW BLIK NA TELEFON`,
 		"TRANSFER_NORMAL/iban_transfer": `To: SOMEONE WHO RECEIVED MONEY\n${polishAccount}\nTitle: CUSTOM TRANSFER NAME`,
 		"TRANSFER_NORMAL/iban_transfer_receive+lil_different": `From: COMPANY NAME\nAddress: COMPANY ADDRESS\n${polishAccount}\nTitle: INCOMING TRANSFER FOR NAME SURNAME`,

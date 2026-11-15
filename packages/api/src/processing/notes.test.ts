@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { ipkoTransactionSchema } from "../ipkoSchemas.ts";
 import { isTransfer } from "./counterparty.ts";
 import { ipkoExample, rawTransferSend } from "./fixtures.ts";
-import { addressAfterName, formatAccount, transferNotes } from "./notes.ts";
+import { addressAfterName, blikTitle, formatAccount, transferNotes } from "./notes.ts";
 
 const notesOf = (raw: unknown) => {
 	const tx = ipkoTransactionSchema.parse(raw);
@@ -51,6 +51,54 @@ describe("addressAfterName", () => {
 	});
 });
 
+const blik = (side: "DEBIT" | "CREDIT", title: string, code = "MOBILE_PAYMENT_C2C") =>
+	ipkoTransactionSchema.parse(
+		ipkoExample(
+			side === "DEBIT" ? "TRANSFER_NORMAL/blik_transfer" : "TRANSFER_NORMAL/blik_transfer_receive",
+			{ operation_kind: { code }, details: { title, operation_kind: { code } } },
+		),
+	);
+
+describe("blikTitle", () => {
+	it("takes the recipient's number out of a sent transfer's title, masked or not", () => {
+		assert.deepEqual(blikTitle(blik("DEBIT", "PIZZA OD: 48111111111 DO: 48222222222")), {
+			title: "PIZZA",
+			phone: "48222222222",
+		});
+		assert.deepEqual(
+			blikTitle(
+				blik("DEBIT", "PIZZA  OD: 48111111111 DO: 482*****222", "MOBILE_PAYMENT_C2C_EXTERNAL"),
+			),
+			{ title: "PIZZA", phone: "482*****222" },
+		);
+	});
+
+	it("takes the sender's number out of a received transfer's title", () => {
+		assert.deepEqual(
+			blikTitle(blik("CREDIT", "PRZELEW NA TELEFON OD: 48333333333 DO: 48111111111")),
+			{
+				title: "PRZELEW NA TELEFON",
+				phone: "48333333333",
+			},
+		);
+	});
+
+	it("leaves a title without the numbers, and one that is only the numbers", () => {
+		assert.equal(
+			blikTitle(blik("CREDIT", "PRZELEW BLIK NA TELEFON", "MOBILE_PAYMENT_C2C_EXTERNAL")),
+			undefined,
+		);
+		assert.equal(blikTitle(blik("DEBIT", "OD: 48111111111 DO: 48222222222")), undefined);
+	});
+
+	it("leaves transfers other than BLIK alone", () => {
+		const iban = ipkoTransactionSchema.parse(
+			rawTransferSend({ details: { title: "RENT OD: 1 DO: 2" } }),
+		);
+		assert.equal(blikTitle(iban), undefined);
+	});
+});
+
 describe("transferNotes", () => {
 	it("describes a sent transfer", () => {
 		assert.equal(
@@ -73,6 +121,18 @@ describe("transferNotes", () => {
 		assert.match(
 			notesOf(ipkoExample("TRANSFER_NORMAL/blik_transfer_receive")) ?? "",
 			/^From: SOMEONE WHO SENT MONEY\n/,
+		);
+	});
+
+	it("adds the other side's phone of a BLIK transfer and drops the numbers from the title", () => {
+		assert.equal(
+			notesOf(ipkoExample("TRANSFER_NORMAL/blik_transfer")),
+			[
+				"To: SOMEONE WHO RECEIVED MONEY",
+				"Account: 12 3456 7890 1234 5678 9012 3456",
+				"Phone: 489*****321",
+				"Title: PEREKAZ",
+			].join("\n"),
 		);
 	});
 

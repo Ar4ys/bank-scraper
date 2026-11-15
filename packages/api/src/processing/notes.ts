@@ -1,4 +1,9 @@
-import { IpkoTxType, OperationSide } from "../ipkoSchemas.ts";
+import {
+	IpkoTxType,
+	OperationSide,
+	TransferOperationSubType,
+	type IpkoTransaction,
+} from "../ipkoSchemas.ts";
 import { type TransferTransaction } from "./counterparty.ts";
 import { matchText } from "./merchantMap.ts";
 
@@ -32,8 +37,36 @@ export function addressAfterName(nameAndAddress: string, name: string) {
 	return rest.replace(/^[\s,]+|[\s,]+$/g, "");
 }
 
+const blikCodes: ReadonlySet<string> = new Set([
+	TransferOperationSubType.BlikInternal,
+	TransferOperationSubType.BlikExternal,
+]);
+
+/**
+ * The title of a BLIK transfer without the phone numbers the bank appends to it (`PIZZA OD:
+ * 48123456789 DO: 489*****321`), and the other side's number: DO for a sent transfer, OD for a
+ * received one, masked or not. `undefined` for other transactions, for a title without the numbers
+ * (as from other banks' clients) and for one that is nothing but them.
+ */
+export function blikTitle(tx: IpkoTransaction): { title: string; phone: string } | undefined {
+	if (tx.$type !== IpkoTxType.TransferSend && tx.$type !== IpkoTxType.TransferReceive) {
+		return undefined;
+	}
+	if (!blikCodes.has(tx.operation_kind.code)) return undefined;
+
+	const match = /^(.*?)\s*OD:\s*(\S+)\s+DO:\s*(\S+)\s*$/s.exec(tx.details.title);
+	const [, title = "", from = "", to = ""] = match ?? [];
+	if (!match || !title.trim()) return undefined;
+
+	return {
+		title: title.trim(),
+		phone: tx.operation_kind.side === OperationSide.Debit ? to : from,
+	};
+}
+
 /** `Label: value` lines describing a transfer, without those whose value is empty */
 export function transferNotes(tx: TransferTransaction): string | undefined {
+	const blik = blikTitle(tx);
 	const lines: Array<[string, string | undefined]> =
 		tx.$type === IpkoTxType.CardTransferSend
 			? [["To", tx.details.receiver_address]]
@@ -49,7 +82,8 @@ export function transferNotes(tx: TransferTransaction): string | undefined {
 						),
 					],
 					["Account", formatAccount(tx.details.other_account)],
-					["Title", tx.details.title],
+					["Phone", blik?.phone],
+					["Title", blik?.title ?? tx.details.title],
 				];
 
 	const text = lines

@@ -21,8 +21,10 @@ Collects my PKO Bank Polski (iPKO) transactions from the web UI into a local SQL
    orders, foreign and card transfers such as PayPal) get no merchant from the bank's data, since
    their other side is mostly a one-off person or payee: only a map entry for their recipient or
    sender, or a rule, names one. Their details go into the transaction's notes instead, one
-   `Label: value` per line: `To` or `From`, `Address`, `Account` and `Title`, each when the bank
-   gives it. The merchant that defaults, the
+   `Label: value` per line: `To` or `From`, `Address`, `Account`, `Phone` and `Title`, each when the
+   bank gives it. A BLIK transfer's title ends in the two phone numbers (`OD: … DO: …`); they are
+   cut from its description and `Title`, and `Phone` holds the other side's number, masked as the
+   bank masks it. The merchant that defaults, the
    map and rules derive is only a name. It is looked up, ignoring case, among
    the merchants of the admin app's Merchants page, and the transaction gets that merchant. A name
    that is not known yet becomes a new merchant. Merchants can be renamed, merged, deleted and
